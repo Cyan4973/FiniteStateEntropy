@@ -21,7 +21,7 @@ Benchmarks
 -------------------------
 
 Benchmarks are run on an Intel Core i5-3340M (2.7GHz) platform, with Window Seven 64-bits.
-They compare [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-entropy-coders.html), a fairly fast Huffman implementation, to FSE.
+They compare FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-entropy-coders.html), a fast Huffman implementation.
 
 <table>
   <tr>
