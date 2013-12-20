@@ -87,7 +87,7 @@ static void generate(void* buffer, size_t buffSize, double p)
     char* op = (char*) buffer;
     char* oend = op + buffSize;
 
-    DISPLAY("\nGenerating %i MB with P=%.2f%%\n", buffSize >> 20, p*100);
+    DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
 
     // Build Table
     while (remaining)

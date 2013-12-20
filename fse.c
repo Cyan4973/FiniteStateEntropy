@@ -32,7 +32,7 @@
 
 
 //****************************************************************
-// Program parameters
+// Tuning parameters
 //****************************************************************
 // MEMORY_USAGE :
 // Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
@@ -40,6 +40,10 @@
 // Reduced memory usage can improve speed, due to cache effect
 // Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
 #define FSE_MEMORY_USAGE 14
+
+// FSE_ILP
+// Instruction Level Parallelism : improve performance on modern CPU featuring multiple ALU and OoO capabilities
+#define FSE_ILP 1
 
 // FSE_DEBUG
 // Enable verification code, which checks table construction and state values (much slower, for debug purpose only)
@@ -77,9 +81,9 @@
 //* Constants
 //****************************************************************
 #define MAX_NB_SYMBOLS 256
-#define FSE_MAX_TABLELOG (FSE_MEMORY_USAGE-2)
+#define FSE_MAX_TABLELOG  (FSE_MEMORY_USAGE-2)
 #define FSE_MAX_TABLESIZE (1U<<FSE_MAX_TABLELOG)
-#define FSE_MAXTABLESIZE_MASK  (FSE_MAX_TABLESIZE-1)
+#define FSE_MAXTABLESIZE_MASK (FSE_MAX_TABLESIZE-1)
 
 #define FSE_VIRTUAL_LOG   30
 #define FSE_VIRTUAL_RANGE (1U<<FSE_VIRTUAL_LOG)
@@ -114,13 +118,11 @@ static long long nbDBlocks = 0;    // debug
 //****************************************************************
 FORCE_INLINE int FSE_highbit (register U32 val)
 {
-#   if defined(_MSC_VER)
+#   if defined(_MSC_VER)   // Visual
     unsigned long r;
     _BitScanReverse( &r, val );
-    //printf("%i => %i \n", val, r);
     return (int)r;
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304)
-    //printf("%i => %i \n", val, 31 - __builtin_clz(val));
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304)   // GCC Intrinsic
     return 31 - __builtin_clz(val);
 #   else   // Software version
     static const int DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
@@ -132,7 +134,6 @@ FORCE_INLINE int FSE_highbit (register U32 val)
     v |= v >> 8;
     v |= v >> 16;
     r = DeBruijnClz[(U32)(v * 0x07C4ACDDU) >> 27];
-    //printf("%i => %i => %i \n", val, v, r);
     return r;
 #   endif
 }
@@ -281,7 +282,7 @@ static void FSE_buildTable(U16* tableU16, U32* count, int nbSymbols)
         {
             int nb=0;
             for (i=0; i<FSE_MAX_TABLESIZE; i++) if (tableBYTE[i]==s) nb++;
-            if (nb != count[s]) 
+            if ((U32)nb != count[s]) 
                 printf("FSE_buildTable_rotation : Count pb for symbol %i : %i present (%i should be)\n", s, nb, count[s]);
         }
 
@@ -410,14 +411,18 @@ static void FSE_buildDecodeTable(FSE_decode_t* tableDecode, U32* count, int nbSy
 
 #if FSE_DEBUG
     {
-        // Check table
-        int s;
+        int s, total=0;
 
+        // Check count
+        for (s=0; s<nbSymbols; s++) total += count[s];
+        if (total != FSE_MAX_TABLESIZE) printf("Count issue ! %i != %i \n", total, FSE_MAX_TABLESIZE);
+
+        // Check table
         for (s=0; s<nbSymbols; s++)
         {
             int nb=0, i;
             for (i=0; i<FSE_MAX_TABLESIZE; i++) if (tableDecode[i].symbol==s) nb++;
-            if (nb != count[s]) 
+            if ((U32)nb != count[s]) 
                 printf("Count pb for symbol %i : %i present (%i should be)\n", s, nb, count[s]);
         }
     }
@@ -463,7 +468,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
     U32   counting[MAX_NB_SYMBOLS];
     U16   stateTable[FSE_MAX_TABLESIZE];
 
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF};   // up to 12 bits
+    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF};   // up to 16 bits
 
 
     // early out
@@ -515,7 +520,9 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
         U32 bitStream=0;
         U32* streamSize = (U32*)op; op += 4;
 
-        ip=iend-1; while (ip>istart)   // from end to beginning, 2 bytes at a time
+        ip=iend-1;
+#if FSE_ILP && (FSE_MAX_TABLELOG<=12)
+        while (ip>istart)   // from end to beginning, 2 bytes at a time
         {
             const BYTE symbol  = *ip--;
             const BYTE symbol2 = *ip--;
@@ -536,8 +543,10 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
 
             state = stateTable[(state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
         }
-
         if (ip==istart)   // last byte (odd sizes)
+#else
+        while (ip>=istart)   // simpler version, one byte at a time
+#endif
         {
             const BYTE symbol  = *ip--;
             int nbBitsOut  = symbolTT[symbol].minBitsOut;
@@ -595,7 +604,7 @@ int FSE_decompress (char* dest, int originalSize,
     BYTE* const oend = op + originalSize;
     U32   counting[MAX_NB_SYMBOLS];
     FSE_decode_t decodeTable[FSE_MAX_TABLESIZE];
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF};   // up to 12 bits
+    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF};   // up to 16 bits
     BYTE  header;
     int nbSymbols = 0;
 
@@ -638,8 +647,22 @@ int FSE_decompress (char* dest, int originalSize,
             { int nbBytes = (32-bitCount) >> 3;  ip -= nbBytes; bitStream = *(U32*)ip; bitCount += nbBytes*8; }
 
             state = decodeTable[state].newState + rest;
+#if FSE_DEBUG
+            {
+                // Check table
+                if ((state >= FSE_MAX_TABLESIZE) || (state < 0))
+                    printf("Error : wrong state %i at pos %i (%i bits read : %x)\n", state, op-(BYTE*)dest, nbBits, rest);
+            }
+#endif
         }
     }
+
+#if FSE_DEBUG
+    {
+        nbDBlocks ++;
+        //printf("Decoded block %i \n", nbDBlocks);
+    }
+#endif
 
     return (int)(iend-istart);
 }

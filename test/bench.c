@@ -104,7 +104,7 @@ typedef unsigned long long  U64;
 
 #define KNUTH               2654435761U
 #define MAX_MEM             (2 GB - 64 MB)
-#define DEFAULT_CHUNKSIZE   (32 KB)  // 1909  // 2811  // 13633  // 55213  // 112113  // 213217 // 997997
+#define DEFAULT_CHUNKSIZE   (32 KB)
 
 
 //**************************************
