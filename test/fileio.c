@@ -323,9 +323,9 @@ int compress_file(char* output_filename, char* input_filename)
             }
             if ((nbFullBlocks * inputBlockSize) < (size_t)inSize)   // last Block
             {
-                int nbBytes = ((blockSizeId+10)/8) + 1;
+                int nbBytes = ((blockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
                 int lastBlockSize = inSize & (inputBlockSize-1);
-                *op++= 0;
+                if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
                 op += compressionFunction(op, ip, lastBlockSize);
                 ip +=  lastBlockSize;
@@ -444,7 +444,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
 
 _lastBlock:
     {
-        int nbBytes = ((blockSizeId+10)/8)+1;
+        int nbBytes = ((blockSizeId+10)/8)+1;   // Nb Bytes to describe last block size
         U32 lastBlockSize = LITTLE_ENDIAN_32(*(U32*)ip);
         U32 mask;
         ip += nbBytes;

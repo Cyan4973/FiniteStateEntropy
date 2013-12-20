@@ -44,5 +44,6 @@ They compare FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-en
   </tr>
 </table>
 
-*Speed is provided in MS/s (Millions of Symbols per second)*
+*Speed is provided in MS/s (Millions of Symbols per second).
+For more detailed results, browse to [data directory](data)*
 
