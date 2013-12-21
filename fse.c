@@ -80,10 +80,6 @@
 //****************************************************************
 //* Constants
 //****************************************************************
-#if FSE_MAX_TABLELOG>25
-#error "FSE_MAX_TABLELOG>25 isn't supported"
-#endif
-
 #define MAX_NB_SYMBOLS 256
 #define FSE_MAX_TABLELOG  (FSE_MEMORY_USAGE-2)
 #define FSE_MAX_TABLESIZE (1U<<FSE_MAX_TABLELOG)
@@ -93,6 +89,10 @@
 #define FSE_VIRTUAL_RANGE (1U<<FSE_VIRTUAL_LOG)
 #define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
 #define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
+
+#if FSE_MAX_TABLELOG>25
+#error "FSE_MAX_TABLELOG>25 isn't supported"
+#endif
 
 #if FSE_DEBUG
 static long long nbBlocks = 0;     // debug
