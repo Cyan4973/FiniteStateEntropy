@@ -521,7 +521,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
         U32* streamSize = (U32*)op; op += 4;
 
         ip=iend-1;
-#if FSE_ILP && (FSE_MAX_TABLELOG<=12)
+#if FSE_ILP
         while (ip>istart)   // from end to beginning, 2 bytes at a time
         {
             const BYTE symbol  = *ip--;
@@ -532,21 +532,19 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
             nbBitsOut += (state > symbolTT[symbol].maxState);
             bitStream += (state & mask[nbBitsOut]) << bitpos;
             bitpos += nbBitsOut;
-
             state = stateTable[(state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+#if FSE_MAX_TABLELOG>12
+            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
+#endif
 
             nbBitsOut2 += (state > symbolTT[symbol2].maxState);
             bitStream += (state & mask[nbBitsOut2]) << bitpos;
             bitpos += nbBitsOut2;
-
-            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
-
             state = stateTable[(state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
+            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
         }
-        if (ip==istart)   // last byte (odd sizes)
-#else
-        while (ip>=istart)   // simpler version, one byte at a time
 #endif
+        while (ip>=istart)   // simpler version, one byte at a time
         {
             const BYTE symbol  = *ip--;
             int nbBitsOut  = symbolTT[symbol].minBitsOut;
