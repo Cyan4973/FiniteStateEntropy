@@ -90,6 +90,10 @@
 #define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
 #define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
 
+#if FSE_MAX_TABLELOG>25
+#error "FSE_MAX_TABLELOG>25 isn't supported"
+#endif
+
 #if FSE_DEBUG
 static long long nbBlocks = 0;     // debug
 static long long toCheck  = -1;    // debug
@@ -468,7 +472,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
     U32   counting[MAX_NB_SYMBOLS];
     U16   stateTable[FSE_MAX_TABLESIZE];
 
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF};   // up to 16 bits
+    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
 
 
     // early out
@@ -521,7 +525,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
         U32* streamSize = (U32*)op; op += 4;
 
         ip=iend-1;
-#if FSE_ILP && (FSE_MAX_TABLELOG<=12)
+#if FSE_ILP
         while (ip>istart)   // from end to beginning, 2 bytes at a time
         {
             const BYTE symbol  = *ip--;
@@ -532,21 +536,19 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
             nbBitsOut += (state > symbolTT[symbol].maxState);
             bitStream += (state & mask[nbBitsOut]) << bitpos;
             bitpos += nbBitsOut;
-
             state = stateTable[(state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+#if FSE_MAX_TABLELOG>12
+            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
+#endif
 
             nbBitsOut2 += (state > symbolTT[symbol2].maxState);
             bitStream += (state & mask[nbBitsOut2]) << bitpos;
             bitpos += nbBitsOut2;
-
-            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
-
             state = stateTable[(state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
+            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
         }
-        if (ip==istart)   // last byte (odd sizes)
-#else
-        while (ip>=istart)   // simpler version, one byte at a time
 #endif
+        while (ip>=istart)   // simpler version, one byte at a time
         {
             const BYTE symbol  = *ip--;
             int nbBitsOut  = symbolTT[symbol].minBitsOut;
@@ -604,7 +606,7 @@ int FSE_decompress (char* dest, int originalSize,
     BYTE* const oend = op + originalSize;
     U32   counting[MAX_NB_SYMBOLS];
     FSE_decode_t decodeTable[FSE_MAX_TABLESIZE];
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF};   // up to 16 bits
+    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
     BYTE  header;
     int nbSymbols = 0;
 
