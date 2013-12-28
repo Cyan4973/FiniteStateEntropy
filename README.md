@@ -21,14 +21,15 @@ Benchmarks
 -------------------------
 
 Benchmarks are run on an Intel Core i5-3340M (2.7GHz) platform, with Window Seven 64-bits.
-They compare FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-entropy-coders.html), a fast Huffman implementation.
+Source code is compiled using MSVC 2012, 64-bits mode.
+It compares FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-entropy-coders.html), a fast Huffman implementation.
 
 <table>
   <tr>
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.684</th><th>190 MS/s</th><th>210 MS/s</th>
+    <th>win98-lz4-run</th><th>FSE</th><th>2.684</th><th>195 MS/s</th><th>265 MS/s</th>
   </tr>
   <tr>
     <th>win98-lz4-run</th><th>Huff0</th><th>2.673</th><th>165 MS/s</th><th>165 MS/s</th>
@@ -37,13 +38,25 @@ They compare FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-en
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>190 MS/s</th><th>210 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>195 MS/s</th><th>265 MS/s</th>
   </tr>
   <tr>
     <th>proba70.bin</th><th>Huff0</th><th>5.574</th><th>190 MS/s</th><th>190 MS/s</th>
+  </tr>
+  <tr>
+    <th></th><th></th><th></th><th></th><th></th>
+  </tr>
+  <tr>
+    <th>proba90.bin</th><th>FSE</th><th>15.19</th><th>195 MS/s</th><th>265 MS/s</th>
+  </tr>
+  <tr>
+    <th>proba90.bin</th><th>Huff0</th><th>7.176</th><th>190 MS/s</th><th>190 MS/s</th>
   </tr>
 </table>
 
 *Speed is provided in MS/s (Millions of Symbols per second).
 For more detailed results, browse to [data directory](data)*
+
+By design, Huffman can't break the "1 bit per symbol" limit, and therefore loses efficiency when probabilities improve.
+In contrast, FSE keeps increasing its performance, remaining close to Shannon limit.
 

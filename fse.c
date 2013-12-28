@@ -76,6 +76,8 @@
   typedef unsigned long long  U64;
 #endif
 
+typedef U32 bitContainer_t;
+
 
 //****************************************************************
 //* Constants
@@ -100,6 +102,7 @@ static long long toCheck  = -1;    // debug
 static long long nbDBlocks = 0;    // debug
 #endif
 
+
 //****************************************************************
 //* Compiler specifics
 //****************************************************************
@@ -120,6 +123,15 @@ static long long nbDBlocks = 0;    // debug
 //****************************************************************
 //* Adaptation 
 //****************************************************************
+FORCE_INLINE int FSE_32bits() { return sizeof(void*)==4; }
+
+FORCE_INLINE bitContainer_t FSE_mask(int nbBits)
+{
+    static const bitContainer_t mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
+    if (FSE_32bits()) return mask[nbBits];
+    return (1<<nbBits)-1;
+}
+
 FORCE_INLINE int FSE_highbit (register U32 val)
 {
 #   if defined(_MSC_VER)   // Visual
@@ -435,7 +447,7 @@ static void FSE_buildDecodeTable(FSE_decode_t* tableDecode, U32* count, int nbSy
 
 
 //****************************
-// LUE Compression Code
+// FSE Compression Code
 //****************************
 
 typedef struct
@@ -521,7 +533,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
     {
         int state=FSE_MAX_TABLESIZE;
         int bitpos=0;
-        U32 bitStream=0;
+        bitContainer_t bitStream=0;
         U32* streamSize = (U32*)op; op += 4;
 
         ip=iend-1;
@@ -536,16 +548,18 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
             nbBitsOut += (state > symbolTT[symbol].maxState);
             bitStream += (state & mask[nbBitsOut]) << bitpos;
             bitpos += nbBitsOut;
+
             state = stateTable[(state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-#if FSE_MAX_TABLELOG>12
-            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
-#endif
+#  if FSE_MAX_TABLELOG>12
+            *(bitContainer_t*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
+#  endif
 
             nbBitsOut2 += (state > symbolTT[symbol2].maxState);
             bitStream += (state & mask[nbBitsOut2]) << bitpos;
             bitpos += nbBitsOut2;
+
             state = stateTable[(state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
-            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
+            *(bitContainer_t*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
         }
 #endif
         while (ip>=istart)   // simpler version, one byte at a time
@@ -556,16 +570,15 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
             bitStream += (state & mask[nbBitsOut]) << bitpos;
             bitpos += nbBitsOut;
             state = stateTable[(state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-            *(U32*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
+            *(bitContainer_t*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
         }
 
         // Finalize block
         bitStream += (state & FSE_MAXTABLESIZE_MASK) << bitpos;
         bitpos += FSE_MAX_TABLELOG;
-        *(U32*)op = bitStream;
+        *(bitContainer_t*)op = bitStream;
         *streamSize = (U32)(((op-(BYTE*)streamSize)*8) + bitpos);
         op += (bitpos+7)/8;
-
     }
 
     // check compressibility
@@ -606,7 +619,6 @@ int FSE_decompress (char* dest, int originalSize,
     BYTE* const oend = op + originalSize;
     U32   counting[MAX_NB_SYMBOLS];
     FSE_decode_t decodeTable[FSE_MAX_TABLESIZE];
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
     BYTE  header;
     int nbSymbols = 0;
 
@@ -626,7 +638,7 @@ int FSE_decompress (char* dest, int originalSize,
 
     // decoding hot loop
     {
-        U32 bitStream;
+        bitContainer_t bitStream;
         int bitCount;
         U32 state;
 
@@ -637,16 +649,18 @@ int FSE_decompress (char* dest, int originalSize,
         bitCount -= FSE_MAX_TABLELOG;
         state = (bitStream >> bitCount) & FSE_MAXTABLESIZE_MASK;
 
+        bitCount = 32-bitCount;
         while (op<oend)
         {
             U32 rest;
             const int nbBits = decodeTable[state].nbBits;
 
-            bitCount -= nbBits;
             *op++ = decodeTable[state].symbol;
-            rest = (bitStream >> bitCount) & mask[nbBits];
 
-            { int nbBytes = (32-bitCount) >> 3;  ip -= nbBytes; bitStream = *(U32*)ip; bitCount += nbBytes*8; }
+            rest = ((bitStream << bitCount) >> 1) >> (31 - nbBits);   // faster than mask
+            bitCount += nbBits;
+
+            { int nbBytes = bitCount >> 3; ip -= nbBytes; bitStream = *(bitContainer_t*)ip; bitCount &= 7; }
 
             state = decodeTable[state].newState + rest;
 #if FSE_DEBUG
@@ -662,7 +676,7 @@ int FSE_decompress (char* dest, int originalSize,
 #if FSE_DEBUG
     {
         nbDBlocks ++;
-        //printf("Decoded block %i \n", nbDBlocks);
+        printf("Decoded block %i \n", nbDBlocks);
     }
 #endif
 
