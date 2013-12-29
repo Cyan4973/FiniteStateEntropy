@@ -92,8 +92,8 @@ typedef U32 bitContainer_t;
 #define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
 #define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
 
-#if FSE_MAX_TABLELOG>25
-#error "FSE_MAX_TABLELOG>25 isn't supported"
+#if FSE_MAX_TABLELOG>12
+#error "FSE_MAX_TABLELOG>12 isn't supported"
 #endif
 
 #if FSE_DEBUG
@@ -381,71 +381,6 @@ static int FSE_readHeader(U32* counting, const BYTE* ip, int* nbSymbols)
 }
 
 
-typedef struct
-{
-    U16  newState;
-    BYTE symbol;
-    BYTE nbBits;
-} FSE_decode_t;
-
-
-static void FSE_buildDecodeTable(FSE_decode_t* tableDecode, U32* count, int nbSymbols)  
-{
-    int s, i;
-    U32 symbolNext[MAX_NB_SYMBOLS];
-    U32 position = 0;
-    const U32 step = (FSE_MAX_TABLESIZE>>1) + (FSE_MAX_TABLESIZE>>3) + 1;
-
-    // symbol start positions
-    symbolNext[0] = count[0];
-    for (s=1; s<nbSymbols; s++) { symbolNext[s] = symbolNext[s-1] + count[s]; }
-
-    // Spread symbols
-    s=0;
-    while (!symbolNext[s]) s++;
-    for (i=0; i<(int)FSE_MAX_TABLESIZE; i++)
-    {
-        tableDecode[position].symbol = (BYTE)s;
-        while ((U32)i+2 > symbolNext[s]) s++;
-        position = (position + step) & FSE_MAXTABLESIZE_MASK;
-    }
-
-    // Calculate symbol next
-    for (s=0; s<nbSymbols; s++) symbolNext[s] = count[s];
-
-    // Build table Decoding table
-    {
-        int i;
-        for (i=0; i<(int)FSE_MAX_TABLESIZE; i++)
-        {
-            BYTE s = tableDecode[i].symbol;
-            U32 nextState = symbolNext[s]++;
-            tableDecode[i].nbBits = (BYTE)(FSE_MAX_TABLELOG - FSE_highbit(nextState));
-            tableDecode[i].newState = (U16)((nextState << tableDecode[i].nbBits) - FSE_MAX_TABLESIZE);
-        }
-    }
-
-#if FSE_DEBUG
-    {
-        int s, total=0;
-
-        // Check count
-        for (s=0; s<nbSymbols; s++) total += count[s];
-        if (total != FSE_MAX_TABLESIZE) printf("Count issue ! %i != %i \n", total, FSE_MAX_TABLESIZE);
-
-        // Check table
-        for (s=0; s<nbSymbols; s++)
-        {
-            int nb=0, i;
-            for (i=0; i<FSE_MAX_TABLESIZE; i++) if (tableDecode[i].symbol==s) nb++;
-            if ((U32)nb != count[s]) 
-                printf("Count pb for symbol %i : %i present (%i should be)\n", s, nb, count[s]);
-        }
-    }
-#endif
-}
-
-
 //****************************
 // FSE Compression Code
 //****************************
@@ -596,6 +531,70 @@ int FSE_compress_Nsymbols (char* dest, const char* source, int inputSize, int nb
 //****************************
 // Decompression CODE
 //****************************
+
+typedef struct
+{
+    U16  newState;
+    BYTE symbol;
+    BYTE nbBits;
+} FSE_decode_t;
+
+
+static void FSE_buildDecodeTable(FSE_decode_t* tableDecode, U32* count, int nbSymbols)  
+{
+    int s, i;
+    U32 symbolNext[MAX_NB_SYMBOLS];
+    U32 position = 0;
+    const U32 step = (FSE_MAX_TABLESIZE>>1) + (FSE_MAX_TABLESIZE>>3) + 1;
+
+    // symbol start positions
+    symbolNext[0] = count[0];
+    for (s=1; s<nbSymbols; s++) { symbolNext[s] = symbolNext[s-1] + count[s]; }
+
+    // Spread symbols
+    s=0;
+    while (!symbolNext[s]) s++;
+    for (i=0; i<(int)FSE_MAX_TABLESIZE; i++)
+    {
+        tableDecode[position].symbol = (BYTE)s;
+        while ((U32)i+2 > symbolNext[s]) s++;
+        position = (position + step) & FSE_MAXTABLESIZE_MASK;
+    }
+
+    // Calculate symbol next
+    for (s=0; s<nbSymbols; s++) symbolNext[s] = count[s];
+
+    // Build table Decoding table
+    {
+        int i;
+        for (i=0; i<(int)FSE_MAX_TABLESIZE; i++)
+        {
+            BYTE s = tableDecode[i].symbol;
+            U32 nextState = symbolNext[s]++;
+            tableDecode[i].nbBits = (BYTE)(FSE_MAX_TABLELOG - FSE_highbit(nextState));
+            tableDecode[i].newState = (U16)((nextState << tableDecode[i].nbBits) - FSE_MAX_TABLESIZE);
+        }
+    }
+
+#if FSE_DEBUG
+    {
+        int s, total=0;
+
+        // Check count
+        for (s=0; s<nbSymbols; s++) total += count[s];
+        if (total != FSE_MAX_TABLESIZE) printf("Count issue ! %i != %i \n", total, FSE_MAX_TABLESIZE);
+
+        // Check table
+        for (s=0; s<nbSymbols; s++)
+        {
+            int nb=0, i;
+            for (i=0; i<FSE_MAX_TABLESIZE; i++) if (tableDecode[i].symbol==s) nb++;
+            if ((U32)nb != count[s]) 
+                printf("Count pb for symbol %i : %i present (%i should be)\n", s, nb, count[s]);
+        }
+    }
+#endif
+}
 
 int FSE_decodeRaw (BYTE* out, int osize, const BYTE* in)
 {
