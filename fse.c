@@ -92,8 +92,8 @@ typedef U32 bitContainer_t;
 #define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
 #define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
 
-#if FSE_MAX_TABLELOG>12
-#error "FSE_MAX_TABLELOG>12 isn't supported"
+#if FSE_MAX_TABLELOG>14
+#error "FSE_MAX_TABLELOG>14 isn't supported"
 #endif
 
 #if FSE_DEBUG
@@ -127,8 +127,11 @@ FORCE_INLINE int FSE_32bits() { return sizeof(void*)==4; }
 
 FORCE_INLINE bitContainer_t FSE_mask(int nbBits)
 {
-    static const bitContainer_t mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
-    if (FSE_32bits()) return mask[nbBits];
+    if (FSE_32bits())
+    {
+        static const bitContainer_t mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
+        return mask[nbBits];
+    }
     return (1<<nbBits)-1;
 }
 
@@ -493,8 +496,8 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
             bitStream += (state & mask[nbBitsOut2]) << bitpos;
             bitpos += nbBitsOut2;
 
+            *(bitContainer_t*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }   // Better speed on 32-bits when done before state update
             state = stateTable[(state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
-            *(bitContainer_t*)op = bitStream; { int nbBytes = bitpos/8; bitpos &= 7; op += nbBytes; bitStream >>= nbBytes*8; }
         }
 #endif
         while (ip>=istart)   // simpler version, one byte at a time
@@ -649,6 +652,9 @@ int FSE_decompress (char* dest, int originalSize,
         state = (bitStream >> bitCount) & FSE_MAXTABLESIZE_MASK;
 
         bitCount = 32-bitCount;
+#if FSE_MAX_TABLELOG > 12
+        { int nbBytes = bitCount >> 3; ip -= nbBytes; bitStream = *(bitContainer_t*)ip; bitCount &= 7; }   // refill bitStream
+#endif
         while (op<oend)
         {
             U32 rest;
