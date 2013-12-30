@@ -46,20 +46,75 @@ extern "C" {
 
 
 //****************************
-// LUE Compression Code
+// FSE simple functions
 //****************************
-
 int FSE_compress   (char* dest,
                     const char* source, int inputSize);
 int FSE_decompress (char* dest, int originalSize,
                     const char* compressed);
+/*
+FSE_compress():
+    Will take a memory buffer as input (const char* source), of size int inputSize,
+    and compress it using FSE method (order-0) to destination buffer char* dest.
+    Destination buffer must be already allocated, and sized to handle worst case situations.
+    Use FSE_compressBound() to determine this size.
+    return : size of compressed data
+FSE_decompress():
+    Will decompress into destination buffer char* dest, a compressed data of final size int originalSize.
+    Destination buffer must be already allocated, and large enough to accomodate originalSize bytes.
+    Compressed input must be pointed by const char* compressed.
+    The function will determine how many bytes are read from input buffer to generate originalSize bytes into dest buffer.
+    return : size of compressed data
+*/
 
 
 #define FSE_COMPRESSBOUND(size) (size + 512)   // mostly headers
 static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
+/*
+FSE_compressBound():
+    Gives the maximum (worst case) size that can be reached by function FSE_compress.
+    Used to know how much memory to allocate for destination buffer.
+*/
 
-
+//****************************
+// FSE advanced functions
+//****************************
 int FSE_compress_Nsymbols (char* dest, const char* source, int inputSize, int nbSymbols);
+/*
+FSE_compress_Nsymbols():
+    Minor variant of FSE_compress()
+    where the number of symbols can be provided.
+    The function will then assume that any byte within source will have value < nbSymbols.
+    note : If this condition is not respected, compressed data will be corrupted !
+    return : size of compressed data
+*/
+
+int FSE_getDistributionTotal();
+int FSE_encode(char* dest, const char* source, int inputSize, unsigned int* distribution, int nbSymbols);
+/*
+FSE_encode():
+    This version allows the use of customized format or rules to determine the distribution properties of 'source'.
+    It will only compress 'inputSize' bytes from 'source'.
+    **It will not calculate its distribution, nor generate any header.**
+    The distribution of symbols **must be provided** using a table of unsigned int 'distribution'.
+    The number of symbols (and therefore the size of 'distribution' table) must be provided as nbSymbols.
+    **For a distribution to be valid, the total of all symbols must be strictly equal to FSE_getDistributionTotal()**
+    Destination buffer must be already allocated, and sized to handle worst case situations.
+    Use FSE_compressBound() to determine this size.
+    return : size of compressed data (without header)
+             or 0 if failed (typically, wrong distribution).
+*/
+
+int FSE_decode(char* dest, int originalSize, const char* compressed, unsigned int* distribution, int nbSymbols);
+/*
+    This version allows the use of customized format or rules to determine the distribution properties.
+    It will only decode compressed bitstream 'compressed' into 'dest', without reading any header.
+    Distribution is expected to be provided using the table of unsigned int 'distribution'.
+    Same rules as FSE_encode() are valid.
+    return : size of compressed data (without header)
+             or 0 if failed (typically, wrong distribution).
+*/
+
 
 #if defined (__cplusplus)
 }
