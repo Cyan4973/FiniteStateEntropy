@@ -92,8 +92,8 @@ typedef U32 bitContainer_t;
 #define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
 #define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
 
-#if FSE_MAX_TABLELOG>14
-#error "FSE_MAX_TABLELOG>14 isn't supported"
+#if FSE_MAX_TABLELOG>15
+#error "FSE_MAX_TABLELOG>15 isn't supported"
 #endif
 
 #if FSE_DEBUG
@@ -456,7 +456,7 @@ int FSE_compress_generic (char* dest, const char* source, int inputSize, int nb_
                 symbolTT[s].minBitsOut = FSE_MAX_TABLELOG;
                 symbolTT[s].deltaFindState = total - 1;
                 total ++;
-                symbolTT[s].maxState = FSE_MAX_TABLESIZE*2;   // ensures state < maxState
+                symbolTT[s].maxState = (FSE_MAX_TABLESIZE*2) - 1;   // ensures state <= maxState
                 break;
             default :
                 symbolTT[s].minBitsOut = (BYTE)((FSE_MAX_TABLELOG-1) - FSE_highbit(counting[s]-1));
