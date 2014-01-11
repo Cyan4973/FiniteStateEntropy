@@ -267,7 +267,7 @@ STREAMCRC
 */
 int compress_file(char* output_filename, char* input_filename)
 {
-    int (*compressionFunction)(char*, const char*, int) = DEFAULT_COMPRESSOR;
+    int (*compressionFunction)(void*, const void*, int) = DEFAULT_COMPRESSOR;
     U64 filesize = 0;
     U64 compressedfilesize = 0;
     char* in_buff;

@@ -48,27 +48,27 @@ extern "C" {
 //****************************
 // FSE simple functions
 //****************************
-int FSE_compress   (char* dest,
-                    const char* source, int inputSize);
-int FSE_decompress (char* dest, int originalSize,
-                    const char* compressed);
+int FSE_compress   (void* dest,
+                    const void* source, int sourceSize);
+int FSE_decompress (void* dest, int originalSize,
+                    const void* compressed);
 /*
 FSE_compress():
-    Will take a memory buffer as input (const char* source), of size int inputSize,
-    and compress it using FSE method (order-0) to destination buffer char* dest.
-    Destination buffer must be already allocated, and sized to handle worst case situations.
+    Compress memory buffer 'source', of size 'sourceSize', into destination buffer 'dest'.
+    'dest' buffer must be already allocated, and sized to handle worst case situations.
     Use FSE_compressBound() to determine this size.
     return : size of compressed data
 FSE_decompress():
-    Will decompress into destination buffer char* dest, a compressed data of final size int originalSize.
-    Destination buffer must be already allocated, and large enough to accomodate originalSize bytes.
-    Compressed input must be pointed by const char* compressed.
-    The function will determine how many bytes are read from input buffer to generate originalSize bytes into dest buffer.
+    Decompress compressed data from buffer 'compressed',
+    into destination buffer 'dest', of size 'originalSize'.
+    Destination buffer must be already allocated, and large enough to accomodate 'originalSize' bytes.
+    The function will determine how many bytes are read from buffer 'compressed'.
     return : size of compressed data
 */
 
 
-#define FSE_COMPRESSBOUND(size) (size + 512)   // mostly headers
+#define FSE_MAX_HEADERSIZE 512
+#define FSE_COMPRESSBOUND(size) (size + FSE_MAX_HEADERSIZE)
 static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
 /*
 FSE_compressBound():
@@ -79,41 +79,133 @@ FSE_compressBound():
 //****************************
 // FSE advanced functions
 //****************************
-int FSE_compress_Nsymbols (char* dest, const char* source, int inputSize, int nbSymbols);
+int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols);
 /*
 FSE_compress_Nsymbols():
-    Minor variant of FSE_compress()
-    where the number of symbols can be provided.
-    The function will then assume that any byte within source will have value < nbSymbols.
+    Minor variant of FSE_compress(), where the number of symbols can be specified.
+    The function will then assume that any byte within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
 */
 
-int FSE_getDistributionTotal();
-int FSE_encode(char* dest, const char* source, int inputSize, unsigned int* distribution, int nbSymbols);
+
+//******************************************
+// FSE detailed API (experimental)
+//******************************************
 /*
-FSE_encode():
-    This version allows the use of customized format or rules to determine the distribution properties of 'source'.
-    It will only compress 'inputSize' bytes from 'source'.
-    **It will not calculate its distribution, nor generate any header.**
-    The distribution of symbols **must be provided** using a table of unsigned int 'distribution'.
-    The number of symbols (and therefore the size of 'distribution' table) must be provided as nbSymbols.
-    **For a distribution to be valid, the total of all symbols must be strictly equal to FSE_getDistributionTotal()**
-    Destination buffer must be already allocated, and sized to handle worst case situations.
-    Use FSE_compressBound() to determine this size.
-    return : size of compressed data (without header)
-             or 0 if failed (typically, wrong distribution).
+int FSE_compress(char* dest, const char* source, int inputSize) does the following:
+1. calculates symbol distribution of the source[] into internal table counting[c]
+2. normalizes counters so that sum(counting[c]) == FSE_MAX_TABLESIZE
+3. saves normalized counters to the file using writeHeader()
+4. builds encoding tables from the normalized counters
+5. encodes the data stream using only these encoding tables
+
+int FSE_decompress(char* dest, int originalSize, const char* compressed) performs:
+1. reads normalized counters with readHeader()
+2. builds decoding tables from the normalized counters
+3. decodes the data stream using only these decoding tables
+
+The following functions allow to target specific sub-functions.
 */
 
-int FSE_decode(char* dest, int originalSize, const char* compressed, unsigned int* distribution, int nbSymbols);
+/* *** COMPRESSION *** */
+
+#define FSE_NBSYMBOLS_DEFAULT 256
+static inline int FSE_sizeof_count(int nbSymbols) { return nbSymbols ? nbSymbols+2 : FSE_NBSYMBOLS_DEFAULT+2; }
+int FSE_count(unsigned int* count, const void* source, int sourceSize, int nbSymbols);
+
+static inline int FSE_sizeof_normalizedCounter(int nbSymbols) { return nbSymbols ? nbSymbols+2 : FSE_NBSYMBOLS_DEFAULT+2; }
+int FSE_normalizeCounter(unsigned int* normalizedCounter, unsigned int* count, int memLog);
+
+static inline int FSE_headerBound(int nbSymbols, int memLog) { (void)memLog; return nbSymbols ? nbSymbols*2 : FSE_NBSYMBOLS_DEFAULT*2; }
+int FSE_writeHeader(void* header, const unsigned int* normalizedCounter);
+
+int FSE_sizeof_CTable(int nbSymbols, int memLog);
+int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter);
+
+int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, void* CTable);
+
 /*
-    This version allows the use of customized format or rules to determine the distribution properties.
-    It will only decode compressed bitstream 'compressed' into 'dest', without reading any header.
-    Distribution is expected to be provided using the table of unsigned int 'distribution'.
-    Same rules as FSE_encode() are valid.
-    return : size of compressed data (without header)
-             or 0 if failed (typically, wrong distribution).
+The first step is to count all symbols. FSE_count() just provides one quick way to do this job.
+Result will be saved into 'count', a table of unsigned int, which must be already allocated.
+Its number of cells only depends on 'nbSymbols',and is provided using FSE_sizeof_count().
+You can use 'nbSymbols'==0 to mean "default value". It will be replaced by 'FSE_NBSYMBOLS_DEFAULT'.
+The first cell contains the total (=='sourceSize'), the second cell contains 'nbSymbols', then follows the frequency of each symbol.
+'source' is assumed to be a table of char of size 'sourceSize' if 'nbSymbols' <= 256.
+FSE_count() will return the maximum symbol value detected into 'source' (necessarily <= 'nbSymbols', can be 0 if only 0 is present).
+If there is an error, the function will return -1.
+
+The next step is to normalized the frequencies, so that Sum_of_Frequencies == 2^memLog.
+You can use 'memLog'==0 to mean "default value".
+The result will be saved into a structure, called 'normalizedCounter', which is basically a table of unsigned int.
+'normalizedCounter' must be already allocated.
+Its number of cells only depends on 'nbSymbols', and is provided using FSE_sizeof_normalizedCounter().
+The first cell contains 'memLog', the second cell contains 'nbSymbols', then follows the normalized frequencies.
+FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'memlog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
+FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
+A result of '0' means that the normalization was completed successfully.
+A result > 0 means that there is only a single symbol present, and its value is (result-1).
+If there is an error, the function will return -1.
+
+'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
+The target memory area must be pointed by 'header'.
+'header' buffer must be already allocated. Its size must be at least FSE_headerBound().
+The result of the function is the number of bytes written into 'header'.
+If there is an error, the function will return -1.
+
+'normalizedCounter' can then be used to create the compression tables 'CTable'.
+The space required by 'CTable' must be already allocated.
+Its size is provided by FSE_sizeof_CTable().
+In both cases, if there is an error, the function will return -1.
+
+'CTable' can then be used to compress 'source', using FSE_compress_usingCTable().
+Similar to FSE_count(), the convention is that 'source' is assumed to be a table of char of size 'sourceSize' if 'nbSymbols' <= 256.
+The function returns the size of compressed data (without header), or -1 if failed.
 */
+
+
+/* *** DECOMPRESSION *** */
+
+int FSE_readHeader (unsigned int* normalizedCounter, const void* header);
+
+int FSE_sizeof_DTable(int nbSymbols, int memLog);
+int FSE_buildDTable(void* DTable, const unsigned int* normalizedCounter);
+
+int FSE_decompress_usingDTable(void* dest, int originalSize, const void* compressed, const void* DTable);
+
+/*
+The first step is to get the normalized frequency of symbols.
+This can be performed in many ways, reading a header with FSE_readHeader() being one them.
+'normalizedCounter' must be already allocated (use FSE_sizeof_normalizedCounter()).
+In practice, that means it's necessary to know 'nbSymbols' beforehand,
+or size it to handle worst case situations (typically 'FSE_NBSYMBOLS_DEFAULT').
+The result of FSE_readHeader() is the number of bytes read from 'header'.
+The following values have special meaning :
+return 2 : there is only a single symbol value. The value is provided into the second byte.
+return 1 : data is uncompressed
+If there is an error, the function will return -1.
+
+The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
+This is performed by the function FSE_buildDTable().
+The space required by 'DTable' must be already allocated. Its size is provided by FSE_sizeof_DTable().
+FSE_sizeof_DTable() requires 'nbSymbols' and 'memLog'. Remember both values are present into 'normalizedCounter'.
+'normalizedCounter' first cell contains 'memLog', the second cell contains 'nbSymbols', then follows the normalized frequencies.
+
+'DTable' can then be used to decompress 'compressed', using FSE_decompress_usingDTable().
+FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, either as char if 'nbSymbols' <= 256.
+The function returns the size of compressed data (without header), or -1 if failed.
+*/
+
+
+//****************************
+// Deprecated functions
+//****************************
+#if 0
+/* Deprecated and no longer supported (for the record)*/
+int FSE_getDistributionTotal();
+int FSE_encode(char* dest, const char* source, int inputSize, unsigned int* distribution, int nbSymbols);
+int FSE_decode(char* dest, int originalSize, const char* compressed, unsigned int* distribution, int nbSymbols);
+#endif
 
 
 #if defined (__cplusplus)
