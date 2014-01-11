@@ -95,7 +95,7 @@ FSE_compress_Nsymbols():
 /*
 int FSE_compress(char* dest, const char* source, int inputSize) does the following:
 1. calculates symbol distribution of the source[] into internal table counting[c]
-2. normalizes counters so that sum(counting[c]) == FSE_MAX_TABLESIZE
+2. normalizes counters so that sum(counting[c]) == Power_of_2 (== 2^memLog)
 3. saves normalized counters to the file using writeHeader()
 4. builds encoding tables from the normalized counters
 5. encodes the data stream using only these encoding tables
@@ -105,7 +105,7 @@ int FSE_decompress(char* dest, int originalSize, const char* compressed) perform
 2. builds decoding tables from the normalized counters
 3. decodes the data stream using only these decoding tables
 
-The following functions allow to target specific sub-functions.
+The following API allows to target specific sub-functions.
 */
 
 /* *** COMPRESSION *** */
@@ -135,7 +135,7 @@ The first cell contains the total (=='sourceSize'), the second cell contains 'nb
 FSE_count() will return the maximum symbol value detected into 'source' (necessarily <= 'nbSymbols', can be 0 if only 0 is present).
 If there is an error, the function will return -1.
 
-The next step is to normalized the frequencies, so that Sum_of_Frequencies == 2^memLog.
+The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^memLog.
 You can use 'memLog'==0 to mean "default value".
 The result will be saved into a structure, called 'normalizedCounter', which is basically a table of unsigned int.
 'normalizedCounter' must be already allocated.
