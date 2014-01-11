@@ -1,6 +1,6 @@
 /* ******************************************************************
    FSE : Finite State Entropy coder
-   Copyright (C) 2013, Yann Collet.
+   Copyright (C) 2013-2014, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without

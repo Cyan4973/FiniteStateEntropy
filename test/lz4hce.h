@@ -2,6 +2,7 @@
     LZ4 HC Extractor - Generates selected fields from LZ4 HC algorithm
     Header File
     Copyright (C) Yann Collet 2013-2014
+    GPLv2 License
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
