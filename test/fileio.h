@@ -31,12 +31,16 @@ extern "C" {
 // Special input/output constants
 //**************************************
 #define NULL_OUTPUT "null"
-static char stdinmark[] = "stdin";
-static char stdoutmark[] = "stdout";
+#define stdinmark "stdin"
+#define stdoutmark "stdout"
+//static char stdinmark[] = "stdin";
+//static char stdoutmark[] = "stdout";
 #ifdef _WIN32
-static char nulmark[] = "nul";
+#define nulmark "nul"
+//static char nulmark[] = "nul";
 #else
-static char nulmark[] = "/dev/null";
+#define nulmark "/dev/null"
+//static char nulmark[] = "/dev/null";
 #endif
 
 

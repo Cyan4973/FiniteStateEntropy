@@ -219,7 +219,7 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
     {
         // Check if destination file already exists
         *pfoutput=0;
-        if (output_filename != nulmark) *pfoutput = fopen( output_filename, "rb" );
+        if (strcmp(output_filename,nulmark)) *pfoutput = fopen( output_filename, "rb" );
         if (*pfoutput!=0) 
         { 
             fclose(*pfoutput); 
@@ -278,6 +278,7 @@ int compress_file(char* output_filename, char* input_filename)
     size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(blockSizeId);
     size_t inputBufferSize = FIO_GetBufferSize_FromBufferId(bufferSizeId);
     int nbBlocksPerBuffer;
+    int lastBlockDone=0;
     void* hashCtx = XXH32_init(FSE_CHECKSUM_SEED);
 
 
@@ -303,10 +304,10 @@ int compress_file(char* output_filename, char* input_filename)
     {
         // Fill input Buffer
         int outSize;
-        int inSize = (int) fread(in_buff, (size_t)1, (size_t)inputBufferSize, finput);
-        if( inSize<=0 ) break;
+        size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBufferSize, finput);
+        if ((inSize<=0) && (lastBlockDone)) break;
         filesize += inSize;
-        XXH32_update(hashCtx, in_buff, inSize);
+        XXH32_update(hashCtx, in_buff, (int)inSize);
         DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
 
         // Compress Blocks
@@ -321,14 +322,15 @@ int compress_file(char* output_filename, char* input_filename)
                 op += compressionFunction(op, ip, (int)inputBlockSize);
                 ip += inputBlockSize;
             }
-            if ((nbFullBlocks * inputBlockSize) < (size_t)inSize)   // last Block
+            if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
             {
                 int nbBytes = ((blockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
-                int lastBlockSize = inSize & (inputBlockSize-1);
+                int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
                 op += compressionFunction(op, ip, lastBlockSize);
                 ip +=  lastBlockSize;
+                lastBlockDone=1;
             }
             outSize = (int)(op - out_buff);
             compressedfilesize += outSize;

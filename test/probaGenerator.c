@@ -39,7 +39,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 // Constants
 //******************************
 #define MB *(1<<20)
-#define BUFFERSIZE 1 MB
+#define BUFFERSIZE ((1 MB) - 1)
 #define PROBATABLESIZE 4096
 
 

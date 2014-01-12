@@ -333,7 +333,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         if (strstr(inFileName,".fse"))
         {
             char ch;
-            DISPLAY("%s is compressed. Do you want to uncompress it (Y/N) :", inFileName);
+            DISPLAY("%s is compressed. Do you want to uncompress it (Y/N) : ", inFileName);
             ch = (char)getchar();
             if ((ch=='Y') || (ch=='y'))
             {
@@ -342,8 +342,9 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
                 memcpy(destName, inFileName, l-4);
                 FIO_overwriteMode();
                 decompress_file (destName, inFileName);
-                inFileName[l-4]=0;
+                free(destName);
                 fclose(inFile);
+                inFileName[l-4]=0;
                 inFile = fopen( inFileName, "rb" );
             }
         }
@@ -396,7 +397,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         if (readSize != benchedSize)
         {
-            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, readSize, benchedSize);
+            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, (int)readSize, (int)benchedSize);
             free(orig_buff);
             free(compressedBuffer);
             free(chunkP);
