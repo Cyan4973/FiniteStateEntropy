@@ -226,9 +226,9 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
             if (!overwrite)
             {
                 char ch;
+                if (displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   // No interaction possible
                 DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 DISPLAYLEVEL(2, "Overwrite ? (Y/N) : ");
-                if (displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   // No interaction possible
                 ch = (char)getchar();
                 if ((ch!='Y') && (ch!='y')) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);
             }
@@ -478,6 +478,8 @@ _lastBlock:
     // Free
     free(in_buff);
     free(out_buff);
+    fclose(finput);
+    fclose(foutput);
 
     return filesize;
 }

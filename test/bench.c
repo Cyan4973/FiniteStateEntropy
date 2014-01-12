@@ -56,6 +56,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 #include "bench.h"
+#include "fileio.h"
 #include "../fse.h"
 #include "xxhash.h"
 #include "lz4hce.h"
@@ -222,8 +223,8 @@ static U64 BMK_GetFileSize(char* infilename)
 
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
-                 U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
-                 int nbSymbols)
+                  U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
+                  int nbSymbols)
 {
     int loopNb, chunkNb;
     size_t cSize=0;
@@ -328,6 +329,25 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         inFile = fopen( inFileName, "rb" );
         if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
+        // Check if file is fse compressed
+        if (strstr(inFileName,".fse"))
+        {
+            char ch;
+            DISPLAY("%s is compressed. Do you want to uncompress it (Y/N) :", inFileName);
+            ch = (char)getchar();
+            if ((ch=='Y') || (ch=='y'))
+            {
+                size_t l = strlen(inFileName);
+                char* destName = (char*)calloc(l,1);
+                memcpy(destName, inFileName, l-4);
+                FIO_overwriteMode();
+                decompress_file (destName, inFileName);
+                inFileName[l-4]=0;
+                fclose(inFile);
+                inFile = fopen( inFileName, "rb" );
+            }
+        }
+
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
         benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
@@ -376,7 +396,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         if (readSize != benchedSize)
         {
-            DISPLAY("\nError: problem reading file '%s' !!    \n", inFileName);
+            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, readSize, benchedSize);
             free(orig_buff);
             free(compressedBuffer);
             free(chunkP);
