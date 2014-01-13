@@ -123,18 +123,6 @@ static long long nbDBlocks = 0;    // debug
 //****************************************************************
 //* Internal functions
 //****************************************************************
-FORCE_INLINE int FSE_32bits() { return sizeof(void*)==4; }
-
-FORCE_INLINE bitContainer_t FSE_mask(int nbBits)
-{
-    if (FSE_32bits())
-    {
-        static const bitContainer_t mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
-        return mask[nbBits];
-    }
-    return (1<<nbBits)-1;
-}
-
 FORCE_INLINE int FSE_highbit (register U32 val)
 {
 #   if defined(_MSC_VER)   // Visual
