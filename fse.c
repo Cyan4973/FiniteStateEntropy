@@ -607,15 +607,6 @@ int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int n
         if (s1) return FSE_writeSingleSymbolHeader(ostart, (BYTE)(s1-1));   // only one symbol in the set
     }
 
-/*
-    {
-        int i;
-        for (i=0; i<500; i++) FSE_writeHeader(op, counting);
-        op += FSE_writeHeader(op, counting);
-        return (int)(op-ostart);
-    }
-    */
-
     op += FSE_writeHeader(op, counting);
 
     // Compress
@@ -749,7 +740,7 @@ int FSE_decompress_usingDTable(void* dest, int originalSize, const void* compres
     const int nbSymbols = memLogP[1];
     const int nbSymbBits = FSE_highbit(nbSymbols-1)+1;
     const int nbSymbStore = memLog / nbSymbBits;   // Assumption : necessarily >= 1
-    bitContainer_t bitStream;
+    U32 bitStream;
     int bitCount;
     U32 state;
 
@@ -779,9 +770,10 @@ int FSE_decompress_usingDTable(void* dest, int originalSize, const void* compres
         rest = ((bitStream << bitCount) >> 1) >> (31 - nbBits);   // faster than mask
         bitCount += nbBits;
 
-        ip -= bitCount >> 3; bitStream = *(bitContainer_t*)ip; bitCount &= 7;
-
         state = decodeTable[state].newState + rest;
+
+        ip -= bitCount >> 3; bitCount &= 7; bitStream = *(U32*)ip;
+
 #if FSE_DEBUG
         {
             // Check table
@@ -796,9 +788,9 @@ int FSE_decompress_usingDTable(void* dest, int originalSize, const void* compres
         int i;
         for (i=0; i<nbSymbStore; i++)
         {
-            int bitHigh = (nbSymbStore-i) * nbSymbBits;
-            int symbol = (state << (32-bitHigh)) >> (32-nbSymbBits);
-            *op++ = (BYTE)symbol;
+            const int bitHigh = (nbSymbStore-i) * nbSymbBits;
+            const BYTE symbol = (BYTE)((state << (32-bitHigh)) >> (32-nbSymbBits));
+            *op++ = symbol;
         }
     }
 
