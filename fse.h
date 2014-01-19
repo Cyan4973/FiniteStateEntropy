@@ -110,37 +110,30 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-#define FSE_NBSYMBOLS_DEFAULT 256
-static inline int FSE_sizeof_count(int nbSymbols) { return nbSymbols ? nbSymbols+2 : FSE_NBSYMBOLS_DEFAULT+2; }
-int FSE_count(unsigned int* count, const void* source, int sourceSize, int nbSymbols);
+int FSE_count(unsigned int* count, const void* source, int sourceSize, int maxNbSymbols);
 
-static inline int FSE_sizeof_normalizedCounter(int nbSymbols) { return nbSymbols ? nbSymbols+2 : FSE_NBSYMBOLS_DEFAULT+2; }
-int FSE_normalizeCounter(unsigned int* normalizedCounter, unsigned int* count, int memLog);
+int FSE_normalizeCount(unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols);
 
-static inline int FSE_headerBound(int nbSymbols, int memLog) { (void)memLog; return nbSymbols ? nbSymbols*2 : FSE_NBSYMBOLS_DEFAULT*2; }
-int FSE_writeHeader(void* header, const unsigned int* normalizedCounter);
+static inline int FSE_headerBound(int nbSymbols, int memLog) { (void)memLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
+int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
 
-int FSE_sizeof_CTable(int nbSymbols, int memLog);
-int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter);
+int FSE_sizeof_CTable(int nbSymbols, int tableLog);
+int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
 
 int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, void* CTable);
 
 /*
-The first step is to count all symbols. FSE_count() just provides one quick way to do this job.
-Result will be saved into 'count', a table of unsigned int, which must be already allocated.
-Its number of cells only depends on 'nbSymbols',and is provided using FSE_sizeof_count().
-You can use 'nbSymbols'==0 to mean "default value". It will be replaced by 'FSE_NBSYMBOLS_DEFAULT'.
-The first cell contains the total (=='sourceSize'), the second cell contains 'nbSymbols', then follows the frequency of each symbol.
-'source' is assumed to be a table of char of size 'sourceSize' if 'nbSymbols' <= 256.
-FSE_count() will return the maximum symbol value detected into 'source' (necessarily <= 'nbSymbols', can be 0 if only 0 is present).
+The first step is to count all symbols. FSE_count() provides one quick way to do this job.
+Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
+'source' is assumed to be a table of char of size 'sourceSize' if 'maxNbSymbols' <= 256.
+All values within 'source' MUST be < maxNbSymbols.
+FSE_count() will return the highest symbol value detected into 'source' (necessarily <= 'maxNbSymbols', can be 0 if only 0 is present).
 If there is an error, the function will return -1.
 
-The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^memLog.
-You can use 'memLog'==0 to mean "default value".
+The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^tableLog.
+You can use 'tableLog'==0 to mean "default value".
 The result will be saved into a structure, called 'normalizedCounter', which is basically a table of unsigned int.
-'normalizedCounter' must be already allocated.
-Its number of cells only depends on 'nbSymbols', and is provided using FSE_sizeof_normalizedCounter().
-The first cell contains 'memLog', the second cell contains 'nbSymbols', then follows the normalized frequencies.
+'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
 FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'memlog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
 A result of '0' means that the normalization was completed successfully.
@@ -158,7 +151,7 @@ The space required by 'CTable' must be already allocated.
 Its size is provided by FSE_sizeof_CTable().
 In both cases, if there is an error, the function will return -1.
 
-'CTable' can then be used to compress 'source', using FSE_compress_usingCTable().
+'CTable' can then be used to compress 'source', with FSE_compress_usingCTable().
 Similar to FSE_count(), the convention is that 'source' is assumed to be a table of char of size 'sourceSize' if 'nbSymbols' <= 256.
 The function returns the size of compressed data (without header), or -1 if failed.
 */
@@ -166,19 +159,20 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (unsigned int* normalizedCounter, const void* header);
+int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* tableLog, const void* header);
 
-int FSE_sizeof_DTable(int nbSymbols, int memLog);
-int FSE_buildDTable(void* DTable, const unsigned int* normalizedCounter);
+int FSE_sizeof_DTable(int tableLog);
+int FSE_buildDTable(void* DTable, const unsigned int* const normalizedCounter, int nbSymbols, int tableLog);
 
-int FSE_decompress_usingDTable(void* dest, int originalSize, const void* compressed, const void* DTable);
+int FSE_decompress_usingDTable(void* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
 
 /*
 The first step is to get the normalized frequency of symbols.
 This can be performed in many ways, reading a header with FSE_readHeader() being one them.
-'normalizedCounter' must be already allocated (use FSE_sizeof_normalizedCounter()).
+'normalizedCounter' must be already allocated, and have at least 'nbSymbols' cells.
 In practice, that means it's necessary to know 'nbSymbols' beforehand,
 or size it to handle worst case situations (typically 'FSE_NBSYMBOLS_DEFAULT').
+FSE_readHeader will provide 'tableLog" and 'nbSymbols' stored into the header.
 The result of FSE_readHeader() is the number of bytes read from 'header'.
 The following values have special meaning :
 return 2 : there is only a single symbol value. The value is provided into the second byte.
@@ -188,24 +182,11 @@ If there is an error, the function will return -1.
 The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
 The space required by 'DTable' must be already allocated. Its size is provided by FSE_sizeof_DTable().
-FSE_sizeof_DTable() requires 'nbSymbols' and 'memLog'. Remember both values are present into 'normalizedCounter'.
-'normalizedCounter' first cell contains 'memLog', the second cell contains 'nbSymbols', then follows the normalized frequencies.
 
-'DTable' can then be used to decompress 'compressed', using FSE_decompress_usingDTable().
-FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, either as char if 'nbSymbols' <= 256.
+'DTable' can then be used to decompress 'compressed', with FSE_decompress_usingDTable().
+FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, as a table of char if 'nbSymbols' <= 256.
 The function returns the size of compressed data (without header), or -1 if failed.
 */
-
-
-//****************************
-// Deprecated functions
-//****************************
-#if 0
-/* Deprecated and no longer supported (for the record)*/
-int FSE_getDistributionTotal();
-int FSE_encode(char* dest, const char* source, int inputSize, unsigned int* distribution, int nbSymbols);
-int FSE_decode(char* dest, int originalSize, const char* compressed, unsigned int* distribution, int nbSymbols);
-#endif
 
 
 #if defined (__cplusplus)
