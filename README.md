@@ -2,7 +2,7 @@ Finite State Entropy coder
 ===========================
 
 FSE is a new kind of [Entropy encoder](http://en.wikipedia.org/wiki/Entropy_encoding),
-based on [ANS theory, from Jarek Duda](http://arxiv.org/abs/0902.0271).
+based on [ANS theory, from Jarek Duda](http://arxiv.org/abs/1311.2540).
 
 It is designed to compete with [Huffman encoder](http://en.wikipedia.org/wiki/Huffman_coding)
 and [Arithmetic ones](http://en.wikipedia.org/wiki/Arithmetic_coding).
