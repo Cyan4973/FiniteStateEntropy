@@ -573,26 +573,8 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
     // cheap last-symbol storage
     state += *ip--;
 
-    while (ip>istart+1)   // from end to beginning, 2 bytes at a time
+    while (ip>istart+1)   // from end to beginning, up to 3 bytes at a time
     {
-    /*
-        const BYTE symbol  = *ip--;
-        const BYTE symbol2 = *ip--;
-        int nbBitsOut  = symbolTT[symbol].minBitsOut;
-        int nbBitsOut2 = symbolTT[symbol2].minBitsOut;
-
-        nbBitsOut += (state > symbolTT[symbol].maxState);
-        FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
-        state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-
-        if (FSE_MAX_TABLELOG*2+7 > sizeof(bitContainer_t)*8)   // Need this test to be static
-            FSE_flushBits(&bitStream, &op, &bitpos);
-
-        nbBitsOut2 += (state > symbolTT[symbol2].maxState);
-        FSE_addBits(&bitStream, &bitpos, nbBitsOut2, state);
-        state = stateTable[ (state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
-        FSE_flushBits(&bitStream, &op, &bitpos);
-        */
         {
             const BYTE symbol  = *ip--;
             int nbBitsOut  = symbolTT[symbol].minBitsOut;
@@ -636,6 +618,7 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
     FSE_addBits(&bitStream, &bitpos, memLog, state);
     FSE_flushBits(&bitStream, &op, &bitpos);
     *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
+    op += bitpos>0;
 
     return (int) (op-ostart);
 }
