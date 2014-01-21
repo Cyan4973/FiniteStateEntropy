@@ -50,6 +50,7 @@
 //* Includes
 //****************************************************************
 #include "fse.h"
+#include <stddef.h>    // ptrdiff_t
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
 
@@ -154,7 +155,6 @@ static int FSE_writeSingleSymbolHeader (BYTE *out, BYTE symbol)
     *out=symbol;
     return 2;
 }
-
 
 
 int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog)
@@ -527,7 +527,38 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
     return 0;
 }
 
-int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, void* CTable)
+
+FORCE_INLINE void FSE_addBits(bitContainer_t* bitStream, int* bitpos, int nbBits, bitContainer_t value)
+{
+    static const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF };  // up to 15 bits
+
+    *bitStream |= (value & mask[nbBits]) << *bitpos;
+    *bitpos += nbBits;
+}
+
+
+FORCE_INLINE void FSE_flushBits(bitContainer_t* bitStream, BYTE** op, int* bitpos)
+{
+    ** (bitContainer_t**) op = *bitStream;
+    {
+        size_t nbBytes = *bitpos >> 3;
+        *bitpos &= 7;
+        *op += nbBytes;
+        *bitStream >>= nbBytes*8;
+    }
+}
+
+
+FORCE_INLINE void FSE_encodeSymbol(ptrdiff_t* state, bitContainer_t* bitStream, int* bitpos, BYTE symbol, const FSE_symbolCompressionTransform* const symbolTT, const U16* const stateTable)
+{
+    int nbBitsOut  = symbolTT[symbol].minBitsOut;
+    nbBitsOut -= (int)((symbolTT[symbol].maxState - *state) >> 31);
+    FSE_addBits(bitStream, bitpos, nbBitsOut, *state);
+    *state = stateTable[ (*state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+}
+
+
+int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, const void* CTable)
 {
     const BYTE* const istart = (const BYTE*) source;
     const BYTE* ip;
@@ -538,12 +569,12 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
 
     const int memLog = ( (U16*) CTable) [0];
     const int tableSize = 1 << memLog;
-    U16* const stateTable = ( (U16*) CTable) + 2;
-    FSE_symbolCompressionTransform* const symbolTT = (FSE_symbolCompressionTransform*) (stateTable + tableSize);
+    const U16* const stateTable = ( (const U16*) CTable) + 2;
+    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) (stateTable + tableSize);
 
-    const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF, 0x1FFFFFF};   // up to 25 bits
 
-    bitContainer_t state=tableSize;
+    //bitContainer_t state=tableSize;
+    ptrdiff_t state=tableSize;
     int bitpos=0;
     bitContainer_t bitStream=0;
     U32* streamSize = (U32*) op;
@@ -553,67 +584,42 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
     // cheap last-symbol storage
     state += *ip--;
 
-    while (ip>istart)   // from end to beginning, 2 bytes at a time
+    while (ip>istart+1)   // from end to beginning, up to 3 bytes at a time
     {
-        const BYTE symbol  = *ip--;
-        const BYTE symbol2 = *ip--;
-        int nbBitsOut  = symbolTT[symbol].minBitsOut;
-        int nbBitsOut2 = symbolTT[symbol2].minBitsOut;
-
-        nbBitsOut += (state > symbolTT[symbol].maxState);
-        bitStream += (state & mask[nbBitsOut]) << bitpos;
-        bitpos += nbBitsOut;
-
-        state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-
-#  if FSE_MAX_TABLELOG>12
-        if (sizeof(bitContainer_t)==4)
+        /*
         {
-            int nbBytes = bitpos >> 3;
-            * (bitContainer_t*) op = bitStream;
-            bitpos &= 7;
-            op += nbBytes;
-            bitStream >>= nbBytes*8;
+            const BYTE symbol  = *ip--;
+            int nbBitsOut  = symbolTT[symbol].minBitsOut;
+            nbBitsOut += (state > symbolTT[symbol].maxState);
+            FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
+            state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
         }
-#  endif
+        */
 
-        nbBitsOut2 += (state > symbolTT[symbol2].maxState);
-        bitStream += (state & mask[nbBitsOut2]) << bitpos;
-        bitpos += nbBitsOut2;
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
 
-        state = stateTable[ (state>>nbBitsOut2) + symbolTT[symbol2].deltaFindState];
-        * (bitContainer_t*) op = bitStream;
-        {
-            int nbBytes = bitpos >> 3;
-            bitpos &= 7;
-            op += nbBytes;
-            bitStream >>= nbBytes*8;
-        }
+        if (sizeof(bitContainer_t)*8 < FSE_MAX_TABLELOG*2+7 )   // Need this test to be static
+            FSE_flushBits(&bitStream, &op, &bitpos);
+
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+
+        if (sizeof(bitContainer_t)*8 > FSE_MAX_TABLELOG*3+7 )   // Need this test to be static
+            FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+
+        FSE_flushBits(&bitStream, &op, &bitpos);
     }
 
-    if (ip>=istart)   // simpler version, one symbol at a time
+    while (ip>=istart)   // simpler version, one symbol at a time
     {
-        const BYTE symbol  = *ip--;
-        int nbBitsOut  = symbolTT[symbol].minBitsOut;
-        nbBitsOut += (state > symbolTT[symbol].maxState);
-        bitStream += (state & mask[nbBitsOut]) << bitpos;
-        bitpos += nbBitsOut;
-        state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-        * (bitContainer_t*) op = bitStream;
-        {
-            int nbBytes = bitpos>>3;
-            bitpos &= 7;
-            op += nbBytes;
-            bitStream >>= nbBytes*8;
-        }
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+        FSE_flushBits(&bitStream, &op, &bitpos);
     }
 
     // Finalize block
-    bitStream += (state & mask[memLog]) << bitpos;
-    bitpos += memLog;
-    * (bitContainer_t*) op = bitStream;
+    FSE_addBits(&bitStream, &bitpos, memLog, state);
+    FSE_flushBits(&bitStream, &op, &bitpos);
     *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
-    op += (bitpos+7) /8;
+    op += bitpos>0;
 
     return (int) (op-ostart);
 }
@@ -644,7 +650,7 @@ int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int n
     BYTE* op = ostart;
 
     U32   counting[FSE_MAX_NB_SYMBOLS];
-    CTable_max_t CTable;   // [FSE_SIZEOF_CTABLE_U32(MAX_NB_SYMBOLS, FSE_MAX_TABLELOG)];
+    CTable_max_t CTable;
 
 
     // early out

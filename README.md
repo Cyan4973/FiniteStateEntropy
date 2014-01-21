@@ -29,7 +29,7 @@ It compares FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-ent
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.684</th><th>195 MS/s</th><th>265 MS/s</th>
+    <th>win98-lz4-run</th><th>FSE</th><th>2.684</th><th>205 MS/s</th><th>265 MS/s</th>
   </tr>
   <tr>
     <th>win98-lz4-run</th><th>Huff0</th><th>2.673</th><th>165 MS/s</th><th>165 MS/s</th>
@@ -38,7 +38,7 @@ It compares FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-ent
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>195 MS/s</th><th>265 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>205 MS/s</th><th>265 MS/s</th>
   </tr>
   <tr>
     <th>proba70.bin</th><th>Huff0</th><th>5.574</th><th>190 MS/s</th><th>190 MS/s</th>
@@ -47,7 +47,7 @@ It compares FSE to [Huff0](http://fastcompression.blogspot.fr/p/huff0-range0-ent
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.19</th><th>195 MS/s</th><th>265 MS/s</th>
+    <th>proba90.bin</th><th>FSE</th><th>15.19</th><th>205 MS/s</th><th>265 MS/s</th>
   </tr>
   <tr>
     <th>proba90.bin</th><th>Huff0</th><th>7.176</th><th>190 MS/s</th><th>190 MS/s</th>
