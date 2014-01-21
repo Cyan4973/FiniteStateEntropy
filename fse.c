@@ -50,6 +50,7 @@
 //* Includes
 //****************************************************************
 #include "fse.h"
+#include <stddef.h>    // ptrdiff_t
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
 
@@ -548,7 +549,16 @@ FORCE_INLINE void FSE_flushBits(bitContainer_t* bitStream, BYTE** op, int* bitpo
 }
 
 
-int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, void* CTable)
+FORCE_INLINE void FSE_encodeSymbol(ptrdiff_t* state, bitContainer_t* bitStream, int* bitpos, BYTE symbol, const FSE_symbolCompressionTransform* const symbolTT, const U16* const stateTable)
+{
+    int nbBitsOut  = symbolTT[symbol].minBitsOut;
+    nbBitsOut -= (int)((symbolTT[symbol].maxState - *state) >> 31);
+    FSE_addBits(bitStream, bitpos, nbBitsOut, *state);
+    *state = stateTable[ (*state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+}
+
+
+int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, const void* CTable)
 {
     const BYTE* const istart = (const BYTE*) source;
     const BYTE* ip;
@@ -559,11 +569,12 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
 
     const int memLog = ( (U16*) CTable) [0];
     const int tableSize = 1 << memLog;
-    U16* const stateTable = ( (U16*) CTable) + 2;
-    FSE_symbolCompressionTransform* const symbolTT = (FSE_symbolCompressionTransform*) (stateTable + tableSize);
+    const U16* const stateTable = ( (const U16*) CTable) + 2;
+    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) (stateTable + tableSize);
 
 
-    bitContainer_t state=tableSize;
+    //bitContainer_t state=tableSize;
+    ptrdiff_t state=tableSize;
     int bitpos=0;
     bitContainer_t bitStream=0;
     U32* streamSize = (U32*) op;
@@ -575,6 +586,7 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
 
     while (ip>istart+1)   // from end to beginning, up to 3 bytes at a time
     {
+        /*
         {
             const BYTE symbol  = *ip--;
             int nbBitsOut  = symbolTT[symbol].minBitsOut;
@@ -582,35 +594,24 @@ int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, vo
             FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
             state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
         }
+        */
 
-        if (sizeof(bitContainer_t)*8 > FSE_MAX_TABLELOG*2+7 )   // Need this test to be static
-        {
-            const BYTE symbol  = *ip--;
-            int nbBitsOut  = symbolTT[symbol].minBitsOut;
-            nbBitsOut += (state > symbolTT[symbol].maxState);
-            FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
-            state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-        }
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+
+        if (sizeof(bitContainer_t)*8 < FSE_MAX_TABLELOG*2+7 )   // Need this test to be static
+            FSE_flushBits(&bitStream, &op, &bitpos);
+
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
 
         if (sizeof(bitContainer_t)*8 > FSE_MAX_TABLELOG*3+7 )   // Need this test to be static
-        {
-            const BYTE symbol  = *ip--;
-            int nbBitsOut  = symbolTT[symbol].minBitsOut;
-            nbBitsOut += (state > symbolTT[symbol].maxState);
-            FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
-            state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
-        }
+            FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
 
         FSE_flushBits(&bitStream, &op, &bitpos);
     }
 
     while (ip>=istart)   // simpler version, one symbol at a time
     {
-        const BYTE symbol = *ip--;
-        int nbBitsOut = symbolTT[symbol].minBitsOut;
-        nbBitsOut += (state > symbolTT[symbol].maxState);
-        FSE_addBits(&bitStream, &bitpos, nbBitsOut, state);
-        state = stateTable[ (state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+        FSE_encodeSymbol(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
         FSE_flushBits(&bitStream, &op, &bitpos);
     }
 

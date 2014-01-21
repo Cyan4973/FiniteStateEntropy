@@ -120,7 +120,7 @@ int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbS
 int FSE_sizeof_CTable(int nbSymbols, int tableLog);
 int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
 
-int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, void* CTable);
+int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, const void* CTable);
 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
