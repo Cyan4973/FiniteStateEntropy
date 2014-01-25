@@ -79,7 +79,6 @@ FSE_compressBound():
 //****************************
 // FSE advanced functions
 //****************************
-int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols);
 /*
 FSE_compress_Nsymbols():
     Minor variant of FSE_compress(), where the number of symbols can be specified.
@@ -87,6 +86,21 @@ FSE_compress_Nsymbols():
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
 */
+int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols);
+
+typedef struct
+{
+    int nbSymbols;
+    int memLog;
+} FSE_compress2_param_t;
+/*
+FSE_compress2:
+    Same as FSE_compress(), but allows the selection of nbSymbols and memLog, within 'params'.
+    The function will then assume that any byte within 'source' has value < nbSymbols.
+    note : If this condition is not respected, compressed data will be corrupted !
+    return : size of compressed data
+*/
+int FSE_compress2 (void* dest, const void* source, int sourceSize, FSE_compress2_param_t params);
 
 
 //******************************************

@@ -214,8 +214,6 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 #  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
 #  define UARCH U32
 #  define AARCH A32
-//#  define HTYPE                 const BYTE*
-//#  define INITBASE(b,s)         const int b = 0
 #  define HTYPE                 U32
 #  define INITBASE(b,s)         const BYTE* const b = s
 #endif
