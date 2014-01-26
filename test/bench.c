@@ -223,7 +223,7 @@ static U64 BMK_GetFileSize(char* infilename)
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
-                  int nbSymbols)
+                  int nbSymbols, int memLog)
 {
     int loopNb, chunkNb;
     size_t cSize=0;
@@ -235,7 +235,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
     // Init
     param.nbSymbols = nbSymbols;
-    param.memLog = 11;
+    param.memLog = memLog;
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
 
     DISPLAY("\r%79s\r", "");
@@ -409,7 +409,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256);
+        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, 0);
         totals += benchedSize;
 
         free(orig_buff);
@@ -535,17 +535,18 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
             // Bench
             {
                 int nbSymbols=256;
+                int memLog=0;
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; break;
-                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; break;
-                case et_offset:      strcat(localName, "of."); nbSymbols=16; break;
-                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; break;
-                case et_literals:    strcat(localName, "lit.");nbSymbols=256; break;
+                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; memLog=10; break;
+                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; memLog=10; break;
+                case et_offset:      strcat(localName, "of."); nbSymbols=16; memLog=10; break;
+                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; memLog=10; break;
+                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
                 }
                 strcat(localName, inFileName);
-                BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols);
+                BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols, memLog);
                 totals += digestedSize;
             }
 

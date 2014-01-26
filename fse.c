@@ -649,7 +649,7 @@ int FSE_compress2 (void* dest, const void* source, int sourceSize, FSE_compress2
     BYTE* op = ostart;
 
     int nbSymbols = params.nbSymbols;
-    const int memLog = params.memLog;
+    const int memLog = params.memLog ? params.memLog : FSE_MAX_TABLELOG;
     U32   counting[FSE_MAX_NB_SYMBOLS];
     CTable_max_t CTable;
 
