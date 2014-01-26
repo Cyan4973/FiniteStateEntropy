@@ -221,10 +221,9 @@ static U64 BMK_GetFileSize(char* infilename)
 //  Public function
 //*********************************************************
 
-
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
-                  int nbSymbols)
+                  int nbSymbols, int memLog)
 {
     int loopNb, chunkNb;
     size_t cSize=0;
@@ -232,7 +231,11 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     double ratio=0.;
     U32 crcCheck=0;
     U32 crcOrig;
+    FSE_compress2_param_t param;
 
+    // Init
+    param.nbSymbols = nbSymbols;
+    param.memLog = memLog;
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
 
     DISPLAY("\r%79s\r", "");
@@ -252,7 +255,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
+                //chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
+                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, param);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -405,7 +409,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256);
+        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, 0);
         totals += benchedSize;
 
         free(orig_buff);
@@ -531,17 +535,18 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
             // Bench
             {
                 int nbSymbols=256;
+                int memLog=0;
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; break;
-                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; break;
-                case et_offset:      strcat(localName, "of."); nbSymbols=16; break;
-                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; break;
-                case et_literals:    strcat(localName, "lit.");nbSymbols=256; break;
+                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; memLog=9; break;
+                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; memLog=9; break;
+                case et_offset:      strcat(localName, "of."); nbSymbols=16; memLog=10; break;
+                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; memLog=8; break;
+                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=11; break;
                 }
                 strcat(localName, inFileName);
-                BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols);
+                BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols, memLog);
                 totals += digestedSize;
             }
 

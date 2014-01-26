@@ -87,8 +87,6 @@ typedef size_t bitContainer_t;
 
 #define FSE_VIRTUAL_LOG   30
 #define FSE_VIRTUAL_RANGE (1U<<FSE_VIRTUAL_LOG)
-#define FSE_VIRTUAL_SCALE (FSE_VIRTUAL_LOG-FSE_MAX_TABLELOG)
-#define FSE_VIRTUAL_STEP  (1U << FSE_VIRTUAL_SCALE)
 
 #if FSE_MAX_TABLELOG>15
 #error "FSE_MAX_TABLELOG>15 isn't supported"
@@ -118,11 +116,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************************************************
-//* Internal functions
-//****************************************************************
-FORCE_INLINE int FSE_32bits() { return sizeof(void*)==4; }
-
+/****************************************************************
+  Internal functions
+****************************************************************/
 FORCE_INLINE int FSE_highbit (register U32 val)
 {
 #   if defined(_MSC_VER)   // Visual
@@ -328,6 +324,8 @@ int FSE_count (unsigned int* count, const void* source, int sourceSize, int maxN
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
     int vTotal= total;
+    const int scale = FSE_VIRTUAL_LOG - tableLog;
+    const int vStep = 1 << scale;
 
 #if FSE_DEBUG
     U32 countOrig[MAX_NB_SYMBOLS] = {0};
@@ -357,9 +355,8 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         U32 const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
         U32 const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
         int s;
-        int cumulativeRest = ( (int) FSE_VIRTUAL_STEP + error) / 2;
-
-        if (error > FSE_VIRTUAL_STEP) cumulativeRest = error;   // Note : in this case, total is too large; Error will be given to first non-zero symbol
+        int cumulativeRest = ( (int) vStep + error) / 2;
+        if (error > (U32)vStep) cumulativeRest = error;   // Note : in this case, total is too large; Error will be given to first non-zero symbol
 
         for (s=0; s<nbSymbols; s++)
         {
@@ -367,11 +364,11 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
             if (count[s]>0)
             {
                 int rest;
-                U32 size = (normalizedCounter[s]*step) >> FSE_VIRTUAL_SCALE;
-                rest = (normalizedCounter[s]*step) - (size * FSE_VIRTUAL_STEP);   // necessarily >= 0
+                U32 size = (normalizedCounter[s]*step) >> scale;
+                rest = (normalizedCounter[s]*step) - (size * vStep);   // necessarily >= 0
                 cumulativeRest += rest;
-                size += cumulativeRest >> FSE_VIRTUAL_SCALE;
-                cumulativeRest &= (FSE_VIRTUAL_STEP - 1);
+                size += cumulativeRest >> scale;
+                cumulativeRest &= (vStep - 1);
                 normalizedCounter[s] = size;
             }
         }
@@ -530,7 +527,7 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
 
 FORCE_INLINE void FSE_addBits(bitContainer_t* bitStream, int* bitpos, int nbBits, bitContainer_t value)
 {
-    static const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF };  // up to 15 bits
+    static const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF };   // up to 15 bits
 
     *bitStream |= (value & mask[nbBits]) << *bitpos;
     *bitpos += nbBits;
@@ -641,7 +638,7 @@ typedef struct
     FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];
 } CTable_max_t;
 
-int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols)
+int FSE_compress2 (void* dest, const void* source, int sourceSize, FSE_compress2_param_t params)
 {
     const BYTE* const istart = (const BYTE*) source;
     const BYTE* ip = istart;
@@ -649,6 +646,8 @@ int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int n
     BYTE* const ostart = (BYTE*) dest;
     BYTE* op = ostart;
 
+    int nbSymbols = params.nbSymbols;
+    const int memLog = params.memLog ? params.memLog : FSE_MAX_TABLELOG;
     U32   counting[FSE_MAX_NB_SYMBOLS];
     CTable_max_t CTable;
 
@@ -661,14 +660,14 @@ int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int n
 
     // Normalize
     {
-        int s1 = FSE_normalizeCount (counting, FSE_MAX_TABLELOG, counting, sourceSize, nbSymbols);
+        int s1 = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
         if (s1) return FSE_writeSingleSymbolHeader (ostart, (BYTE) (s1-1) ); // only one symbol in the set
     }
 
-    op += FSE_writeHeader (op, counting, nbSymbols, FSE_MAX_TABLELOG);
+    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
 
     // Compress
-    FSE_buildCTable (&CTable, counting, nbSymbols, FSE_MAX_TABLELOG);
+    FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
     op += FSE_compress_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
@@ -679,9 +678,21 @@ int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int n
 }
 
 
+int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols)
+{
+    FSE_compress2_param_t params;
+    params.nbSymbols = nbSymbols;
+    params.memLog = FSE_MAX_TABLELOG;
+    return FSE_compress2(dest, source, sourceSize, params);
+}
+
+
 int FSE_compress (void* dest, const void* source, int sourceSize)
 {
-    return FSE_compress_Nsymbols (dest, source, sourceSize, FSE_MAX_NB_SYMBOLS);
+    FSE_compress2_param_t params;
+    params.nbSymbols = FSE_MAX_NB_SYMBOLS;
+    params.memLog = FSE_MAX_TABLELOG;
+    return FSE_compress2(dest, source, sourceSize, params);
 }
 
 
