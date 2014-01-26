@@ -116,11 +116,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************************************************
-//* Internal functions
-//****************************************************************
-FORCE_INLINE int FSE_32bits() { return sizeof(void*)==4; }
-
+/****************************************************************
+  Internal functions
+****************************************************************/
 FORCE_INLINE int FSE_highbit (register U32 val)
 {
 #   if defined(_MSC_VER)   // Visual

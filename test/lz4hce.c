@@ -256,6 +256,28 @@ typedef struct
 //**************************************
 // Private functions
 //**************************************
+FORCE_INLINE int LZ4HC_highbit (register U32 val)
+{
+#   if defined(_MSC_VER)   // Visual
+    unsigned long r;
+    _BitScanReverse ( &r, val );
+    return (int) r;
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304)   // GCC Intrinsic
+    return 31 - __builtin_clz (val);
+#   else   // Software version
+    static const int DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
+    U32 v = val;
+    int r;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    r = DeBruijnClz[ (U32) (v * 0x07C4ACDDU) >> 27];
+    return r;
+#   endif
+}
+
 #if LZ4_ARCH64
 
 FORCE_INLINE int LZ4_NbCommonBytes (register U64 val)
@@ -384,21 +406,6 @@ char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
     }
     hc4->end -= distance;
     return (char*)(hc4->end);
-}
-
-
-FORCE_INLINE int LZ4HC_highbit (register U32 val)
-{
-#   if defined(_MSC_VER)
-    unsigned long r;
-    _BitScanReverse( &r, val );
-    return (int)r;
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304)
-    return __builtin_ctz(val);
-#   else
-    static const int DeBruijnCtz[32] = { 0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9 };
-    return DeBruijnCtz[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-#   endif
 }
 
 
@@ -564,10 +571,11 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
     if (eType == et_runLength)
     {
-        length = (int)(*ip - *anchor);
+        U32 rl = (U32)(*ip - *anchor)+1;
         token = (*op)++;
-        if (length>=15) *token= 15;
-        else *token = (BYTE)(length);
+        //if (length>=15) *token= 15; else *token = (BYTE)(length);
+        if (rl >= 4095) rl=4095;
+        *token = (BYTE)(LZ4HC_highbit(rl));
         // Prepare next loop
         *ip += matchLength;
         *anchor = *ip; 
@@ -576,10 +584,12 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
     if (eType == et_matchLength)
     {
-        length = (int)(matchLength-MINMATCH);
+        U32 ml = (U32)(matchLength-MINMATCH+1);
+        //length = (int)(matchLength-MINMATCH);
         token = (*op)++;
-        if (length>=15) *token= 15;
-        else *token = (BYTE)(length);
+        //if (length>=15) *token= 15; else *token = (BYTE)(length);
+        if (ml >= 4095) ml=4095;
+        *token = (BYTE)(LZ4HC_highbit(ml));
         // Prepare next loop
         *ip += matchLength;
         *anchor = *ip; 
@@ -603,8 +613,8 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     {
         U32 offset = (U32)(*ip-ref);
         token = (*op)++;
-        length = offset & 15;
-        if (length>=15) *token = 15;
+        length = offset & 7;
+        if (length>=7) *token = 7;
         else *token = (BYTE)(length);
         // Prepare next loop
         *ip += matchLength;

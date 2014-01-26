@@ -539,11 +539,11 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; memLog=10; break;
-                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; memLog=10; break;
+                case et_runLength:   strcat(localName, "rl."); nbSymbols=16; memLog=9; break;
+                case et_matchLength: strcat(localName, "ml."); nbSymbols=16; memLog=9; break;
                 case et_offset:      strcat(localName, "of."); nbSymbols=16; memLog=10; break;
-                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; memLog=10; break;
-                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
+                case et_lastbits:    strcat(localName, "lb."); nbSymbols=16; memLog=8; break;
+                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=11; break;
                 }
                 strcat(localName, inFileName);
                 BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols, memLog);
