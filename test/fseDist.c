@@ -42,9 +42,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 //**************************************
 // Compiler specifics
 //**************************************
-// GCC does not support _rotl outside of Windows
-#if !defined(_WIN32)
-#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
+#ifdef __GNUC__
+#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #endif
 
 
@@ -169,7 +168,7 @@ int FSED_writeSingleU16(void* dest, U16 distance)
 }
 
 
-void FSED_encodeU16(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
+inline void FSED_encodeU16(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitStream, bitpos, nbBits, (size_t)value);
