@@ -28,7 +28,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 // Unix Large Files support (>4GB)
 #define _FILE_OFFSET_BITS 64
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
-#  define _LARGEFILE_SOURCE 
+#  define _LARGEFILE_SOURCE
 #elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
 #endif
@@ -625,11 +625,11 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:   strcat(localName, "rl."); nbSymbols= 16; memLog= 9; break;
-                case et_matchLength: strcat(localName, "ml."); nbSymbols= 16; memLog= 9; break;
-                case et_offset:      strcat(localName, "of."); nbSymbols= 16; memLog=10; break;
-                case et_lastbits:    strcat(localName, "lb."); nbSymbols= 16; memLog= 8; break;
-                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=11; break;
+                case et_runLength:   strcat(localName, "rl."); nbSymbols= 16; memLog=12; break;
+                case et_matchLength: strcat(localName, "ml."); nbSymbols= 16; memLog=12; break;
+                case et_offset:      strcat(localName, "of."); nbSymbols= 16; memLog=12; break;
+                case et_lastbits:    strcat(localName, "lb."); nbSymbols= 16; memLog=12; break;
+                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
                 case et_runLengthU16:strcat(localName, "r16"); nbSymbols=  0; memLog= 9; break;
                 case et_matchLengthU16:strcat(localName,"m16");nbSymbols=  0; memLog= 9; break;
                 case et_offsetU16:   strcat(localName, "o16"); nbSymbols=  0; memLog=10; break;

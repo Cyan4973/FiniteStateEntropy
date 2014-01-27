@@ -28,15 +28,15 @@
 extern "C" {
 #endif
 
-typedef enum { et_runLengthU16, et_matchLengthU16, et_offsetU16, et_lastbits, et_literals, et_final, 
-      et_runLength, et_matchLength, et_offset, et_offsetHigh } extractionType;
+typedef enum { et_runLength, et_matchLength, et_offset, et_offsetHigh, et_runLengthU16, et_matchLengthU16, et_offsetU16, et_lastbits, et_literals, et_final,
+   } extractionType;
 
 int LZ4_extractHC (const char* source, char* dest, int inputSize, extractionType eType);
 /*
 LZ4_extractHC :
     return : the number of bytes into dest buffer
              or 0 if compression fails.
-    note : destination buffer must be already allocated. 
+    note : destination buffer must be already allocated.
 */
 
 
