@@ -28,7 +28,8 @@
 extern "C" {
 #endif
 
-typedef enum { et_runLength, et_matchLength, et_offset, et_lastbits, et_literals, et_final } extractionType;
+typedef enum { et_runLengthU16, et_matchLengthU16, et_offsetU16, et_lastbits, et_literals, et_final, 
+      et_runLength, et_matchLength, et_offset, et_offsetHigh } extractionType;
 
 int LZ4_extractHC (const char* source, char* dest, int inputSize, extractionType eType);
 /*

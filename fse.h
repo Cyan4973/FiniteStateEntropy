@@ -45,9 +45,15 @@ extern "C" {
 #endif
 
 
-//****************************
+//**************************************
+//* Includes
+//**************************************
+#include <stddef.h>    // size_t, ptrdiff_t
+
+
+//**************************************
 // FSE simple functions
-//****************************
+//**************************************
 int FSE_compress   (void* dest,
                     const void* source, int sourceSize);
 int FSE_decompress (void* dest, int originalSize,
@@ -201,6 +207,14 @@ The space required by 'DTable' must be already allocated. Its size is provided b
 FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, as a table of char if 'nbSymbols' <= 256.
 The function returns the size of compressed data (without header), or -1 if failed.
 */
+
+
+void FSE_addBits(size_t* bitStream, int* bitpos, int nbBits, size_t value);
+void FSE_flushBits(size_t* bitStream, void** op, int* bitpos);
+void FSE_encodeSymbol(ptrdiff_t* state, size_t* bitStream, int* bitpos, unsigned char symbol, const void* symbolTT, const void* stateTable);
+
+unsigned char FSE_decodeSymbol(unsigned int* state, unsigned int bitStream, int* bitsConsumed, const void* DTable);
+void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const unsigned char** ip);
 
 
 #if defined (__cplusplus)

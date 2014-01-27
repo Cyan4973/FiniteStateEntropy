@@ -582,6 +582,18 @@ FORCE_INLINE int LZ4HC_encodeSequence (
         return 0;
     }
 
+    if (eType == et_runLengthU16)
+    {
+        U32 rl = (U32)(*ip - *anchor)+1;
+        if (rl >= 4095) rl=4095;
+        *((U16*)*op) = (U16)rl;
+        *op += 2;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip; 
+        return 0;
+    }
+
     if (eType == et_matchLength)
     {
         U32 ml = (U32)(matchLength-MINMATCH+1);
@@ -596,6 +608,18 @@ FORCE_INLINE int LZ4HC_encodeSequence (
         return 0;
     }
 
+    if (eType == et_matchLengthU16)
+    {
+        U32 ml = (U32)(matchLength-MINMATCH+1);
+        if (ml >= 4095) ml=4095;
+        *((U16*)*op) = (U16)ml;
+        *op += 2;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip; 
+        return 0;
+    }
+
     if (eType == et_offset)
     {
         U32 offset = (U32)(*ip-ref);
@@ -603,6 +627,28 @@ FORCE_INLINE int LZ4HC_encodeSequence (
         length = LZ4HC_highbit(offset);
         if (length>=15) *token = 15;
         else *token = (BYTE)(length);
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip; 
+        return 0;
+    }
+
+    if (eType == et_offsetU16)
+    {
+        U32 offset = (U32)(*ip-ref);
+        *((U16*)*op) = (U16)offset;
+        *op += 2;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip; 
+        return 0;
+    }
+
+    if (eType == et_offsetHigh)
+    {
+        U32 offset = (U32)(*ip-ref);
+        token = (*op)++;
+        *token = (BYTE)(offset >> 8);
         // Prepare next loop
         *ip += matchLength;
         *anchor = *ip; 
