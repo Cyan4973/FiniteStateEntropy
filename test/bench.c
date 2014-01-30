@@ -395,13 +395,10 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     double ratio=0.;
     U32 crcCheck=0;
     U32 crcOrig;
-    FSE_compress2_param_t param;
 
     // Init
     if (nbSymbols==0) { BMK_benchMemU16(chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
     if (nbSymbols==1) { BMK_benchMemU32(chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
-    param.nbSymbols = nbSymbols;
-    param.memLog = memLog;
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
 
     DISPLAY("\r%79s\r", "");
@@ -422,7 +419,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                 //chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
-                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, param);
+                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);

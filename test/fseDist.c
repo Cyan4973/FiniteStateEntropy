@@ -206,7 +206,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
         if (sizeof(size_t)>4) FSED_encodeU16(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);   // static test
         FSE_flushBits(&bitStream, (void**)&op, &bitpos);
     }
-    if (ip>=istart) FSED_encodeU16(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+    if (ip==istart) { FSED_encodeU16(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable); FSE_flushBits(&bitStream, (void**)&op, &bitpos); }
 
     // Finalize block
     FSE_addBits(&bitStream, &bitpos, memLog, state);
@@ -240,10 +240,8 @@ int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int memLog)
     nbSymbols = FSED_countU16 (counting, ip, sourceSize);
 
     // Normalize
-    {
-        int s1 = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
-        if (s1) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
-    }
+    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, counting, nbSymbols, memLog);
 
@@ -467,10 +465,8 @@ int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
     nbSymbols = FSED_countU32 (counting, ip, sourceSize);
 
     // Normalize
-    {
-        int s1 = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
-        if (s1) return FSED_writeSingleU32 (ostart, *source);   // only one distance in the set
-    }
+    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    if (memLog==0) return FSED_writeSingleU32 (ostart, *source);
 
     op += FSE_writeHeader (op, counting, nbSymbols, memLog);
 
