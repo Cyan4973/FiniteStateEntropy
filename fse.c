@@ -495,28 +495,6 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
 }
 
 
-void FSE_addBits(bitContainer_t* bitStream, int* bitpos, int nbBits, bitContainer_t value)
-{
-    static const U32 mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF };   // up to 15 bits
-
-    *bitStream |= (value & mask[nbBits]) << *bitpos;
-    *bitpos += nbBits;
-}
-
-
-void FSE_flushBits(size_t* bitStream, void** p, int* bitpos)
-{
-    char** op = (char**)p;
-    ** (size_t**) op = *bitStream;
-    {
-        size_t nbBytes = *bitpos >> 3;
-        *bitpos &= 7;
-        *op += nbBytes;
-        *bitStream >>= nbBytes*8;
-    }
-}
-
-
 void FSE_encodeSymbol(ptrdiff_t* state, size_t* bitStream, int* bitpos, BYTE symbol, const void* CTable1, const void* CTable2)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) CTable1;
