@@ -40,10 +40,10 @@ default: fse
 
 all: fse fse32 probagen
 
-fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c ../fse.c
+fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c ../fse.c
 	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
 
-fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c ../fse.c
+fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c ../fse.c
 	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c

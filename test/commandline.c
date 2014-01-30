@@ -44,6 +44,7 @@
 #include <string.h>   // strcmp, strcat
 #include "bench.h"
 #include "fileio.h"
+#include "lz4hce.h"   // et_final
 
 
 //****************************
@@ -174,9 +175,9 @@ int main(int argc, char** argv)
                     // Benchmark mode (default)
                 case 'b': bench=1; break;
 
-                    // Benchmark LZ4 extracted fields
+                    // Benchmark LZ4 extracted fields (hidden)
                 case 'l': benchLZ4e=1;
-                    if ((argument[1]>='1') && (argument[1]<='5')) { algoNb = argument[1] - '1'; argument++; }
+                    if ((argument[1]>='1') && (argument[1]<='1'+et_final)) { algoNb = argument[1] - '1'; argument++; }
                     break;
 
                     // Test
@@ -204,8 +205,8 @@ int main(int argc, char** argv)
                 case 'i':
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
-                        int iters = argument[1] - '0'; 
-                        BMK_SetNbIterations(iters); 
+                        int iters = argument[1] - '0';
+                        BMK_SetNbIterations(iters);
                         argument++;
                     }
                     break;
@@ -243,7 +244,7 @@ int main(int argc, char** argv)
     if (bench) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
 
     // No output filename ==> try to select one automatically (when possible)
-    while (!output_filename) 
+    while (!output_filename)
     {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   // Default to stdout whenever possible (i.e. not a console)
         if ((!decode) && !(forceCompress))   // auto-determine compression or decompression, based on file extension

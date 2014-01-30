@@ -86,27 +86,14 @@ FSE_compressBound():
 // FSE advanced functions
 //****************************
 /*
-FSE_compress_Nsymbols():
-    Minor variant of FSE_compress(), where the number of symbols can be specified.
+FSE_compress2():
+    Same as FSE_compress(), but allows the selection of 'nbSymbols' and 'memLog'
+    Both parameters can be defined as '0' to means : use default value
     The function will then assume that any byte within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
 */
-int FSE_compress_Nsymbols (void* dest, const void* source, int sourceSize, int nbSymbols);
-
-typedef struct
-{
-    int nbSymbols;
-    int memLog;
-} FSE_compress2_param_t;
-/*
-FSE_compress2:
-    Same as FSE_compress(), but allows the selection of nbSymbols and memLog, within 'params'.
-    The function will then assume that any byte within 'source' has value < nbSymbols.
-    note : If this condition is not respected, compressed data will be corrupted !
-    return : size of compressed data
-*/
-int FSE_compress2 (void* dest, const void* source, int sourceSize, FSE_compress2_param_t params);
+int FSE_compress2 (void* dest, const void* source, int sourceSize, int nbSymbols, int memLog);
 
 
 //******************************************
@@ -132,7 +119,7 @@ The following API allows to target specific sub-functions.
 
 int FSE_count(unsigned int* count, const void* source, int sourceSize, int maxNbSymbols);
 
-int FSE_normalizeCount(unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols);
+int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
 static inline int FSE_headerBound(int nbSymbols, int memLog) { (void)memLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
 int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
@@ -156,8 +143,8 @@ The result will be saved into a structure, called 'normalizedCounter', which is 
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
 FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'memlog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
-A result of '0' means that the normalization was completed successfully.
-A result > 0 means that there is only a single symbol present, and its value is (result-1).
+The return value is the corrected tableLog (<=maxTableLog). It is necessary to retrieve it for next steps.
+A result of '0' means that there is only a single symbol present.
 If there is an error, the function will return -1.
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
