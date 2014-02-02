@@ -328,6 +328,8 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     // Check
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
     if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;
+    if ((FSE_highbit(nbSymbols-1)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;
+    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
 
     {
         // Ensure minimum step is 1
