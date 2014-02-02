@@ -53,7 +53,7 @@
 #include <stdlib.h>   // malloc
 #include <string.h>   // strcmp, strlen
 #include "fileio.h"
-#include "../fse.h"
+#include "fse.h"
 #include "xxhash.h"
 
 

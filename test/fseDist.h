@@ -25,5 +25,9 @@ int FSED_compressU16 (void* dest, const unsigned short* source, int sourceSize, 
 int FSED_decompressU16 (unsigned short* dest, int originalSize, const void* compressed);
 
 
+int FSED_compressU16Log2 (void* dest, const unsigned short* source, int sourceSize, int memLog);
+int FSED_decompressU16Log2 (unsigned short* dest, int originalSize, const void* compressed);
+
+
 int FSED_compressU32 (void* dest, const unsigned int* source, int sourceSize, int memLog);
 int FSED_decompressU32 (unsigned int* dest, int originalSize, const void* compressed);

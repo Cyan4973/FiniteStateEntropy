@@ -36,7 +36,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdlib.h>   // malloc
 #include <stdio.h>    // fprintf, fopen, ftello64
 #include <string.h>   // memcpy
-#include "../fse.h"
+#include "fse.h"
 
 
 //**************************************
@@ -335,6 +335,141 @@ int FSED_decompressU16 (U16* dest, int originalSize,
     ip += FSED_decompressU16_usingDTable (dest, originalSize, ip, DTable, tableLog);
 
     return (int) (ip-istart);
+}
+
+
+//*********************************************************
+//  U16Log2 Compression functions
+//*********************************************************
+// note : values MUST be >= (1<<LN)
+#define LN 3
+int FSED_Log2(U16 value)
+{
+    int hb = FSED_highbit(value>>LN);
+    return (hb * (1<<LN)) + (value>>hb) - (1<<LN);
+}
+
+
+int FSED_countU16Log2 (unsigned int* count, const U16* source, int sourceSize)
+{
+    const U16* ip = source;
+    const U16* const iend = source+sourceSize;
+    int   i;
+
+    U32   Counting1[64] = {0};
+    U32   Counting2[64] = {0};
+    U32   Counting3[64] = {0};
+    U32   Counting4[64] = {0};
+
+    // Init checks
+    if (!sourceSize) return -1;                              // Error : no input
+
+    while (ip < iend-3)
+    {
+        Counting1[FSED_Log2(*ip++)]++;
+        Counting2[FSED_Log2(*ip++)]++;
+        Counting3[FSED_Log2(*ip++)]++;
+        Counting4[FSED_Log2(*ip++)]++;
+    }
+    while (ip<iend) Counting1[FSED_Log2(*ip++)]++;
+
+    for (i=0; i<64; i++) count[i] = Counting1[i] + Counting2[i] + Counting3[i] + Counting4[i];
+
+    {
+        int max = 64;
+        while (!count[max-1]) max--;
+        return max;
+    }
+}
+
+
+inline void FSED_encodeU16Log2(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
+{
+    int nbBits = FSED_highbit(value>>LN);
+    BYTE symbol = (BYTE)FSED_Log2(value);
+    FSE_addBits(bitStream, bitpos, nbBits, (size_t)value);
+    FSE_encodeSymbol(state, bitStream, bitpos, symbol, symbolTT, stateTable);
+}
+
+
+int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceSize, const void* CTable)
+{
+    const U16* const istart = source;
+    const U16* ip;
+    const U16* const iend = istart + sourceSize;
+
+    BYTE* const ostart = (BYTE*) dest;
+    BYTE* op = (BYTE*) dest;
+
+    const int memLog = ( (U16*) CTable) [0];
+    const int tableSize = 1 << memLog;
+    const U16* const stateTable = ( (const U16*) CTable) + 2;
+    const void* const symbolTT = (const void*) (stateTable + tableSize);
+
+    ptrdiff_t state=tableSize;
+    int bitpos=0;
+    size_t bitStream=0;
+    U32* streamSize = (U32*) op;
+    op += 4;
+
+    ip=iend-1;
+    // cheap last-symbol storage
+    //if (*ip < tableSize) state += *ip--;
+
+    while (ip>istart)
+    {
+        FSED_encodeU16Log2(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
+        if (sizeof(size_t)>4) FSED_encodeU16Log2(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);   // static test
+        FSE_flushBits(&bitStream, (void**)&op, &bitpos);
+    }
+    if (ip==istart) { FSED_encodeU16Log2(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable); FSE_flushBits(&bitStream, (void**)&op, &bitpos); }
+
+    // Finalize block
+    FSE_addBits(&bitStream, &bitpos, memLog, state);
+    FSE_flushBits(&bitStream, (void**)&op, &bitpos);
+    *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
+    op += bitpos>0;
+
+    return (int) (op-ostart);
+}
+
+
+#define FSED_U16LOG2_MAXMEMLOG 11
+int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int memLog)
+{
+    const U16* const istart = (const U16*) source;
+    const U16* ip = istart;
+
+    BYTE* const ostart = (BYTE*) dest;
+    BYTE* op = ostart;
+
+    int nbSymbols = 16;
+    U32 counting[64];
+    U32 CTable[2 + 16 + (1<<FSED_U16LOG2_MAXMEMLOG)];
+
+
+    if (memLog > FSED_U16LOG2_MAXMEMLOG) return -1;
+    // early out
+    if (sourceSize <= 1) return FSED_noCompressU16 (ostart, istart, sourceSize);
+
+    // Scan for stats
+    nbSymbols = FSED_countU16Log2 (counting, ip, sourceSize);
+
+    // Normalize
+    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
+
+    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
+
+    // Compress
+    FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
+    op += FSED_compressU16Log2_usingCTable (op, ip, sourceSize, &CTable);
+
+    // check compressibility
+    if ( (op-ostart) >= (sourceSize*2-1) )
+        return FSED_noCompressU16 (ostart, istart, sourceSize);
+
+    return (int) (op-ostart);
 }
 
 
