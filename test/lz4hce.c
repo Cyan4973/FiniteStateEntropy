@@ -571,11 +571,10 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
     if (eType == et_runLength)
     {
-        U32 rl = (U32)(*ip - *anchor)+1;
+        U32 rl = (U32)(*ip - *anchor);
         token = (*op)++;
-        //if (length>=15) *token= 15; else *token = (BYTE)(length);
-        if (rl >= 4095) rl=4095;
-        *token = (BYTE)(LZ4HC_highbit(rl));
+        if (rl >= 255) rl=255;
+        *token = (BYTE)rl;
         // Prepare next loop
         *ip += matchLength;
         *anchor = *ip;
@@ -585,7 +584,19 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     if (eType == et_runLengthU16)
     {
         U32 rl = (U32)(*ip - *anchor)+1;
-        if (rl >= 4095) rl=4095;
+        if (rl >= 255) rl=255;
+        *((U16*)*op) = (U16)rl;
+        *op += 2;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip;
+        return 0;
+    }
+
+    if (eType == et_runLengthLN)
+    {
+        U32 rl = (U32)(*ip - *anchor)+8;
+        if (rl >= 255) rl=255;
         *((U16*)*op) = (U16)rl;
         *op += 2;
         // Prepare next loop
@@ -596,12 +607,10 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
     if (eType == et_matchLength)
     {
-        U32 ml = (U32)(matchLength-MINMATCH+1);
-        //length = (int)(matchLength-MINMATCH);
+        U32 ml = (U32)(matchLength-MINMATCH);
         token = (*op)++;
-        //if (length>=15) *token= 15; else *token = (BYTE)(length);
-        if (ml >= 4095) ml=4095;
-        *token = (BYTE)(LZ4HC_highbit(ml));
+        if (ml >= 255) ml=255;
+        *token = (BYTE)ml;
         // Prepare next loop
         *ip += matchLength;
         *anchor = *ip;
@@ -611,7 +620,19 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     if (eType == et_matchLengthU16)
     {
         U32 ml = (U32)(matchLength-MINMATCH+1);
-        if (ml >= 4095) ml=4095;
+        if (ml >= 255) ml=255;
+        *((U16*)*op) = (U16)ml;
+        *op += 2;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip;
+        return 0;
+    }
+
+    if (eType == et_matchLengthLog2)
+    {
+        U32 ml = (U32)(matchLength+4);
+        if (ml >= 255) ml=255;
         *((U16*)*op) = (U16)ml;
         *op += 2;
         // Prepare next loop

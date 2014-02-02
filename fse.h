@@ -205,6 +205,7 @@ void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const unsig
 
 
 /* *** inlined functions (for performance) *** */
+/* GCC is not as good as visual to inline code from other source files */
 
 inline void FSE_flushBits(size_t* bitStream, void** p, int* bitpos)
 {
@@ -220,10 +221,11 @@ inline void FSE_flushBits(size_t* bitStream, void** p, int* bitpos)
 
 inline void FSE_addBits(size_t* bitStream, int* bitpos, int nbBits, size_t value)
 {
-    static const unsigned int mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF };   // up to 15 bits
+    static const unsigned int mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF };   // up to 24 bits
     *bitStream |= (value & mask[nbBits]) << *bitpos;
     *bitpos += nbBits;
 }
+
 
 #if defined (__cplusplus)
 }

@@ -70,7 +70,7 @@
 //***************************************************
 #define COMPRESSOR_NAME "FSE : Finite State Entropy"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "%s, capability demo by %s (%s)\n", COMPRESSOR_NAME, AUTHOR, __DATE__
+#define WELCOME_MESSAGE "%s, %i-bits demo by %s (%s)\n", COMPRESSOR_NAME, sizeof(void*)*8, AUTHOR, __DATE__
 #define FSE_EXTENSION ".fse"
 
 
@@ -100,6 +100,7 @@ static int usage()
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
     DISPLAY(" -o : force compression\n");
     DISPLAY(" -b : benchmark (default, if -o not present)\n");
+    DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
     DISPLAY(" -h/-H : display help/long help and exit\n");
     return 0;
@@ -175,6 +176,9 @@ int main(int argc, char** argv)
                     // Benchmark mode (default)
                 case 'b': bench=1; break;
 
+                    // zlib Benchmark mode
+                case 'z': bench=2; break;
+
                     // Benchmark LZ4 extracted fields (hidden)
                 case 'l': benchLZ4e=1;
                     if ((argument[1]>='1') && (argument[1]<='1'+et_final)) { algoNb = argument[1] - '1'; argument++; }
@@ -241,7 +245,8 @@ int main(int argc, char** argv)
     if (benchLZ4e) { BMK_benchFilesLZ4E(argv+indexFileNames, argc-indexFileNames, algoNb); goto _end; }
 
     // Check if benchmark is selected
-    if (bench) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
+    if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
+    if (bench==2) { BMK_benchFilesZLIBH(argv+indexFileNames, argc-indexFileNames); goto _end; }
 
     // No output filename ==> try to select one automatically (when possible)
     while (!output_filename)
