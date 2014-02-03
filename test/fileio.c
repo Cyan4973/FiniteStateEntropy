@@ -85,7 +85,7 @@
 #elif GCC_VERSION >= 403
 #  define swap32 __builtin_bswap32
 #else
-  static inline unsigned int swap32(unsigned int x) 
+  static inline unsigned int swap32(unsigned int x)
   {
     return ((x << 24) & 0xff000000 ) |
            ((x <<  8) & 0x00ff0000 ) |
@@ -198,31 +198,31 @@ static int          FIO_GetBufferSize_FromBufferId (int id) { return (1 << (id +
 
 int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
-    if (!strcmp (input_filename, stdinmark)) 
+    if (!strcmp (input_filename, stdinmark))
     {
         DISPLAYLEVEL(4,"Using stdin for input\n");
         *pfinput = stdin;
         SET_BINARY_MODE(stdin);
-    } 
-    else 
+    }
+    else
     {
         *pfinput = fopen(input_filename, "rb");
     }
 
-    if (!strcmp (output_filename, stdoutmark)) 
+    if (!strcmp (output_filename, stdoutmark))
     {
         DISPLAYLEVEL(4,"Using stdout for output\n");
         *pfoutput = stdout;
         SET_BINARY_MODE(stdout);
-    } 
-    else 
+    }
+    else
     {
         // Check if destination file already exists
         *pfoutput=0;
         if (strcmp(output_filename,nulmark)) *pfoutput = fopen( output_filename, "rb" );
-        if (*pfoutput!=0) 
-        { 
-            fclose(*pfoutput); 
+        if (*pfoutput!=0)
+        {
+            fclose(*pfoutput);
             if (!overwrite)
             {
                 char ch;
@@ -237,7 +237,7 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
     }
 
     if ( *pfinput==0 ) EXM_THROW(12, "Pb opening %s", input_filename);
-    if ( *pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename); 
+    if ( *pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
 
     return 0;
 }
@@ -251,7 +251,7 @@ STREAMDESCRIPTOR
     1 byte value :
     bits 0-3 : block size, 2^value from 0 to 0xF, with 5=>32 KB (0=>1KB, 0xF=>32MB)
     bits 4-7 = 0 : reserved; All blocks must be full, except last one
-MULTIBLOCKHEADER 
+MULTIBLOCKHEADER
     1 byte value :
     if 0 : next block is the last, (BLOCKSIZE) will be provided
     if >0 : the next n blocks are full ones
@@ -262,12 +262,12 @@ MULTIBLOCKHEADER
     the number of bytes required depends on block size (ex : for 32KB blocks, n=2)
 COMPRESSEDBLOCK
     the compressed data itself. Note that its size is not provided. Maximum size is Blocksize+1
-STREAMCRC 
+STREAMCRC
     4 bytes xxh32() value of the original data.
 */
 int compress_file(char* output_filename, char* input_filename)
 {
-    int (*compressionFunction)(void*, const void*, int) = DEFAULT_COMPRESSOR;
+    int (*compressionFunction)(void*, const unsigned char*, int) = DEFAULT_COMPRESSOR;
     U64 filesize = 0;
     U64 compressedfilesize = 0;
     char* in_buff;
@@ -319,7 +319,7 @@ int compress_file(char* output_filename, char* input_filename)
             *(BYTE*)out_buff = (BYTE)nbFullBlocks;
             for (i=0; i<nbFullBlocks; i++)
             {
-                op += compressionFunction(op, ip, (int)inputBlockSize);
+                op += compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
                 ip += inputBlockSize;
             }
             if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
@@ -328,7 +328,7 @@ int compress_file(char* output_filename, char* input_filename)
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
-                op += compressionFunction(op, ip, lastBlockSize);
+                op += compressionFunction(op, (unsigned char*)ip, lastBlockSize);
                 ip +=  lastBlockSize;
                 lastBlockDone=1;
             }
@@ -426,7 +426,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
                 nbFullBlocks = *ip++;
                 if (!nbFullBlocks) goto _lastBlock;   // goto last block
             }
-            ip += FSE_decompress(out_buff, blockSize, ip);
+            ip += FSE_decompress((unsigned char*)out_buff, blockSize, ip);
             filesize += blockSize;
             nbFullBlocks--;
 
@@ -459,7 +459,7 @@ _lastBlock:
         }
         lastBlockSize &= mask;
 
-        ip += FSE_decompress(out_buff, lastBlockSize, ip);
+        ip += FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip);
         filesize += lastBlockSize;
 
         sizeCheck = fwrite(out_buff, 1, lastBlockSize, foutput);

@@ -55,22 +55,29 @@ extern "C" {
 // FSE simple functions
 //**************************************
 int FSE_compress   (void* dest,
-                    const void* source, int sourceSize);
-int FSE_decompress (void* dest, int originalSize,
+                    const unsigned char* source, int sourceSize);
+int FSE_decompress (unsigned char* dest, int originalSize,
                     const void* compressed);
 /*
 FSE_compress():
-    Compress memory buffer 'source', of size 'sourceSize', into destination buffer 'dest'.
+    Compress table of unsigned char 'source', of size 'sourceSize', into destination buffer 'dest'.
     'dest' buffer must be already allocated, and sized to handle worst case situations.
     Use FSE_compressBound() to determine this size.
     return : size of compressed data
 FSE_decompress():
     Decompress compressed data from buffer 'compressed',
-    into destination buffer 'dest', of size 'originalSize'.
-    Destination buffer must be already allocated, and large enough to accomodate 'originalSize' bytes.
+    into destination table 'dest', of size 'originalSize' unsigned char.
+    Destination table must be already allocated, and large enough to accomodate 'originalSize' bytes.
     The function will determine how many bytes are read from buffer 'compressed'.
     return : size of compressed data
 */
+
+
+/* same as FSE_compress(), but input is a table of unsigned short */
+int FSE_compressU16  (void* dest,
+                      const unsigned short* source, int sourceSize, int nbSymbols, int memLog);
+int FSE_decompressU16(unsigned short* dest, int originalSize,
+                      const void* compressed);
 
 
 #define FSE_MAX_HEADERSIZE 512
@@ -82,23 +89,23 @@ FSE_compressBound():
     Used to know how much memory to allocate for destination buffer.
 */
 
-//****************************
-// FSE advanced functions
-//****************************
+/******************************************
+   FSE advanced functions
+******************************************/
 /*
 FSE_compress2():
     Same as FSE_compress(), but allows the selection of 'nbSymbols' and 'memLog'
     Both parameters can be defined as '0' to means : use default value
-    The function will then assume that any byte within 'source' has value < nbSymbols.
+    The function will then assume that any unsigned char within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
 */
-int FSE_compress2 (void* dest, const void* source, int sourceSize, int nbSymbols, int memLog);
+int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int memLog);
 
 
-//******************************************
-// FSE detailed API (experimental)
-//******************************************
+/******************************************
+   FSE detailed API (experimental)
+******************************************/
 /*
 int FSE_compress(char* dest, const char* source, int inputSize) does the following:
 1. calculates symbol distribution of the source[] into internal table counting[c]
@@ -117,7 +124,7 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-int FSE_count(unsigned int* count, const void* source, int sourceSize, int maxNbSymbols);
+int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
 
 int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
@@ -127,7 +134,7 @@ int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbS
 int FSE_sizeof_CTable(int nbSymbols, int tableLog);
 int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
 
-int FSE_compress_usingCTable (void* dest, const void* source, int sourceSize, const void* CTable);
+int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourceSize, const void* CTable);
 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
@@ -171,7 +178,7 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
 int FSE_sizeof_DTable(int tableLog);
 int FSE_buildDTable(void* DTable, const unsigned int* const normalizedCounter, int nbSymbols, int tableLog);
 
-int FSE_decompress_usingDTable(void* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
+int FSE_decompress_usingDTable(unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
 
 /*
 The first step is to get the normalized frequency of symbols.
@@ -196,16 +203,15 @@ The function returns the size of compressed data (without header), or -1 if fail
 */
 
 
-//void FSE_addBits(size_t* bitStream, int* bitpos, int nbBits, size_t value);
-//void FSE_flushBits(size_t* bitStream, void** op, int* bitpos);
 void FSE_encodeSymbol(ptrdiff_t* state, size_t* bitStream, int* bitpos, unsigned char symbol, const void* symbolTT, const void* stateTable);
 
 unsigned char FSE_decodeSymbol(unsigned int* state, unsigned int bitStream, int* bitsConsumed, const void* DTable);
 void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const unsigned char** ip);
 
 
+/***********************************************************************/
 /* *** inlined functions (for performance) *** */
-/* GCC is not as good as visual to inline code from other source files */
+/* GCC is not as good as visual to inline code from other *.c files */
 
 inline void FSE_flushBits(size_t* bitStream, void** p, int* bitpos)
 {

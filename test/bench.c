@@ -500,7 +500,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                 //chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
-                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -522,7 +522,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSE_decompress(chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = FSE_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
