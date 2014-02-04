@@ -111,7 +111,7 @@ static long long nbDBlocks = 0;    // debug
 #  define FORCE_INLINE static __forceinline
 #  include <intrin.h>                    // For Visual 2005
 #  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
-#  pragma warning(disable : 4214)        // disable: C4214: bitfields
+#  pragma warning(disable : 4214)        // disable: C4214: non-int bitfields
 #else
 #  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  ifdef __GNUC__
@@ -547,6 +547,7 @@ static int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
     return (isize+1);
 }
 
+static U64 CCounter=0;
 
 typedef struct
 {
@@ -567,7 +568,6 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
     U32   counting[FSE_MAX_NB_SYMBOLS];
     CTable_max_t CTable;
 
-
     // early out
     if (sourceSize <= 1) return FSE_noCompression (ostart, istart, sourceSize);
     if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS;
@@ -575,6 +575,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
 
     // Scan for stats
     nbSymbols = FSE_count (counting, ip, sourceSize, nbSymbols);
+    if (nbSymbols==1) return FSE_writeSingleChar (ostart, *istart);
 
     // Normalize
     memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
@@ -986,6 +987,7 @@ int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, i
 
     // Scan for stats
     nbSymbols = FSE_countU16 (counting, ip, sourceSize, nbSymbols);
+    if (nbSymbols==1) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
     memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);

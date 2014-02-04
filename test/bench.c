@@ -669,7 +669,6 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         int maxCompressedChunkSize;
         size_t readSize;
         char* compressedBuffer; int compressedBuffSize;
-        char* destBuffer;
         chunkParameters_t* chunkP;
 
         // Check file existence
@@ -699,7 +698,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
-        benchedSize = (size_t) BMK_findMaxMem(inFileSize * 3) / 3;
+        benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         if (benchedSize < inFileSize) DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
 
@@ -710,15 +709,13 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         maxCompressedChunkSize = FSE_compressBound(chunkSize);
         compressedBuffSize = nbChunks * maxCompressedChunkSize;
         compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
-        destBuffer = (char*)malloc((size_t )benchedSize);
 
 
-        if (!orig_buff || !compressedBuffer || !destBuffer)
+        if (!orig_buff || !compressedBuffer)
         {
             DISPLAY("\nError: not enough memory!\n");
             free(orig_buff);
             free(compressedBuffer);
-            free(destBuffer);
             free(chunkP);
             fclose(inFile);
             return 12;
@@ -730,7 +727,6 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             size_t remaining = benchedSize;
             char* in = orig_buff;
             char* out = compressedBuffer;
-            char* dst = destBuffer;
             for (i=0; i<nbChunks; i++)
             {
                 chunkP[i].id = i;
@@ -738,7 +734,6 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
                 if ((int)remaining > chunkSize) { chunkP[i].origSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
                 chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
                 chunkP[i].compressedSize = 0;
-                chunkP[i].destBuffer = dst; dst +=  chunkSize;
             }
         }
 
@@ -752,7 +747,6 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, (int)readSize, (int)benchedSize);
             free(orig_buff);
             free(compressedBuffer);
-            free(destBuffer);
             free(chunkP);
             return 13;
         }
@@ -763,7 +757,6 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         free(orig_buff);
         free(compressedBuffer);
-        free(destBuffer);
         free(chunkP);
     }
 

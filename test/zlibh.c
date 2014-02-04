@@ -58,6 +58,7 @@ You can contact the author at :
 
 #ifdef _MSC_VER    // Visual Studio
 #  pragma warning(disable : 4701)        // disable: C4701: variable potentially uninitialized
+#  pragma warning(disable : 4131)        // disable: C4131: obsolete declarator
 #endif
 
 /*
@@ -508,7 +509,7 @@ tree_desc *bltree_desc;     /* the tree descriptor */
         if (++count < max_count && curlen == nextlen) {
             continue;
         } else if (count < min_count) {
-            bltree[curlen].Freq += count;
+            bltree[curlen].Freq += (unsigned short)count;
         } else if (curlen != 0) {
             if (curlen != prevlen) bltree[curlen].Freq++;
             bltree[REP_3_6].Freq++;
@@ -575,7 +576,7 @@ unsigned short *bl_count;              /* number of codes at each bit length */
     for (n = 0;  n <= max_code; n++) {
         int len = tree[n].Len;
         if (len == 0) continue;
-        tree[n].Code = bi_reverse(next_code[len]++, len);   /* Now reverse the bits */
+        tree[n].Code = (unsigned short)bi_reverse(next_code[len]++, len);   /* Now reverse the bits */
     }
 }
 
@@ -825,7 +826,7 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
 
     symbol = 0;
     do {
-        dyn_ltree[symbol].Freq = freq_l[symbol];
+        dyn_ltree[symbol].Freq = (unsigned short)freq_l[symbol];
         ++symbol;
     } while (symbol < 257);
 
