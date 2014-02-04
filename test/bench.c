@@ -23,7 +23,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 // Tuning parameters
 //**************************************
 #define NBLOOPS    4
-#define TIMELOOP   2
+#define TIMELOOP   2500
 
 
 //**************************************
@@ -528,8 +528,6 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
                 total += chunkP[chunkNb].origSize;
-                if (total >= 527994)
-                    printf(" ");
                 chunkP[chunkNb].compressedSize = FSE_decompressU16((unsigned short*)chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
             }
             nbLoops++;

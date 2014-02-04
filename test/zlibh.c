@@ -1,33 +1,33 @@
 /* ******************************************************************
-   ZLIBH : Zlib based Huffman coder
-   Copyright (C) 1995-2012 Jean-loup Gailly
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+ZLIBH : Zlib based Huffman coder
+Copyright (C) 1995-2012 Jean-loup Gailly
+BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
 
-       * Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following disclaimer
-   in the documentation and/or other materials provided with the
-   distribution.
+* Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
 
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF Sunsigned char DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF Sunsigned char DAMAGE.
 
-   You can contact the author at :
-   - Public forum : https://groups.google.com/forum/#!forum/lz4c
+You can contact the author at :
+- Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
 
@@ -56,10 +56,14 @@
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
 
+#ifdef _MSC_VER    // Visual Studio
+#  pragma warning(disable : 4701)        // disable: C4701: variable potentially uninitialized
+#endif
+
 /*
- * Maximums for allocations and loops.  It is not useful to change these --
- * they are fixed by the deflate format.
- */
+* Maximums for allocations and loops.  It is not useful to change these --
+* they are fixed by the deflate format.
+*/
 
 #define ZLIBH_MAX_BITS    15    /* maximum bits in a code */
 #define ZLIBH_MAX_BL_BITS  7    /* maximum bits in a length code code */
@@ -106,7 +110,7 @@ typedef struct static_tree_desc_s {
     int     extra_base;          /* base index for extra_bits */
     int     elems;               /* max number of elements in the tree */
     int     max_length;          /* max bit length for the codes */
-    } static_tree_desc;
+} static_tree_desc;
 
 typedef struct tree_desc_s {
     ct_data          *dyn_tree;  /* the dynamic tree */
@@ -116,76 +120,76 @@ typedef struct tree_desc_s {
 } tree_desc;
 
 static const unsigned char bl_order[]
-   = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
+= {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
 /* The lengths of the bit length codes are sent in order of decreasing
- * probability, to avoid transmitting the lengths for unused bit length codes.
- */
- 
+* probability, to avoid transmitting the lengths for unused bit length codes.
+*/
+
 static const int extra_lbits[]   /* extra bits for each length code */
-   = {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
+= {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
 
 static const int extra_blbits[]  /* extra bits for each bit length code */
-   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7};
+= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7};
 
 static const ct_data static_ltree[] = {
-{{ 12},{  8}}, {{140},{  8}}, {{ 76},{  8}}, {{204},{  8}}, {{ 44},{  8}},
-{{172},{  8}}, {{108},{  8}}, {{236},{  8}}, {{ 28},{  8}}, {{156},{  8}},
-{{ 92},{  8}}, {{220},{  8}}, {{ 60},{  8}}, {{188},{  8}}, {{124},{  8}},
-{{252},{  8}}, {{  2},{  8}}, {{130},{  8}}, {{ 66},{  8}}, {{194},{  8}},
-{{ 34},{  8}}, {{162},{  8}}, {{ 98},{  8}}, {{226},{  8}}, {{ 18},{  8}},
-{{146},{  8}}, {{ 82},{  8}}, {{210},{  8}}, {{ 50},{  8}}, {{178},{  8}},
-{{114},{  8}}, {{242},{  8}}, {{ 10},{  8}}, {{138},{  8}}, {{ 74},{  8}},
-{{202},{  8}}, {{ 42},{  8}}, {{170},{  8}}, {{106},{  8}}, {{234},{  8}},
-{{ 26},{  8}}, {{154},{  8}}, {{ 90},{  8}}, {{218},{  8}}, {{ 58},{  8}},
-{{186},{  8}}, {{122},{  8}}, {{250},{  8}}, {{  6},{  8}}, {{134},{  8}},
-{{ 70},{  8}}, {{198},{  8}}, {{ 38},{  8}}, {{166},{  8}}, {{102},{  8}},
-{{230},{  8}}, {{ 22},{  8}}, {{150},{  8}}, {{ 86},{  8}}, {{214},{  8}},
-{{ 54},{  8}}, {{182},{  8}}, {{118},{  8}}, {{246},{  8}}, {{ 14},{  8}},
-{{142},{  8}}, {{ 78},{  8}}, {{206},{  8}}, {{ 46},{  8}}, {{174},{  8}},
-{{110},{  8}}, {{238},{  8}}, {{ 30},{  8}}, {{158},{  8}}, {{ 94},{  8}},
-{{222},{  8}}, {{ 62},{  8}}, {{190},{  8}}, {{126},{  8}}, {{254},{  8}},
-{{  1},{  8}}, {{129},{  8}}, {{ 65},{  8}}, {{193},{  8}}, {{ 33},{  8}},
-{{161},{  8}}, {{ 97},{  8}}, {{225},{  8}}, {{ 17},{  8}}, {{145},{  8}},
-{{ 81},{  8}}, {{209},{  8}}, {{ 49},{  8}}, {{177},{  8}}, {{113},{  8}},
-{{241},{  8}}, {{  9},{  8}}, {{137},{  8}}, {{ 73},{  8}}, {{201},{  8}},
-{{ 41},{  8}}, {{169},{  8}}, {{105},{  8}}, {{233},{  8}}, {{ 25},{  8}},
-{{153},{  8}}, {{ 89},{  8}}, {{217},{  8}}, {{ 57},{  8}}, {{185},{  8}},
-{{121},{  8}}, {{249},{  8}}, {{  5},{  8}}, {{133},{  8}}, {{ 69},{  8}},
-{{197},{  8}}, {{ 37},{  8}}, {{165},{  8}}, {{101},{  8}}, {{229},{  8}},
-{{ 21},{  8}}, {{149},{  8}}, {{ 85},{  8}}, {{213},{  8}}, {{ 53},{  8}},
-{{181},{  8}}, {{117},{  8}}, {{245},{  8}}, {{ 13},{  8}}, {{141},{  8}},
-{{ 77},{  8}}, {{205},{  8}}, {{ 45},{  8}}, {{173},{  8}}, {{109},{  8}},
-{{237},{  8}}, {{ 29},{  8}}, {{157},{  8}}, {{ 93},{  8}}, {{221},{  8}},
-{{ 61},{  8}}, {{189},{  8}}, {{125},{  8}}, {{253},{  8}}, {{ 19},{  9}},
-{{275},{  9}}, {{147},{  9}}, {{403},{  9}}, {{ 83},{  9}}, {{339},{  9}},
-{{211},{  9}}, {{467},{  9}}, {{ 51},{  9}}, {{307},{  9}}, {{179},{  9}},
-{{435},{  9}}, {{115},{  9}}, {{371},{  9}}, {{243},{  9}}, {{499},{  9}},
-{{ 11},{  9}}, {{267},{  9}}, {{139},{  9}}, {{395},{  9}}, {{ 75},{  9}},
-{{331},{  9}}, {{203},{  9}}, {{459},{  9}}, {{ 43},{  9}}, {{299},{  9}},
-{{171},{  9}}, {{427},{  9}}, {{107},{  9}}, {{363},{  9}}, {{235},{  9}},
-{{491},{  9}}, {{ 27},{  9}}, {{283},{  9}}, {{155},{  9}}, {{411},{  9}},
-{{ 91},{  9}}, {{347},{  9}}, {{219},{  9}}, {{475},{  9}}, {{ 59},{  9}},
-{{315},{  9}}, {{187},{  9}}, {{443},{  9}}, {{123},{  9}}, {{379},{  9}},
-{{251},{  9}}, {{507},{  9}}, {{  7},{  9}}, {{263},{  9}}, {{135},{  9}},
-{{391},{  9}}, {{ 71},{  9}}, {{327},{  9}}, {{199},{  9}}, {{455},{  9}},
-{{ 39},{  9}}, {{295},{  9}}, {{167},{  9}}, {{423},{  9}}, {{103},{  9}},
-{{359},{  9}}, {{231},{  9}}, {{487},{  9}}, {{ 23},{  9}}, {{279},{  9}},
-{{151},{  9}}, {{407},{  9}}, {{ 87},{  9}}, {{343},{  9}}, {{215},{  9}},
-{{471},{  9}}, {{ 55},{  9}}, {{311},{  9}}, {{183},{  9}}, {{439},{  9}},
-{{119},{  9}}, {{375},{  9}}, {{247},{  9}}, {{503},{  9}}, {{ 15},{  9}},
-{{271},{  9}}, {{143},{  9}}, {{399},{  9}}, {{ 79},{  9}}, {{335},{  9}},
-{{207},{  9}}, {{463},{  9}}, {{ 47},{  9}}, {{303},{  9}}, {{175},{  9}},
-{{431},{  9}}, {{111},{  9}}, {{367},{  9}}, {{239},{  9}}, {{495},{  9}},
-{{ 31},{  9}}, {{287},{  9}}, {{159},{  9}}, {{415},{  9}}, {{ 95},{  9}},
-{{351},{  9}}, {{223},{  9}}, {{479},{  9}}, {{ 63},{  9}}, {{319},{  9}},
-{{191},{  9}}, {{447},{  9}}, {{127},{  9}}, {{383},{  9}}, {{255},{  9}},
-{{511},{  9}}, {{  0},{  7}}, {{ 64},{  7}}, {{ 32},{  7}}, {{ 96},{  7}},
-{{ 16},{  7}}, {{ 80},{  7}}, {{ 48},{  7}}, {{112},{  7}}, {{  8},{  7}},
-{{ 72},{  7}}, {{ 40},{  7}}, {{104},{  7}}, {{ 24},{  7}}, {{ 88},{  7}},
-{{ 56},{  7}}, {{120},{  7}}, {{  4},{  7}}, {{ 68},{  7}}, {{ 36},{  7}},
-{{100},{  7}}, {{ 20},{  7}}, {{ 84},{  7}}, {{ 52},{  7}}, {{116},{  7}},
-{{  3},{  8}}, {{131},{  8}}, {{ 67},{  8}}, {{195},{  8}}, {{ 35},{  8}},
-{{163},{  8}}, {{ 99},{  8}}, {{227},{  8}}
+    {{ 12},{  8}}, {{140},{  8}}, {{ 76},{  8}}, {{204},{  8}}, {{ 44},{  8}},
+    {{172},{  8}}, {{108},{  8}}, {{236},{  8}}, {{ 28},{  8}}, {{156},{  8}},
+    {{ 92},{  8}}, {{220},{  8}}, {{ 60},{  8}}, {{188},{  8}}, {{124},{  8}},
+    {{252},{  8}}, {{  2},{  8}}, {{130},{  8}}, {{ 66},{  8}}, {{194},{  8}},
+    {{ 34},{  8}}, {{162},{  8}}, {{ 98},{  8}}, {{226},{  8}}, {{ 18},{  8}},
+    {{146},{  8}}, {{ 82},{  8}}, {{210},{  8}}, {{ 50},{  8}}, {{178},{  8}},
+    {{114},{  8}}, {{242},{  8}}, {{ 10},{  8}}, {{138},{  8}}, {{ 74},{  8}},
+    {{202},{  8}}, {{ 42},{  8}}, {{170},{  8}}, {{106},{  8}}, {{234},{  8}},
+    {{ 26},{  8}}, {{154},{  8}}, {{ 90},{  8}}, {{218},{  8}}, {{ 58},{  8}},
+    {{186},{  8}}, {{122},{  8}}, {{250},{  8}}, {{  6},{  8}}, {{134},{  8}},
+    {{ 70},{  8}}, {{198},{  8}}, {{ 38},{  8}}, {{166},{  8}}, {{102},{  8}},
+    {{230},{  8}}, {{ 22},{  8}}, {{150},{  8}}, {{ 86},{  8}}, {{214},{  8}},
+    {{ 54},{  8}}, {{182},{  8}}, {{118},{  8}}, {{246},{  8}}, {{ 14},{  8}},
+    {{142},{  8}}, {{ 78},{  8}}, {{206},{  8}}, {{ 46},{  8}}, {{174},{  8}},
+    {{110},{  8}}, {{238},{  8}}, {{ 30},{  8}}, {{158},{  8}}, {{ 94},{  8}},
+    {{222},{  8}}, {{ 62},{  8}}, {{190},{  8}}, {{126},{  8}}, {{254},{  8}},
+    {{  1},{  8}}, {{129},{  8}}, {{ 65},{  8}}, {{193},{  8}}, {{ 33},{  8}},
+    {{161},{  8}}, {{ 97},{  8}}, {{225},{  8}}, {{ 17},{  8}}, {{145},{  8}},
+    {{ 81},{  8}}, {{209},{  8}}, {{ 49},{  8}}, {{177},{  8}}, {{113},{  8}},
+    {{241},{  8}}, {{  9},{  8}}, {{137},{  8}}, {{ 73},{  8}}, {{201},{  8}},
+    {{ 41},{  8}}, {{169},{  8}}, {{105},{  8}}, {{233},{  8}}, {{ 25},{  8}},
+    {{153},{  8}}, {{ 89},{  8}}, {{217},{  8}}, {{ 57},{  8}}, {{185},{  8}},
+    {{121},{  8}}, {{249},{  8}}, {{  5},{  8}}, {{133},{  8}}, {{ 69},{  8}},
+    {{197},{  8}}, {{ 37},{  8}}, {{165},{  8}}, {{101},{  8}}, {{229},{  8}},
+    {{ 21},{  8}}, {{149},{  8}}, {{ 85},{  8}}, {{213},{  8}}, {{ 53},{  8}},
+    {{181},{  8}}, {{117},{  8}}, {{245},{  8}}, {{ 13},{  8}}, {{141},{  8}},
+    {{ 77},{  8}}, {{205},{  8}}, {{ 45},{  8}}, {{173},{  8}}, {{109},{  8}},
+    {{237},{  8}}, {{ 29},{  8}}, {{157},{  8}}, {{ 93},{  8}}, {{221},{  8}},
+    {{ 61},{  8}}, {{189},{  8}}, {{125},{  8}}, {{253},{  8}}, {{ 19},{  9}},
+    {{275},{  9}}, {{147},{  9}}, {{403},{  9}}, {{ 83},{  9}}, {{339},{  9}},
+    {{211},{  9}}, {{467},{  9}}, {{ 51},{  9}}, {{307},{  9}}, {{179},{  9}},
+    {{435},{  9}}, {{115},{  9}}, {{371},{  9}}, {{243},{  9}}, {{499},{  9}},
+    {{ 11},{  9}}, {{267},{  9}}, {{139},{  9}}, {{395},{  9}}, {{ 75},{  9}},
+    {{331},{  9}}, {{203},{  9}}, {{459},{  9}}, {{ 43},{  9}}, {{299},{  9}},
+    {{171},{  9}}, {{427},{  9}}, {{107},{  9}}, {{363},{  9}}, {{235},{  9}},
+    {{491},{  9}}, {{ 27},{  9}}, {{283},{  9}}, {{155},{  9}}, {{411},{  9}},
+    {{ 91},{  9}}, {{347},{  9}}, {{219},{  9}}, {{475},{  9}}, {{ 59},{  9}},
+    {{315},{  9}}, {{187},{  9}}, {{443},{  9}}, {{123},{  9}}, {{379},{  9}},
+    {{251},{  9}}, {{507},{  9}}, {{  7},{  9}}, {{263},{  9}}, {{135},{  9}},
+    {{391},{  9}}, {{ 71},{  9}}, {{327},{  9}}, {{199},{  9}}, {{455},{  9}},
+    {{ 39},{  9}}, {{295},{  9}}, {{167},{  9}}, {{423},{  9}}, {{103},{  9}},
+    {{359},{  9}}, {{231},{  9}}, {{487},{  9}}, {{ 23},{  9}}, {{279},{  9}},
+    {{151},{  9}}, {{407},{  9}}, {{ 87},{  9}}, {{343},{  9}}, {{215},{  9}},
+    {{471},{  9}}, {{ 55},{  9}}, {{311},{  9}}, {{183},{  9}}, {{439},{  9}},
+    {{119},{  9}}, {{375},{  9}}, {{247},{  9}}, {{503},{  9}}, {{ 15},{  9}},
+    {{271},{  9}}, {{143},{  9}}, {{399},{  9}}, {{ 79},{  9}}, {{335},{  9}},
+    {{207},{  9}}, {{463},{  9}}, {{ 47},{  9}}, {{303},{  9}}, {{175},{  9}},
+    {{431},{  9}}, {{111},{  9}}, {{367},{  9}}, {{239},{  9}}, {{495},{  9}},
+    {{ 31},{  9}}, {{287},{  9}}, {{159},{  9}}, {{415},{  9}}, {{ 95},{  9}},
+    {{351},{  9}}, {{223},{  9}}, {{479},{  9}}, {{ 63},{  9}}, {{319},{  9}},
+    {{191},{  9}}, {{447},{  9}}, {{127},{  9}}, {{383},{  9}}, {{255},{  9}},
+    {{511},{  9}}, {{  0},{  7}}, {{ 64},{  7}}, {{ 32},{  7}}, {{ 96},{  7}},
+    {{ 16},{  7}}, {{ 80},{  7}}, {{ 48},{  7}}, {{112},{  7}}, {{  8},{  7}},
+    {{ 72},{  7}}, {{ 40},{  7}}, {{104},{  7}}, {{ 24},{  7}}, {{ 88},{  7}},
+    {{ 56},{  7}}, {{120},{  7}}, {{  4},{  7}}, {{ 68},{  7}}, {{ 36},{  7}},
+    {{100},{  7}}, {{ 20},{  7}}, {{ 84},{  7}}, {{ 52},{  7}}, {{116},{  7}},
+    {{  3},{  8}}, {{131},{  8}}, {{ 67},{  8}}, {{195},{  8}}, {{ 35},{  8}},
+    {{163},{  8}}, {{ 99},{  8}}, {{227},{  8}}
 };
 
 static static_tree_desc  static_l_desc =
@@ -200,9 +204,9 @@ static static_tree_desc  static_bl_desc =
 
 
 /* ===========================================================================
- * Remove the smallest element from the heap and recreate the heap with
- * one less element. Updates heap and huf_heap[0].
- */
+* Remove the smallest element from the heap and recreate the heap with
+* one less element. Updates heap and huf_heap[0].
+*/
 #define pqremove(tree, huf_heap, depth, top) \
 {\
     top = huf_heap[SMALLEST]; \
@@ -211,23 +215,23 @@ static static_tree_desc  static_bl_desc =
 }
 
 /* ===========================================================================
- * Compares to subtrees, using the tree depth as tie breaker when
- * the subtrees have equal frequency. This minimizes the worst case length.
- */
+* Compares to subtrees, using the tree depth as tie breaker when
+* the subtrees have equal frequency. This minimizes the worst case length.
+*/
 #define smaller(tree, n, m, depth) \
-   (tree[n].Freq < tree[m].Freq || (tree[n].Freq == tree[m].Freq && depth[n] <= depth[m]))
+    (tree[n].Freq < tree[m].Freq || (tree[n].Freq == tree[m].Freq && depth[n] <= depth[m]))
 
 /* ===========================================================================
- * Restore the heap property by moving down the tree starting at node k,
- * exchanging a node with the smallest of its two sons if necessary, stopping
- * when the heap property is re-established (each father smaller than its
- * two sons).
- */
+* Restore the heap property by moving down the tree starting at node k,
+* exchanging a node with the smallest of its two sons if necessary, stopping
+* when the heap property is re-established (each father smaller than its
+* two sons).
+*/
 static void pqdownheap(tree, huf_heap, depth, k)
     ct_data *tree;  /* the tree to restore */
-    int *huf_heap;
-    unsigned char *depth;
-    int k;               /* node to move down */
+int *huf_heap;
+unsigned char *depth;
+int k;               /* node to move down */
 {
     int v = huf_heap[k];
     int j = k << 1;  /* left son of k */
@@ -235,7 +239,7 @@ static void pqdownheap(tree, huf_heap, depth, k)
         /* Set j to the smallest of the two sons: */
         if (j < huf_heap[0] &&
             smaller(tree, huf_heap[j+1], huf_heap[j], depth)) {
-            j++;
+                j++;
         }
         /* Exit if v is smaller than both sons */
         if (smaller(tree, v, huf_heap[j], depth)) break;
@@ -254,17 +258,17 @@ static void pqdownheap(tree, huf_heap, depth, k)
 //****************************************************************
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
-  typedef  uint8_t BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
+typedef  uint8_t BYTE;
+typedef uint16_t U16;
+typedef uint32_t U32;
+typedef  int32_t S32;
+typedef uint64_t U64;
 #else
-  typedef unsigned char       BYTE;
-  typedef unsigned short      U16;
-  typedef unsigned int        U32;
-  typedef   signed int        S32;
-  typedef unsigned long long  U64;
+typedef unsigned char       BYTE;
+typedef unsigned short      U16;
+typedef unsigned int        U32;
+typedef   signed int        S32;
+typedef unsigned long long  U64;
 #endif
 
 typedef U32 bitContainer_t;
@@ -315,34 +319,34 @@ static long long nbDBlocks = 0;    // debug
 // ZLIBH Compression Code
 //****************************
 
-    /* If not enough room in bi_buf, use (valid) bits from bi_buf and
-     * (16 - bi_valid) bits from value, leaving (width - (16-bi_valid))
-     * unused bits in value.
-     */
+/* If not enough room in bi_buf, use (valid) bits from bi_buf and
+* (16 - bi_valid) bits from value, leaving (width - (16-bi_valid))
+* unused bits in value.
+*/
 #define SENDBITS() \
     do { \
-      if (bi_valid > (16U - length)) { \
-        bi_buf |= value << bi_valid; \
-	*op++=(unsigned char)(bi_buf & 0xff); \
-        *op++=(unsigned char)(bi_buf >> 8); \
-        bi_buf = value >> (16 - bi_valid); \
-        bi_valid += length - 16; \
-      } else { \
-        bi_buf |= value << bi_valid; \
-        bi_valid += length; \
-      } \
+    if (bi_valid > (16U - length)) { \
+    bi_buf |= value << bi_valid; \
+    *op++=(unsigned char)(bi_buf & 0xff); \
+    *op++=(unsigned char)(bi_buf >> 8); \
+    bi_buf = value >> (16 - bi_valid); \
+    bi_valid += length - 16; \
+    } else { \
+    bi_buf |= value << bi_valid; \
+    bi_valid += length; \
+    } \
     } while (0)
 
 
 /* ===========================================================================
- * Send the block data compressed using the given Huffman trees
- */
+* Send the block data compressed using the given Huffman trees
+*/
 static void ZLIBH_compress_block(ip, op, ltree, bltree, ip_len)
     unsigned char* ip;      /* input buffer */
-    unsigned char* op;      /* output buffer */
-    const ct_data *ltree;   /* literal tree */
-    const ct_data *bltree;  /* bitlen tree */
-    unsigned int ip_len;    /* number of symbols in input buffer */
+unsigned char* op;      /* output buffer */
+const ct_data *ltree;   /* literal tree */
+const ct_data *bltree;  /* bitlen tree */
+unsigned int ip_len;    /* number of symbols in input buffer */
 {
     unsigned int bi_buf;    /* bit buffer */
     unsigned int bi_valid;  /* bits used in bit_buf */
@@ -353,132 +357,132 @@ static void ZLIBH_compress_block(ip, op, ltree, bltree, ip_len)
     unsigned int n;
 
     if  (ltree != static_ltree) {  /* write dynamic Huffman header first */
-      /* send_tree is merged here */
-      int prevlen = -1;            /* last emitted length */
-      int curlen;                  /* length of current code */
-      int nextlen = ltree[0].Len;  /* length of next code */
-      int count = 0;               /* repeat count of the current code */
-      int max_count = 7;           /* max repeat count */
-      int min_count = 4;           /* min repeat count */
-      unsigned int max_code = 256;
-      unsigned int blcodes;
+        /* send_tree is merged here */
+        int prevlen = -1;            /* last emitted length */
+        int curlen;                  /* length of current code */
+        int nextlen = ltree[0].Len;  /* length of next code */
+        int count = 0;               /* repeat count of the current code */
+        int max_count = 7;           /* max repeat count */
+        int min_count = 4;           /* min repeat count */
+        unsigned int max_code = 256;
+        unsigned int blcodes;
 
-      bi_valid = 5;
-      blcodes = op[0];
-      bi_buf = (unsigned int)((blcodes-4)<<1);
-      length = 3;
-      for (n = 0; n < blcodes; n++) {
-        value = bltree[bl_order[n]].Len;
-	SENDBITS();
-      }
+        bi_valid = 5;
+        blcodes = op[0];
+        bi_buf = (unsigned int)((blcodes-4)<<1);
+        length = 3;
+        for (n = 0; n < blcodes; n++) {
+            value = bltree[bl_order[n]].Len;
+            SENDBITS();
+        }
 
-      if (nextlen == 0) max_count = 138, min_count = 3;
+        if (nextlen == 0) max_count = 138, min_count = 3;
 
-      for (n = 0; n <= max_code; n++) {
-        curlen = nextlen; nextlen = ltree[n+1].Len;
-        if (++count < max_count && curlen == nextlen) {
-          continue;
-        } else if (count < min_count) {
-            do {
-	      value = bltree[curlen].Code;
-	      length = bltree[curlen].Len;
-	      SENDBITS();
-	    } while (--count != 0);
+        for (n = 0; n <= max_code; n++) {
+            curlen = nextlen; nextlen = ltree[n+1].Len;
+            if (++count < max_count && curlen == nextlen) {
+                continue;
+            } else if (count < min_count) {
+                do {
+                    value = bltree[curlen].Code;
+                    length = bltree[curlen].Len;
+                    SENDBITS();
+                } while (--count != 0);
 
-        } else if (curlen != 0) {
-            if (curlen != prevlen) {
-	      value = bltree[curlen].Code;
-	      length = bltree[curlen].Len;
-	      SENDBITS();
-	      count--;
+            } else if (curlen != 0) {
+                if (curlen != prevlen) {
+                    value = bltree[curlen].Code;
+                    length = bltree[curlen].Len;
+                    SENDBITS();
+                    count--;
+                }
+                value = bltree[REP_3_6].Code;
+                length = bltree[REP_3_6].Len;
+                SENDBITS();
+
+                length = 2;
+                value = count-3;
+                SENDBITS();
+
+            } else if (count < 11) {
+                value = bltree[REPZ_3_10].Code;
+                length = bltree[REPZ_3_10].Len;
+                SENDBITS();
+
+                length = 3;
+                value = count-3;
+                SENDBITS();
+
+            } else {
+                value = bltree[REPZ_11_138].Code;
+                length = bltree[REPZ_11_138].Len;
+                SENDBITS();
+
+                length = 7;
+                value = count-11;
+                SENDBITS();
+
             }
-	    value = bltree[REP_3_6].Code;
-	    length = bltree[REP_3_6].Len;
-	    SENDBITS();
-
-	    length = 2;
-	    value = count-3;
-	    SENDBITS();
-
-        } else if (count < 11) {
-	    value = bltree[REPZ_3_10].Code;
-	    length = bltree[REPZ_3_10].Len;
-	    SENDBITS();
-
-	    length = 3;
-	    value = count-3;
-	    SENDBITS();
-            
-        } else {
-	    value = bltree[REPZ_11_138].Code;
-	    length = bltree[REPZ_11_138].Len;
-	    SENDBITS();
-
-	    length = 7;
-	    value = count-11;
-	    SENDBITS();
-
+            count = 0; prevlen = curlen;
+            if (nextlen == 0) {
+                max_count = 138, min_count = 3;
+            } else if (curlen == nextlen) {
+                max_count = 6, min_count = 3;
+            } else {
+                max_count = 7, min_count = 4;
+            }
         }
-        count = 0; prevlen = curlen;
-        if (nextlen == 0) {
-            max_count = 138, min_count = 3;
-        } else if (curlen == nextlen) {
-            max_count = 6, min_count = 3;
-        } else {
-            max_count = 7, min_count = 4;
-        }
-      }
     }
     else {            /* static case only identified by a single one bit */
-      bi_valid = 1;
-      bi_buf = 1;
+        bi_valid = 1;
+        bi_buf = 1;
     }
     lx = 1;
     do {
-      t_index = *ip++;
-      value = (unsigned int)ltree[t_index].Code;
-      length = ltree[t_index].Len;
-      if (bi_valid > (16U - length)) {
-        bi_buf |= value << bi_valid;
-	*op++=(unsigned char)(bi_buf & 0xff);
-        *op++=(unsigned char)(bi_buf >> 8);
-        bi_buf = value >> (16 - bi_valid);
-        bi_valid += length - 16;
-      } else {
-        bi_buf |= value << bi_valid;
-        bi_valid += length;
-      }
+        t_index = *ip++;
+        value = (unsigned int)ltree[t_index].Code;
+        length = ltree[t_index].Len;
+        if (bi_valid > (16U - length)) {
+            bi_buf |= value << bi_valid;
+            *op++=(unsigned char)(bi_buf & 0xff);
+            *op++=(unsigned char)(bi_buf >> 8);
+            bi_buf = value >> (16 - bi_valid);
+            bi_valid += length - 16;
+        } else {
+            bi_buf |= value << bi_valid;
+            bi_valid += length;
+        }
     } while (lx++ < ip_len);
 
     value = (unsigned int)ltree[END_BLOCK].Code;   /* send End of Block */
     length = ltree[END_BLOCK].Len;
     if (bi_valid > (16U - length)) {
-      bi_buf |= value << bi_valid;
-      *op++=(unsigned char)(bi_buf & 0xff);
-      *op++=(unsigned char)(bi_buf >> 8);
-      bi_buf = value >> (16 - bi_valid);
-      bi_valid += length - 16;
+        bi_buf |= value << bi_valid;
+        *op++=(unsigned char)(bi_buf & 0xff);
+        *op++=(unsigned char)(bi_buf >> 8);
+        bi_buf = value >> (16 - bi_valid);
+        bi_valid += length - 16;
     } else {
-      bi_buf |= value << bi_valid;
-      bi_valid += length;
+        bi_buf |= value << bi_valid;
+        bi_valid += length;
     }
-    
+
     if (bi_valid > 8) {                             /* flush bit_buf */
-      *op++=(unsigned char)(bi_buf & 0xff);
-      *op++=(unsigned char)(bi_buf >> 8);
+        *op++=(unsigned char)(bi_buf & 0xff);
+        *op++=(unsigned char)(bi_buf >> 8);
     }
     else if (bi_valid > 0) {
-      *op++=(unsigned char)bi_buf;
+        *op++=(unsigned char)bi_buf;
     }
 }
 
 /* ===========================================================================
- * Merge the literal and distance tree and scan the resulting tree to determine
- * the frequencies of the codes in the bit length tree.
- */
+* Merge the literal and distance tree and scan the resulting tree to determine
+* the frequencies of the codes in the bit length tree.
+*/
 static void feed_bltree(ltree_desc, bltree_desc)
     tree_desc *ltree_desc;      /* the tree descriptor */
-    tree_desc *bltree_desc;     /* the tree descriptor */
+tree_desc *bltree_desc;     /* the tree descriptor */
 {
     ct_data *ltree  = ltree_desc->dyn_tree;
     ct_data *bltree = bltree_desc->dyn_tree;    
@@ -496,7 +500,7 @@ static void feed_bltree(ltree_desc, bltree_desc)
 
     n = 0;
     do {
-      bltree[n++].Freq = 0;
+        bltree[n++].Freq = 0;
     } while (n < 19);
 
     for (n = 0; n <= lmax_code; n++) {
@@ -526,13 +530,13 @@ static void feed_bltree(ltree_desc, bltree_desc)
 
 
 /* ===========================================================================
- * Reverse the first len bits of a code, using straightforward code (a faster
- * method would use a table)
- * IN assertion: 1 <= len <= 15
- */
+* Reverse the first len bits of a code, using straightforward code (a faster
+* method would use a table)
+* IN assertion: 1 <= len <= 15
+*/
 static unsigned bi_reverse(code, len)
     unsigned code; /* the value to invert */
-    int len;       /* its bit length */
+int len;       /* its bit length */
 {
     register unsigned res = 0;
     do {
@@ -544,17 +548,17 @@ static unsigned bi_reverse(code, len)
 
 
 /* ===========================================================================
- * Generate the codes for a given tree and bit counts (which need not be
- * optimal).
- * IN assertion: the array bl_count contains the bit length statistics for
- * the given tree and the field len is set for all tree elements.
- * OUT assertion: the field code is set for all tree elements of non
- *     zero code length.
- */
+* Generate the codes for a given tree and bit counts (which need not be
+* optimal).
+* IN assertion: the array bl_count contains the bit length statistics for
+* the given tree and the field len is set for all tree elements.
+* OUT assertion: the field code is set for all tree elements of non
+*     zero code length.
+*/
 static void gen_codes(tree, max_code, bl_count)
     ct_data        *tree;                  /* the tree to decorate */
-    unsigned int   max_code;               /* largest code with non zero frequency */
-    unsigned short *bl_count;              /* number of codes at each bit length */
+unsigned int   max_code;               /* largest code with non zero frequency */
+unsigned short *bl_count;              /* number of codes at each bit length */
 {
     unsigned short next_code[ZLIBH_MAX_BITS+1];  /* next code value for each bit length */
     unsigned short code = 0;               /* running code value */
@@ -562,35 +566,35 @@ static void gen_codes(tree, max_code, bl_count)
     unsigned int   n;                      /* code index */
 
     /* The distribution counts are first used to generate the code values
-     * without bit reversal.
-     */
+    * without bit reversal.
+    */
     for (bits = 1; bits <= ZLIBH_MAX_BITS; bits++) {
-      next_code[bits] = code = (code + bl_count[bits-1]) << 1;
+        next_code[bits] = code = (code + bl_count[bits-1]) << 1;
     }
 
     for (n = 0;  n <= max_code; n++) {
-      int len = tree[n].Len;
-      if (len == 0) continue;
-      tree[n].Code = bi_reverse(next_code[len]++, len);   /* Now reverse the bits */
+        int len = tree[n].Len;
+        if (len == 0) continue;
+        tree[n].Code = bi_reverse(next_code[len]++, len);   /* Now reverse the bits */
     }
 }
 
 
 /* ===========================================================================
- * Compute the optimal bit lengths for a tree and update the total bit length
- * for the current block.
- * IN assertion: the fields .Freq and dad are set, heap[heap_max] and
- *    above are the tree nodes sorted by increasing frequency.
- * OUT assertions: the field .Len is set to the optimal bit length, the
- *     array bl_count contains the frequencies for each bit length.
- *     The length os_len[0] is updated; os_len[1] is also updated if stree is
- *     not null.
- */
+* Compute the optimal bit lengths for a tree and update the total bit length
+* for the current block.
+* IN assertion: the fields .Freq and dad are set, heap[heap_max] and
+*    above are the tree nodes sorted by increasing frequency.
+* OUT assertions: the field .Len is set to the optimal bit length, the
+*     array bl_count contains the frequencies for each bit length.
+*     The length os_len[0] is updated; os_len[1] is also updated if stree is
+*     not null.
+*/
 static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
     tree_desc *desc;    /* the tree descriptor */
-    int *huf_heap;
-    int heap_max;
-    unsigned short *bl_count;
+int *huf_heap;
+int heap_max;
+unsigned short *bl_count;
 
 {
     ct_data *tree        = desc->dyn_tree;
@@ -610,8 +614,8 @@ static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
     for (bits = 0; bits <= ZLIBH_MAX_BITS; bits++) bl_count[bits] = 0;
 
     /* In a first pass, compute the optimal bit lengths (which may
-     * overflow in the case of the bit length tree).
-     */
+    * overflow in the case of the bit length tree).
+    */
     tree[huf_heap[heap_max]].Len = 0; /* root of the heap */
 
     for (h = heap_max+1; h < ZLIBH_HEAP_SIZE; h++) {
@@ -632,7 +636,7 @@ static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
     }
     if (overflow == 0) return;
 
-//    fprintf(stderr,"\nbit length overflow\n");
+    //    fprintf(stderr,"\nbit length overflow\n");
     /* This happens for example on obj2 and pic of the Calgary corpus */
 
     /* Find the first bit length which could increase: */
@@ -643,23 +647,23 @@ static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
         bl_count[bits+1] += 2; /* move one overflow item as its brother */
         bl_count[max_length]--;
         /* The brother of the overflow item also moves one step up,
-         * but this does not affect bl_count[max_length]
-         */
+        * but this does not affect bl_count[max_length]
+        */
         overflow -= 2;
     } while (overflow > 0);
 
     /* Now recompute all bit lengths, scanning in increasing frequency.
-     * h is still equal to ZLIBH_HEAP_SIZE. (It is simpler to reconstruct all
-     * lengths instead of fixing only the wrong ones. This idea is taken
-     * from 'ar' written by Haruhiko Okumura.)
-     */
+    * h is still equal to ZLIBH_HEAP_SIZE. (It is simpler to reconstruct all
+    * lengths instead of fixing only the wrong ones. This idea is taken
+    * from 'ar' written by Haruhiko Okumura.)
+    */
     for (bits = max_length; bits != 0; bits--) {
         n = bl_count[bits];
         while (n != 0) {
             m = huf_heap[--h];
             if (m > max_code) continue;
             if ((unsigned) tree[m].Len != (unsigned) bits) {
-//                fprintf(stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits);
+                //                fprintf(stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits);
                 csize[0] += ((long)bits - (long)tree[m].Len)*(long)tree[m].Freq;
                 tree[m].Len = (unsigned short)bits;
             }
@@ -670,13 +674,13 @@ static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
 
 
 /* ===========================================================================
- * Construct one Huffman tree and assigns the code bit strings and lengths.
- * Update the total bit length for the current block.
- * IN assertion: the field freq is set for all tree elements.
- * OUT assertions: the fields len and code are set to the optimal bit length
- *     and corresponding code. The length os_len[0] is updated; os_len[1] is
- *     also updated if stree is not null. The field max_code is set.
- */
+* Construct one Huffman tree and assigns the code bit strings and lengths.
+* Update the total bit length for the current block.
+* IN assertion: the field freq is set for all tree elements.
+* OUT assertions: the fields len and code are set to the optimal bit length
+*     and corresponding code. The length os_len[0] is updated; os_len[1] is
+*     also updated if stree is not null. The field max_code is set.
+*/
 static void build_tree(desc)
     tree_desc *desc; /* the tree descriptor */
 {
@@ -695,18 +699,18 @@ static void build_tree(desc)
     /* Depth of each subtree used as tie breaker for trees of equal frequency */
 
     /* Construct the initial heap, with least frequent element in
-     * huf_heap[SMALLEST]. The sons of huf_heap[n] are huf_heap[2*n] and huf_heap[2*n+1].
-     * huf_heap[0] is used in replacement of heap_len (original Zlib).
-     */
+    * huf_heap[SMALLEST]. The sons of huf_heap[n] are huf_heap[2*n] and huf_heap[2*n+1].
+    * huf_heap[0] is used in replacement of heap_len (original Zlib).
+    */
 
     huf_heap[0] = 0, heap_max = ZLIBH_HEAP_SIZE;
-    
+
     for (n = 0; n <2*ZLIBH_L_CODES+1; n++)
-      depth[n] = 0;
+        depth[n] = 0;
 
     for (n = 0; n < elems; n++) {
         if (tree[n].Freq != 0) {
-	    huf_heap[0]++;
+            huf_heap[0]++;
             huf_heap[huf_heap[0]] = max_code = n;
             depth[n] = 0;
         } else {
@@ -715,72 +719,72 @@ static void build_tree(desc)
     }
 
     /* The pkzip format requires that at least one distance code exists,
-     * and that at least one bit should be sent even if there is only one
-     * possible code.
-     */
+    * and that at least one bit should be sent even if there is only one
+    * possible code.
+    */
 
     if (huf_heap[0] > 1) {                /* at least two codes (non trivial tree) */
-    desc->max_code = max_code;
+        desc->max_code = max_code;
 
-    /* The elements huf_heap[huf_heap[0]/2+1 .. huf_heap[0]] are leaves of the tree,
-     * establish sub-heaps of increasing lengths:
-     */
-    for (n = huf_heap[0]/2; n >= 1; n--) pqdownheap(tree, huf_heap, depth, n);
+        /* The elements huf_heap[huf_heap[0]/2+1 .. huf_heap[0]] are leaves of the tree,
+        * establish sub-heaps of increasing lengths:
+        */
+        for (n = huf_heap[0]/2; n >= 1; n--) pqdownheap(tree, huf_heap, depth, n);
 
-    /* Construct the Huffman tree by repeatedly combining the least two
-     * frequent nodes.
-     */
-    node = elems;                          /* next internal node of the tree */
-    do {
-      pqremove(tree, huf_heap, depth, n);  /* n = node of least frequency */
-      m = huf_heap[SMALLEST];              /* m = node of next least frequency */
+        /* Construct the Huffman tree by repeatedly combining the least two
+        * frequent nodes.
+        */
+        node = elems;                          /* next internal node of the tree */
+        do {
+            pqremove(tree, huf_heap, depth, n);  /* n = node of least frequency */
+            m = huf_heap[SMALLEST];              /* m = node of next least frequency */
 
-      huf_heap[--(heap_max)] = n;          /* keep the nodes sorted by frequency */
-      huf_heap[--(heap_max)] = m;
+            huf_heap[--(heap_max)] = n;          /* keep the nodes sorted by frequency */
+            huf_heap[--(heap_max)] = m;
 
-      /* Create a new node father of n and m */
-      tree[node].Freq = tree[n].Freq + tree[m].Freq;
-      depth[node] = (unsigned char)((depth[n] >= depth[m] ? depth[n] : depth[m]) + 1);
-      tree[n].Dad = tree[m].Dad = (unsigned short)node;
+            /* Create a new node father of n and m */
+            tree[node].Freq = tree[n].Freq + tree[m].Freq;
+            depth[node] = (unsigned char)((depth[n] >= depth[m] ? depth[n] : depth[m]) + 1);
+            tree[n].Dad = tree[m].Dad = (unsigned short)node;
 
-      /* and insert the new node in the heap */
-      huf_heap[SMALLEST] = node++;
-      pqdownheap(tree, huf_heap, depth, SMALLEST);
+            /* and insert the new node in the heap */
+            huf_heap[SMALLEST] = node++;
+            pqdownheap(tree, huf_heap, depth, SMALLEST);
 
-    } while (huf_heap[0] >= 2);
+        } while (huf_heap[0] >= 2);
 
-    huf_heap[--(heap_max)] = huf_heap[SMALLEST];
+        huf_heap[--(heap_max)] = huf_heap[SMALLEST];
 
-    /* At this point, the fields freq and dad are set. We can now
-     * generate the bit lengths.
-     */
-    gen_bitlen((tree_desc *)desc, huf_heap, heap_max, bl_count);
+        /* At this point, the fields freq and dad are set. We can now
+        * generate the bit lengths.
+        */
+        gen_bitlen((tree_desc *)desc, huf_heap, heap_max, bl_count);
 
-    /* The field len is now set, we can generate the bit codes */
-    gen_codes ((ct_data *)tree, max_code, bl_count);
+        /* The field len is now set, we can generate the bit codes */
+        gen_codes ((ct_data *)tree, max_code, bl_count);
     }
     else if (huf_heap[0] == 0) {     /* no code at all, create a single dummy zero code */
-      desc->max_code = 0;
-      tree[0].Len = 0;               // gen_bitlen shortcut
-      tree[0].Code = 0;              // gen_codes shortcut (probably useless)
+        desc->max_code = 0;
+        tree[0].Len = 0;               // gen_bitlen shortcut
+        tree[0].Code = 0;              // gen_codes shortcut (probably useless)
     }
     else {                           /* only one code, create a single one bit code */
-      const int *extra     = desc->stat_desc->extra_bits;
-      int base             = desc->stat_desc->extra_base;
-      int xbits;                     /* extra bits */
-      unsigned short f;              /* frequency */
+        const int *extra     = desc->stat_desc->extra_bits;
+        int base             = desc->stat_desc->extra_base;
+        int xbits;                     /* extra bits */
+        unsigned short f;              /* frequency */
 
-      desc->max_code = max_code;
-      for (n = 0; n < max_code; n++) {
-        tree[n].Len = 0;
-      }
-      tree[max_code].Len = 1;        // gen_bitlen shortcut
-      xbits = 0;
-      if (max_code >= base) xbits = extra[max_code-base];
+        desc->max_code = max_code;
+        for (n = 0; n < max_code; n++) {
+            tree[n].Len = 0;
+        }
+        tree[max_code].Len = 1;        // gen_bitlen shortcut
+        xbits = 0;
+        if (max_code >= base) xbits = extra[max_code-base];
         f = tree[max_code].Freq;
-      csize[0] += (unsigned long)f * (1 + xbits);
-      if (stree) csize[1] += (unsigned long)f * (stree[max_code].Len + xbits);
-      tree[max_code].Code = 0;       // gen_codes shortcut, not set earlier since it replaces .Freq
+        csize[0] += (unsigned long)f * (1 + xbits);
+        if (stree) csize[1] += (unsigned long)f * (stree[max_code].Len + xbits);
+        tree[max_code].Code = 0;       // gen_codes shortcut, not set earlier since it replaces .Freq
     }
 }
 
@@ -808,7 +812,7 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
     ltree.comp_size = ldata_compsize;
     ltree.max_code  = ZLIBH_L_CODES;
     ltree.stat_desc = &static_l_desc;
-    
+
     /* bitlen tree init */
     bltree.dyn_tree  = dyn_bltree;
     bltree.comp_size = bldata_compsize;
@@ -821,8 +825,8 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
 
     symbol = 0;
     do {
-      dyn_ltree[symbol].Freq = freq_l[symbol];
-      ++symbol;
+        dyn_ltree[symbol].Freq = freq_l[symbol];
+        ++symbol;
     } while (symbol < 257);
 
     build_tree(&ltree);
@@ -832,23 +836,23 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
 
     /* Build the bit length tree: */
     build_tree(&bltree);
-    
+
     /* Determine the number of bit length codes to send. The pkzip format
-     * requires that at least 4 bit length codes be sent.
-     */
+    * requires that at least 4 bit length codes be sent.
+    */
     for (max_blindex = ZLIBH_BL_CODES-1; max_blindex >= 3; max_blindex--) {
-      if (dyn_bltree[bl_order[max_blindex]].Len != 0) break;
+        if (dyn_bltree[bl_order[max_blindex]].Len != 0) break;
     }
     bldata_compsize[0] += 3*(max_blindex+1)+4;
-    
+
     if ((bldata_compsize[0]+ldata_compsize[0]) < ldata_compsize[1]) {  /* write bloc using the dynamic tree */
-      *op = (unsigned char)(max_blindex+1);
-      ZLIBH_compress_block(ip, op, dyn_ltree, dyn_bltree, inputSize);
-      compressed_size = (bldata_compsize[0]+ldata_compsize[0]+8) >> 3;
+        *op = (unsigned char)(max_blindex+1);
+        ZLIBH_compress_block(ip, op, dyn_ltree, dyn_bltree, inputSize);
+        compressed_size = (bldata_compsize[0]+ldata_compsize[0]+8) >> 3;
     }
     else {                                                             /* write bloc using the static tree */
-      ZLIBH_compress_block(ip, op, static_ltree, dyn_bltree, inputSize);
-      compressed_size = (ldata_compsize[1]+8) >> 3;
+        ZLIBH_compress_block(ip, op, static_ltree, dyn_bltree, inputSize);
+        compressed_size = (ldata_compsize[1]+8) >> 3;
     }
     return compressed_size;
 }
@@ -862,9 +866,9 @@ int ZLIBH_getDistributionTotal() { return ZLIBH_MAX_TABLESIZE; }
 
 /* Possible inflate modes between inflate() calls */
 typedef enum {
-        TYPEDO,     /* i: same, but skip check to exit inflate on new block */
-        TABLE,      /* i: waiting for dynamic block table lengths */
-            LEN,        /* i: waiting for length/lit/eob code */
+    TYPEDO,     /* i: same, but skip check to exit inflate on new block */
+    TABLE,      /* i: waiting for dynamic block table lengths */
+    LEN,        /* i: waiting for length/lit/eob code */
     DONE,       /* finished check, done -- remain here until reset */
     BAD,        /* got a data error -- remain here until reset */
 } inflate_mode;
@@ -880,90 +884,90 @@ typedef struct {
 } code;
 
 static const code lenfix[512] = {
-        {96,7,0},{0,8,80},{0,8,16},{20,8,115},{18,7,31},{0,8,112},{0,8,48},
-        {0,9,192},{16,7,10},{0,8,96},{0,8,32},{0,9,160},{0,8,0},{0,8,128},
-        {0,8,64},{0,9,224},{16,7,6},{0,8,88},{0,8,24},{0,9,144},{19,7,59},
-        {0,8,120},{0,8,56},{0,9,208},{17,7,17},{0,8,104},{0,8,40},{0,9,176},
-        {0,8,8},{0,8,136},{0,8,72},{0,9,240},{16,7,4},{0,8,84},{0,8,20},
-        {21,8,227},{19,7,43},{0,8,116},{0,8,52},{0,9,200},{17,7,13},{0,8,100},
-        {0,8,36},{0,9,168},{0,8,4},{0,8,132},{0,8,68},{0,9,232},{16,7,8},
-        {0,8,92},{0,8,28},{0,9,152},{20,7,83},{0,8,124},{0,8,60},{0,9,216},
-        {18,7,23},{0,8,108},{0,8,44},{0,9,184},{0,8,12},{0,8,140},{0,8,76},
-        {0,9,248},{16,7,3},{0,8,82},{0,8,18},{21,8,163},{19,7,35},{0,8,114},
-        {0,8,50},{0,9,196},{17,7,11},{0,8,98},{0,8,34},{0,9,164},{0,8,2},
-        {0,8,130},{0,8,66},{0,9,228},{16,7,7},{0,8,90},{0,8,26},{0,9,148},
-        {20,7,67},{0,8,122},{0,8,58},{0,9,212},{18,7,19},{0,8,106},{0,8,42},
-        {0,9,180},{0,8,10},{0,8,138},{0,8,74},{0,9,244},{16,7,5},{0,8,86},
-        {0,8,22},{64,8,0},{19,7,51},{0,8,118},{0,8,54},{0,9,204},{17,7,15},
-        {0,8,102},{0,8,38},{0,9,172},{0,8,6},{0,8,134},{0,8,70},{0,9,236},
-        {16,7,9},{0,8,94},{0,8,30},{0,9,156},{20,7,99},{0,8,126},{0,8,62},
-        {0,9,220},{18,7,27},{0,8,110},{0,8,46},{0,9,188},{0,8,14},{0,8,142},
-        {0,8,78},{0,9,252},{96,7,0},{0,8,81},{0,8,17},{21,8,131},{18,7,31},
-        {0,8,113},{0,8,49},{0,9,194},{16,7,10},{0,8,97},{0,8,33},{0,9,162},
-        {0,8,1},{0,8,129},{0,8,65},{0,9,226},{16,7,6},{0,8,89},{0,8,25},
-        {0,9,146},{19,7,59},{0,8,121},{0,8,57},{0,9,210},{17,7,17},{0,8,105},
-        {0,8,41},{0,9,178},{0,8,9},{0,8,137},{0,8,73},{0,9,242},{16,7,4},
-        {0,8,85},{0,8,21},{16,8,258},{19,7,43},{0,8,117},{0,8,53},{0,9,202},
-        {17,7,13},{0,8,101},{0,8,37},{0,9,170},{0,8,5},{0,8,133},{0,8,69},
-        {0,9,234},{16,7,8},{0,8,93},{0,8,29},{0,9,154},{20,7,83},{0,8,125},
-        {0,8,61},{0,9,218},{18,7,23},{0,8,109},{0,8,45},{0,9,186},{0,8,13},
-        {0,8,141},{0,8,77},{0,9,250},{16,7,3},{0,8,83},{0,8,19},{21,8,195},
-        {19,7,35},{0,8,115},{0,8,51},{0,9,198},{17,7,11},{0,8,99},{0,8,35},
-        {0,9,166},{0,8,3},{0,8,131},{0,8,67},{0,9,230},{16,7,7},{0,8,91},
-        {0,8,27},{0,9,150},{20,7,67},{0,8,123},{0,8,59},{0,9,214},{18,7,19},
-        {0,8,107},{0,8,43},{0,9,182},{0,8,11},{0,8,139},{0,8,75},{0,9,246},
-        {16,7,5},{0,8,87},{0,8,23},{64,8,0},{19,7,51},{0,8,119},{0,8,55},
-        {0,9,206},{17,7,15},{0,8,103},{0,8,39},{0,9,174},{0,8,7},{0,8,135},
-        {0,8,71},{0,9,238},{16,7,9},{0,8,95},{0,8,31},{0,9,158},{20,7,99},
-        {0,8,127},{0,8,63},{0,9,222},{18,7,27},{0,8,111},{0,8,47},{0,9,190},
-        {0,8,15},{0,8,143},{0,8,79},{0,9,254},{96,7,0},{0,8,80},{0,8,16},
-        {20,8,115},{18,7,31},{0,8,112},{0,8,48},{0,9,193},{16,7,10},{0,8,96},
-        {0,8,32},{0,9,161},{0,8,0},{0,8,128},{0,8,64},{0,9,225},{16,7,6},
-        {0,8,88},{0,8,24},{0,9,145},{19,7,59},{0,8,120},{0,8,56},{0,9,209},
-        {17,7,17},{0,8,104},{0,8,40},{0,9,177},{0,8,8},{0,8,136},{0,8,72},
-        {0,9,241},{16,7,4},{0,8,84},{0,8,20},{21,8,227},{19,7,43},{0,8,116},
-        {0,8,52},{0,9,201},{17,7,13},{0,8,100},{0,8,36},{0,9,169},{0,8,4},
-        {0,8,132},{0,8,68},{0,9,233},{16,7,8},{0,8,92},{0,8,28},{0,9,153},
-        {20,7,83},{0,8,124},{0,8,60},{0,9,217},{18,7,23},{0,8,108},{0,8,44},
-        {0,9,185},{0,8,12},{0,8,140},{0,8,76},{0,9,249},{16,7,3},{0,8,82},
-        {0,8,18},{21,8,163},{19,7,35},{0,8,114},{0,8,50},{0,9,197},{17,7,11},
-        {0,8,98},{0,8,34},{0,9,165},{0,8,2},{0,8,130},{0,8,66},{0,9,229},
-        {16,7,7},{0,8,90},{0,8,26},{0,9,149},{20,7,67},{0,8,122},{0,8,58},
-        {0,9,213},{18,7,19},{0,8,106},{0,8,42},{0,9,181},{0,8,10},{0,8,138},
-        {0,8,74},{0,9,245},{16,7,5},{0,8,86},{0,8,22},{64,8,0},{19,7,51},
-        {0,8,118},{0,8,54},{0,9,205},{17,7,15},{0,8,102},{0,8,38},{0,9,173},
-        {0,8,6},{0,8,134},{0,8,70},{0,9,237},{16,7,9},{0,8,94},{0,8,30},
-        {0,9,157},{20,7,99},{0,8,126},{0,8,62},{0,9,221},{18,7,27},{0,8,110},
-        {0,8,46},{0,9,189},{0,8,14},{0,8,142},{0,8,78},{0,9,253},{96,7,0},
-        {0,8,81},{0,8,17},{21,8,131},{18,7,31},{0,8,113},{0,8,49},{0,9,195},
-        {16,7,10},{0,8,97},{0,8,33},{0,9,163},{0,8,1},{0,8,129},{0,8,65},
-        {0,9,227},{16,7,6},{0,8,89},{0,8,25},{0,9,147},{19,7,59},{0,8,121},
-        {0,8,57},{0,9,211},{17,7,17},{0,8,105},{0,8,41},{0,9,179},{0,8,9},
-        {0,8,137},{0,8,73},{0,9,243},{16,7,4},{0,8,85},{0,8,21},{16,8,258},
-        {19,7,43},{0,8,117},{0,8,53},{0,9,203},{17,7,13},{0,8,101},{0,8,37},
-        {0,9,171},{0,8,5},{0,8,133},{0,8,69},{0,9,235},{16,7,8},{0,8,93},
-        {0,8,29},{0,9,155},{20,7,83},{0,8,125},{0,8,61},{0,9,219},{18,7,23},
-        {0,8,109},{0,8,45},{0,9,187},{0,8,13},{0,8,141},{0,8,77},{0,9,251},
-        {16,7,3},{0,8,83},{0,8,19},{21,8,195},{19,7,35},{0,8,115},{0,8,51},
-        {0,9,199},{17,7,11},{0,8,99},{0,8,35},{0,9,167},{0,8,3},{0,8,131},
-        {0,8,67},{0,9,231},{16,7,7},{0,8,91},{0,8,27},{0,9,151},{20,7,67},
-        {0,8,123},{0,8,59},{0,9,215},{18,7,19},{0,8,107},{0,8,43},{0,9,183},
-        {0,8,11},{0,8,139},{0,8,75},{0,9,247},{16,7,5},{0,8,87},{0,8,23},
-        {64,8,0},{19,7,51},{0,8,119},{0,8,55},{0,9,207},{17,7,15},{0,8,103},
-        {0,8,39},{0,9,175},{0,8,7},{0,8,135},{0,8,71},{0,9,239},{16,7,9},
-        {0,8,95},{0,8,31},{0,9,159},{20,7,99},{0,8,127},{0,8,63},{0,9,223},
-        {18,7,27},{0,8,111},{0,8,47},{0,9,191},{0,8,15},{0,8,143},{0,8,79},
-        {0,9,255}
-    };
+    {96,7,0},{0,8,80},{0,8,16},{20,8,115},{18,7,31},{0,8,112},{0,8,48},
+    {0,9,192},{16,7,10},{0,8,96},{0,8,32},{0,9,160},{0,8,0},{0,8,128},
+    {0,8,64},{0,9,224},{16,7,6},{0,8,88},{0,8,24},{0,9,144},{19,7,59},
+    {0,8,120},{0,8,56},{0,9,208},{17,7,17},{0,8,104},{0,8,40},{0,9,176},
+    {0,8,8},{0,8,136},{0,8,72},{0,9,240},{16,7,4},{0,8,84},{0,8,20},
+    {21,8,227},{19,7,43},{0,8,116},{0,8,52},{0,9,200},{17,7,13},{0,8,100},
+    {0,8,36},{0,9,168},{0,8,4},{0,8,132},{0,8,68},{0,9,232},{16,7,8},
+    {0,8,92},{0,8,28},{0,9,152},{20,7,83},{0,8,124},{0,8,60},{0,9,216},
+    {18,7,23},{0,8,108},{0,8,44},{0,9,184},{0,8,12},{0,8,140},{0,8,76},
+    {0,9,248},{16,7,3},{0,8,82},{0,8,18},{21,8,163},{19,7,35},{0,8,114},
+    {0,8,50},{0,9,196},{17,7,11},{0,8,98},{0,8,34},{0,9,164},{0,8,2},
+    {0,8,130},{0,8,66},{0,9,228},{16,7,7},{0,8,90},{0,8,26},{0,9,148},
+    {20,7,67},{0,8,122},{0,8,58},{0,9,212},{18,7,19},{0,8,106},{0,8,42},
+    {0,9,180},{0,8,10},{0,8,138},{0,8,74},{0,9,244},{16,7,5},{0,8,86},
+    {0,8,22},{64,8,0},{19,7,51},{0,8,118},{0,8,54},{0,9,204},{17,7,15},
+    {0,8,102},{0,8,38},{0,9,172},{0,8,6},{0,8,134},{0,8,70},{0,9,236},
+    {16,7,9},{0,8,94},{0,8,30},{0,9,156},{20,7,99},{0,8,126},{0,8,62},
+    {0,9,220},{18,7,27},{0,8,110},{0,8,46},{0,9,188},{0,8,14},{0,8,142},
+    {0,8,78},{0,9,252},{96,7,0},{0,8,81},{0,8,17},{21,8,131},{18,7,31},
+    {0,8,113},{0,8,49},{0,9,194},{16,7,10},{0,8,97},{0,8,33},{0,9,162},
+    {0,8,1},{0,8,129},{0,8,65},{0,9,226},{16,7,6},{0,8,89},{0,8,25},
+    {0,9,146},{19,7,59},{0,8,121},{0,8,57},{0,9,210},{17,7,17},{0,8,105},
+    {0,8,41},{0,9,178},{0,8,9},{0,8,137},{0,8,73},{0,9,242},{16,7,4},
+    {0,8,85},{0,8,21},{16,8,258},{19,7,43},{0,8,117},{0,8,53},{0,9,202},
+    {17,7,13},{0,8,101},{0,8,37},{0,9,170},{0,8,5},{0,8,133},{0,8,69},
+    {0,9,234},{16,7,8},{0,8,93},{0,8,29},{0,9,154},{20,7,83},{0,8,125},
+    {0,8,61},{0,9,218},{18,7,23},{0,8,109},{0,8,45},{0,9,186},{0,8,13},
+    {0,8,141},{0,8,77},{0,9,250},{16,7,3},{0,8,83},{0,8,19},{21,8,195},
+    {19,7,35},{0,8,115},{0,8,51},{0,9,198},{17,7,11},{0,8,99},{0,8,35},
+    {0,9,166},{0,8,3},{0,8,131},{0,8,67},{0,9,230},{16,7,7},{0,8,91},
+    {0,8,27},{0,9,150},{20,7,67},{0,8,123},{0,8,59},{0,9,214},{18,7,19},
+    {0,8,107},{0,8,43},{0,9,182},{0,8,11},{0,8,139},{0,8,75},{0,9,246},
+    {16,7,5},{0,8,87},{0,8,23},{64,8,0},{19,7,51},{0,8,119},{0,8,55},
+    {0,9,206},{17,7,15},{0,8,103},{0,8,39},{0,9,174},{0,8,7},{0,8,135},
+    {0,8,71},{0,9,238},{16,7,9},{0,8,95},{0,8,31},{0,9,158},{20,7,99},
+    {0,8,127},{0,8,63},{0,9,222},{18,7,27},{0,8,111},{0,8,47},{0,9,190},
+    {0,8,15},{0,8,143},{0,8,79},{0,9,254},{96,7,0},{0,8,80},{0,8,16},
+    {20,8,115},{18,7,31},{0,8,112},{0,8,48},{0,9,193},{16,7,10},{0,8,96},
+    {0,8,32},{0,9,161},{0,8,0},{0,8,128},{0,8,64},{0,9,225},{16,7,6},
+    {0,8,88},{0,8,24},{0,9,145},{19,7,59},{0,8,120},{0,8,56},{0,9,209},
+    {17,7,17},{0,8,104},{0,8,40},{0,9,177},{0,8,8},{0,8,136},{0,8,72},
+    {0,9,241},{16,7,4},{0,8,84},{0,8,20},{21,8,227},{19,7,43},{0,8,116},
+    {0,8,52},{0,9,201},{17,7,13},{0,8,100},{0,8,36},{0,9,169},{0,8,4},
+    {0,8,132},{0,8,68},{0,9,233},{16,7,8},{0,8,92},{0,8,28},{0,9,153},
+    {20,7,83},{0,8,124},{0,8,60},{0,9,217},{18,7,23},{0,8,108},{0,8,44},
+    {0,9,185},{0,8,12},{0,8,140},{0,8,76},{0,9,249},{16,7,3},{0,8,82},
+    {0,8,18},{21,8,163},{19,7,35},{0,8,114},{0,8,50},{0,9,197},{17,7,11},
+    {0,8,98},{0,8,34},{0,9,165},{0,8,2},{0,8,130},{0,8,66},{0,9,229},
+    {16,7,7},{0,8,90},{0,8,26},{0,9,149},{20,7,67},{0,8,122},{0,8,58},
+    {0,9,213},{18,7,19},{0,8,106},{0,8,42},{0,9,181},{0,8,10},{0,8,138},
+    {0,8,74},{0,9,245},{16,7,5},{0,8,86},{0,8,22},{64,8,0},{19,7,51},
+    {0,8,118},{0,8,54},{0,9,205},{17,7,15},{0,8,102},{0,8,38},{0,9,173},
+    {0,8,6},{0,8,134},{0,8,70},{0,9,237},{16,7,9},{0,8,94},{0,8,30},
+    {0,9,157},{20,7,99},{0,8,126},{0,8,62},{0,9,221},{18,7,27},{0,8,110},
+    {0,8,46},{0,9,189},{0,8,14},{0,8,142},{0,8,78},{0,9,253},{96,7,0},
+    {0,8,81},{0,8,17},{21,8,131},{18,7,31},{0,8,113},{0,8,49},{0,9,195},
+    {16,7,10},{0,8,97},{0,8,33},{0,9,163},{0,8,1},{0,8,129},{0,8,65},
+    {0,9,227},{16,7,6},{0,8,89},{0,8,25},{0,9,147},{19,7,59},{0,8,121},
+    {0,8,57},{0,9,211},{17,7,17},{0,8,105},{0,8,41},{0,9,179},{0,8,9},
+    {0,8,137},{0,8,73},{0,9,243},{16,7,4},{0,8,85},{0,8,21},{16,8,258},
+    {19,7,43},{0,8,117},{0,8,53},{0,9,203},{17,7,13},{0,8,101},{0,8,37},
+    {0,9,171},{0,8,5},{0,8,133},{0,8,69},{0,9,235},{16,7,8},{0,8,93},
+    {0,8,29},{0,9,155},{20,7,83},{0,8,125},{0,8,61},{0,9,219},{18,7,23},
+    {0,8,109},{0,8,45},{0,9,187},{0,8,13},{0,8,141},{0,8,77},{0,9,251},
+    {16,7,3},{0,8,83},{0,8,19},{21,8,195},{19,7,35},{0,8,115},{0,8,51},
+    {0,9,199},{17,7,11},{0,8,99},{0,8,35},{0,9,167},{0,8,3},{0,8,131},
+    {0,8,67},{0,9,231},{16,7,7},{0,8,91},{0,8,27},{0,9,151},{20,7,67},
+    {0,8,123},{0,8,59},{0,9,215},{18,7,19},{0,8,107},{0,8,43},{0,9,183},
+    {0,8,11},{0,8,139},{0,8,75},{0,9,247},{16,7,5},{0,8,87},{0,8,23},
+    {64,8,0},{19,7,51},{0,8,119},{0,8,55},{0,9,207},{17,7,15},{0,8,103},
+    {0,8,39},{0,9,175},{0,8,7},{0,8,135},{0,8,71},{0,9,239},{16,7,9},
+    {0,8,95},{0,8,31},{0,9,159},{20,7,99},{0,8,127},{0,8,63},{0,9,223},
+    {18,7,27},{0,8,111},{0,8,47},{0,9,191},{0,8,15},{0,8,143},{0,8,79},
+    {0,9,255}
+};
 
 static const code distfix[32] = {
-        {16,5,1},{23,5,257},{19,5,17},{27,5,4097},{17,5,5},{25,5,1025},
-        {21,5,65},{29,5,16385},{16,5,3},{24,5,513},{20,5,33},{28,5,8193},
-        {18,5,9},{26,5,2049},{22,5,129},{64,5,0},{16,5,2},{23,5,385},
-        {19,5,25},{27,5,6145},{17,5,7},{25,5,1537},{21,5,97},{29,5,24577},
-        {16,5,4},{24,5,769},{20,5,49},{28,5,12289},{18,5,13},{26,5,3073},
-        {22,5,193},{64,5,0}
-    };
+    {16,5,1},{23,5,257},{19,5,17},{27,5,4097},{17,5,5},{25,5,1025},
+    {21,5,65},{29,5,16385},{16,5,3},{24,5,513},{20,5,33},{28,5,8193},
+    {18,5,9},{26,5,2049},{22,5,129},{64,5,0},{16,5,2},{23,5,385},
+    {19,5,25},{27,5,6145},{17,5,7},{25,5,1537},{21,5,97},{29,5,24577},
+    {16,5,4},{24,5,769},{20,5,49},{28,5,12289},{18,5,13},{26,5,3073},
+    {22,5,193},{64,5,0}
+};
 
 /* state maintained between inflate() calls.  Approximately 10K bytes. */
 struct inflate_state {
@@ -975,26 +979,26 @@ struct inflate_state {
     unsigned dmax;              /* zlib header max distance (INFLATE_STRICT) */
     unsigned long check;        /* protected copy of check value */
     unsigned long total;        /* protected copy of output count */
-        /* sliding window */
+    /* sliding window */
     unsigned wbits;             /* log base 2 of requested window size */
     unsigned wsize;             /* window size or zero if not using window */
     unsigned whave;             /* valid bytes in the window */
     unsigned wnext;             /* window write index */
     unsigned char *window;  /* allocated sliding window, if needed */
-        /* bit accumulator */
+    /* bit accumulator */
     unsigned long hold;         /* input bit accumulator */
     unsigned bits;              /* number of bits in "in" */
-        /* for string and stored block copying */
+    /* for string and stored block copying */
     unsigned length;            /* literal or length of data to copy */
     unsigned offset;            /* distance back to copy string from */
-        /* for table and code decoding */
+    /* for table and code decoding */
     unsigned extra;             /* extra bits needed */
-        /* fixed and dynamic code tables */
+    /* fixed and dynamic code tables */
     code const *lencode;    /* starting table for length/literal codes */
     code const *distcode;   /* starting table for distance codes */
     unsigned lenbits;           /* index bits for lencode */
     unsigned distbits;          /* index bits for distcode */
-        /* dynamic table building */
+    /* dynamic table building */
     unsigned ncode;             /* number of code length code lengths */
     unsigned nlen;              /* number of length code lengths */
     unsigned ndist;             /* number of distance code lengths */
@@ -1018,24 +1022,24 @@ struct inflate_state *state;
 }
 
 /* op values as set by inflate_table():
-    00000000 - literal
-    0000tttt - table link, tttt != 0 is the number of table index bits
-    0001eeee - length or distance, eeee is the number of extra bits
-    01100000 - end of block
-    01000000 - invalid code
- */
+00000000 - literal
+0000tttt - table link, tttt != 0 is the number of table index bits
+0001eeee - length or distance, eeee is the number of extra bits
+01100000 - end of block
+01000000 - invalid code
+*/
 
 /* Maximum size of the dynamic table.  The maximum number of code structures is
-   1444, which is the sum of 852 for literal/length codes and 592 for distance
-   codes.  These values were found by exhaustive searches using the program
-   examples/enough.c found in the zlib distribtution.  The arguments to that
-   program are the number of symbols, the initial root table size, and the
-   maximum bit length of a code.  "enough 286 9 15" for literal/length codes
-   returns returns 852, and "enough 30 6 15" for distance codes returns 592.
-   The initial root table size (9 or 6) is found in the fifth argument of the
-   inflate_table() calls in inflate.c and infback.c.  If the root table size is
-   changed, then these maximum sizes would be need to be recalculated and
-   updated. */
+1444, which is the sum of 852 for literal/length codes and 592 for distance
+codes.  These values were found by exhaustive searches using the program
+examples/enough.c found in the zlib distribtution.  The arguments to that
+program are the number of symbols, the initial root table size, and the
+maximum bit length of a code.  "enough 286 9 15" for literal/length codes
+returns returns 852, and "enough 30 6 15" for distance codes returns 592.
+The initial root table size (9 or 6) is found in the fifth argument of the
+inflate_table() calls in inflate.c and infback.c.  If the root table size is
+changed, then these maximum sizes would be need to be recalculated and
+updated. */
 
 /* Type of code to build for inflate_table() */
 typedef enum {
@@ -1043,7 +1047,7 @@ typedef enum {
     LENS,
     DISTS
 } codetype;
-    
+
 /* Macros for inflate(): */
 
 /* check function to use adler32() for zlib or crc32() for gzip */
@@ -1058,58 +1062,58 @@ typedef enum {
 #ifdef GUNZIP
 #  define CRC2(check, word) \
     do { \
-        hbuf[0] = (unsigned char)(word); \
-        hbuf[1] = (unsigned char)((word) >> 8); \
-        check = crc32(check, hbuf, 2); \
+    hbuf[0] = (unsigned char)(word); \
+    hbuf[1] = (unsigned char)((word) >> 8); \
+    check = crc32(check, hbuf, 2); \
     } while (0)
 
 #  define CRC4(check, word) \
     do { \
-        hbuf[0] = (unsigned char)(word); \
-        hbuf[1] = (unsigned char)((word) >> 8); \
-        hbuf[2] = (unsigned char)((word) >> 16); \
-        hbuf[3] = (unsigned char)((word) >> 24); \
-        check = crc32(check, hbuf, 4); \
+    hbuf[0] = (unsigned char)(word); \
+    hbuf[1] = (unsigned char)((word) >> 8); \
+    hbuf[2] = (unsigned char)((word) >> 16); \
+    hbuf[3] = (unsigned char)((word) >> 24); \
+    check = crc32(check, hbuf, 4); \
     } while (0)
 #endif
 
 /* Load registers with state in inflate() for speed */
 #define LOAD() \
     do { \
-        put = strm->next_out; \
-        left = strm->avail_out; \
-        next = strm->next_in; \
-        have = strm->avail_in; \
-        hold = state.hold; \
-        bits = state.bits; \
+    put = strm->next_out; \
+    left = strm->avail_out; \
+    next = strm->next_in; \
+    have = strm->avail_in; \
+    hold = state.hold; \
+    bits = state.bits; \
     } while (0)
 
 /* Restore state from registers in inflate() */
 #define RESTORE() \
     do { \
-        strm->next_out = put; \
-        strm->avail_out = left; \
-        strm->next_in = next; \
-        strm->avail_in = have; \
-        state.hold = hold; \
-        state.bits = bits; \
+    strm->next_out = put; \
+    strm->avail_out = left; \
+    strm->next_in = next; \
+    strm->avail_in = have; \
+    state.hold = hold; \
+    state.bits = bits; \
     } while (0)
 
 
 /* Get a byte of input into the bit accumulator, or return from inflate()
-   if there is no input available. */
+if there is no input available. */
 #define PULLBYTE() \
     do { \
-        hold += (unsigned long)(*next++) << bits; \
-        bits += 8; \
+    hold += (unsigned long)(*next++) << bits; \
+    bits += 8; \
     } while (0)
 
 /* Assure that there are at least n bits in the bit accumulator.  If there is
-   not enough available input to do that, then return from inflate(). */
+not enough available input to do that, then return from inflate(). */
 #define NEEDBITS(n) \
     do { \
-        while (bits < (unsigned)(n)) \
-            PULLBYTE(); \
+    while (bits < (unsigned)(n)) \
+    PULLBYTE(); \
     } while (0)
 
 /* Return the low n bits of the bit accumulator (n < 16) */
@@ -1119,31 +1123,31 @@ typedef enum {
 /* Remove n bits from the bit accumulator */
 #define DROPBITS(n) \
     do { \
-        hold >>= (n); \
-        bits -= (unsigned)(n); \
+    hold >>= (n); \
+    bits -= (unsigned)(n); \
     } while (0)
 
 /* Remove zero to seven bits as needed to go to a byte boundary */
 #define BYTEBITS() \
     do { \
-        hold >>= bits & 7; \
-        bits -= bits & 7; \
+    hold >>= bits & 7; \
+    bits -= bits & 7; \
     } while (0)
 
 /*
-   Build a set of tables to decode the provided canonical Huffman code.
-   The code lengths are lens[0..codes-1].  The result starts at *table,
-   whose indices are 0..2^bits-1.  work is a writable array of at least
-   lens shorts, which is used as a work area.  type is the type of code
-   to be generated, CODES, LENS, or DISTS.  On return, zero is success,
-   -1 is an invalid code, and +1 means that ENOUGH isn't enough.  table
-   on return points to the next available entry's address.  bits is the
-   requested root table index bits, and on return it is the actual root
-   table index bits.  It will differ if the request is greater than the
-   longest code or if it is less than the shortest code.
- */
+Build a set of tables to decode the provided canonical Huffman code.
+The code lengths are lens[0..codes-1].  The result starts at *table,
+whose indices are 0..2^bits-1.  work is a writable array of at least
+lens shorts, which is used as a work area.  type is the type of code
+to be generated, CODES, LENS, or DISTS.  On return, zero is success,
+-1 is an invalid code, and +1 means that ENOUGH isn't enough.  table
+on return points to the next available entry's address.  bits is the
+requested root table index bits, and on return it is the actual root
+table index bits.  It will differ if the request is greater than the
+longest code or if it is less than the shortest code.
+*/
 int inflate_table(type, lens, codes, table, bits, work)
-codetype type;
+    codetype type;
 unsigned short *lens;
 unsigned codes;
 code * *table;
@@ -1186,35 +1190,35 @@ unsigned short *work;
         28, 28, 29, 29, 64, 64};
 
     /*
-       Process a set of code lengths to create a canonical Huffman code.  The
-       code lengths are lens[0..codes-1].  Each length corresponds to the
-       symbols 0..codes-1.  The Huffman code is generated by first sorting the
-       symbols by length from short to long, and retaining the symbol order
-       for codes with equal lengths.  Then the code starts with all zero bits
-       for the first code of the shortest length, and the codes are integer
-       increments for the same length, and zeros are appended as the length
-       increases.  For the deflate format, these bits are stored backwards
-       from their more natural integer increment ordering, and so when the
-       decoding tables are built in the large loop below, the integer codes
-       are incremented backwards.
+    Process a set of code lengths to create a canonical Huffman code.  The
+    code lengths are lens[0..codes-1].  Each length corresponds to the
+    symbols 0..codes-1.  The Huffman code is generated by first sorting the
+    symbols by length from short to long, and retaining the symbol order
+    for codes with equal lengths.  Then the code starts with all zero bits
+    for the first code of the shortest length, and the codes are integer
+    increments for the same length, and zeros are appended as the length
+    increases.  For the deflate format, these bits are stored backwards
+    from their more natural integer increment ordering, and so when the
+    decoding tables are built in the large loop below, the integer codes
+    are incremented backwards.
 
-       This routine assumes, but does not check, that all of the entries in
-       lens[] are in the range 0..ZLIBH_MAX_BITS.  The caller must assure this.
-       1..ZLIBH_MAX_BITS is interpreted as that code length.  zero means that that
-       symbol does not occur in this code.
+    This routine assumes, but does not check, that all of the entries in
+    lens[] are in the range 0..ZLIBH_MAX_BITS.  The caller must assure this.
+    1..ZLIBH_MAX_BITS is interpreted as that code length.  zero means that that
+    symbol does not occur in this code.
 
-       The codes are sorted by computing a count of codes for each length,
-       creating from that a table of starting indices for each length in the
-       sorted table, and then entering the symbols in order in the sorted
-       table.  The sorted table is work[], with that space being provided by
-       the caller.
+    The codes are sorted by computing a count of codes for each length,
+    creating from that a table of starting indices for each length in the
+    sorted table, and then entering the symbols in order in the sorted
+    table.  The sorted table is work[], with that space being provided by
+    the caller.
 
-       The length counts are used for other purposes as well, i.e. finding
-       the minimum and maximum length codes, determining if there are any
-       codes at all, checking for a valid set of lengths, and looking ahead
-       at length counts to determine sub-table sizes when building the
-       decoding tables.
-     */
+    The length counts are used for other purposes as well, i.e. finding
+    the minimum and maximum length codes, determining if there are any
+    codes at all, checking for a valid set of lengths, and looking ahead
+    at length counts to determine sub-table sizes when building the
+    decoding tables.
+    */
 
     /* accumulate lengths for codes (assumes lens[] all in 0..ZLIBH_MAX_BITS) */
     for (len = 0; len <= ZLIBH_MAX_BITS; len++)
@@ -1260,35 +1264,35 @@ unsigned short *work;
         if (lens[sym] != 0) work[offs[lens[sym]]++] = (unsigned short)sym;
 
     /*
-       Create and fill in decoding tables.  In this loop, the table being
-       filled is at next and has curr index bits.  The code being used is huff
-       with length len.  That code is converted to an index by dropping drop
-       bits off of the bottom.  For codes where len is less than drop + curr,
-       those top drop + curr - len bits are incremented through all values to
-       fill the table with replicated entries.
+    Create and fill in decoding tables.  In this loop, the table being
+    filled is at next and has curr index bits.  The code being used is huff
+    with length len.  That code is converted to an index by dropping drop
+    bits off of the bottom.  For codes where len is less than drop + curr,
+    those top drop + curr - len bits are incremented through all values to
+    fill the table with replicated entries.
 
-       root is the number of index bits for the root table.  When len exceeds
-       root, sub-tables are created pointed to by the root entry with an index
-       of the low root bits of huff.  This is saved in low to check for when a
-       new sub-table should be started.  drop is zero when the root table is
-       being filled, and drop is root when sub-tables are being filled.
+    root is the number of index bits for the root table.  When len exceeds
+    root, sub-tables are created pointed to by the root entry with an index
+    of the low root bits of huff.  This is saved in low to check for when a
+    new sub-table should be started.  drop is zero when the root table is
+    being filled, and drop is root when sub-tables are being filled.
 
-       When a new sub-table is needed, it is necessary to look ahead in the
-       code lengths to determine what size sub-table is needed.  The length
-       counts are used for this, and so count[] is decremented as codes are
-       entered in the tables.
+    When a new sub-table is needed, it is necessary to look ahead in the
+    code lengths to determine what size sub-table is needed.  The length
+    counts are used for this, and so count[] is decremented as codes are
+    entered in the tables.
 
-       used keeps track of how many table entries have been allocated from the
-       provided *table space.  It is checked for LENS and DIST tables against
-       the constants ENOUGH_LENS and ENOUGH_DISTS to guard against changes in
-       the initial root table size constants.  See the comments in inftrees.h
-       for more information.
+    used keeps track of how many table entries have been allocated from the
+    provided *table space.  It is checked for LENS and DIST tables against
+    the constants ENOUGH_LENS and ENOUGH_DISTS to guard against changes in
+    the initial root table size constants.  See the comments in inftrees.h
+    for more information.
 
-       sym increments through all symbols, and the loop terminates when
-       all codes of length max, i.e. all codes, have been processed.  This
-       routine permits incomplete codes, so another loop after this one fills
-       in the rest of the decoding tables with invalid code markers.
-     */
+    sym increments through all symbols, and the loop terminates when
+    all codes of length max, i.e. all codes, have been processed.  This
+    routine permits incomplete codes, so another loop after this one fills
+    in the rest of the decoding tables with invalid code markers.
+    */
 
     /* set up for code type */
     switch (type) {
@@ -1403,8 +1407,8 @@ unsigned short *work;
     }
 
     /* fill in remaining table entry if code is incomplete (guaranteed to have
-       at most one remaining entry, since if the code is incomplete, the
-       maximum code length that was allowed to get this far is one bit) */
+    at most one remaining entry, since if the code is incomplete, the
+    maximum code length that was allowed to get this far is one bit) */
     if (huff != 0) {
         here.op = (unsigned char)64;            /* invalid code marker */
         here.bits = (unsigned char)(len - drop);
@@ -1420,86 +1424,86 @@ unsigned short *work;
 
 
 /*
-   inflate() uses a state machine to process as much input data and generate as
-   much output data as possible before returning.  The state machine is
-   structured roughly as follows:
+inflate() uses a state machine to process as much input data and generate as
+much output data as possible before returning.  The state machine is
+structured roughly as follows:
 
-    for (;;) switch (state) {
-    ...
-    case STATEn:
-        if (not enough input data or output space to make progress)
-            return;
-        ... make progress ...
-        state = STATEm;
-        break;
-    ...
-    }
+for (;;) switch (state) {
+...
+case STATEn:
+if (not enough input data or output space to make progress)
+return;
+... make progress ...
+state = STATEm;
+break;
+...
+}
 
-   so when inflate() is called again, the same case is attempted again, and
-   if the appropriate resources are provided, the machine proceeds to the
-   next state.  The NEEDBITS() macro is usually the way the state evaluates
-   whether it can proceed or should return.  NEEDBITS() does the return if
-   the requested bits are not available.  The typical use of the BITS macros
-   is:
+so when inflate() is called again, the same case is attempted again, and
+if the appropriate resources are provided, the machine proceeds to the
+next state.  The NEEDBITS() macro is usually the way the state evaluates
+whether it can proceed or should return.  NEEDBITS() does the return if
+the requested bits are not available.  The typical use of the BITS macros
+is:
 
-        NEEDBITS(n);
-        ... do something with BITS(n) ...
-        DROPBITS(n);
+NEEDBITS(n);
+... do something with BITS(n) ...
+DROPBITS(n);
 
-   where NEEDBITS(n) either returns from inflate() if there isn't enough
-   input left to load n bits into the accumulator, or it continues.  BITS(n)
-   gives the low n bits in the accumulator.  When done, DROPBITS(n) drops
-   the low n bits off the accumulator.  INITBITS() clears the accumulator
-   and sets the number of available bits to zero.  BYTEBITS() discards just
-   enough bits to put the accumulator on a byte boundary.  After BYTEBITS()
-   and a NEEDBITS(8), then BITS(8) would return the next byte in the stream.
+where NEEDBITS(n) either returns from inflate() if there isn't enough
+input left to load n bits into the accumulator, or it continues.  BITS(n)
+gives the low n bits in the accumulator.  When done, DROPBITS(n) drops
+the low n bits off the accumulator.  INITBITS() clears the accumulator
+and sets the number of available bits to zero.  BYTEBITS() discards just
+enough bits to put the accumulator on a byte boundary.  After BYTEBITS()
+and a NEEDBITS(8), then BITS(8) would return the next byte in the stream.
 
-   NEEDBITS(n) uses PULLBYTE() to get an available byte of input, or to return
-   if there is no input available.  The decoding of variable length codes uses
-   PULLBYTE() directly in order to pull just enough bytes to decode the next
-   code, and no more.
+NEEDBITS(n) uses PULLBYTE() to get an available byte of input, or to return
+if there is no input available.  The decoding of variable length codes uses
+PULLBYTE() directly in order to pull just enough bytes to decode the next
+code, and no more.
 
-   Some states loop until they get enough input, making sure that enough
-   state information is maintained to continue the loop where it left off
-   if NEEDBITS() returns in the loop.  For example, want, need, and keep
-   would all have to actually be part of the saved state in case NEEDBITS()
-   returns:
+Some states loop until they get enough input, making sure that enough
+state information is maintained to continue the loop where it left off
+if NEEDBITS() returns in the loop.  For example, want, need, and keep
+would all have to actually be part of the saved state in case NEEDBITS()
+returns:
 
-    case STATEw:
-        while (want < need) {
-            NEEDBITS(n);
-            keep[want++] = BITS(n);
-            DROPBITS(n);
-        }
-        state = STATEx;
-    case STATEx:
+case STATEw:
+while (want < need) {
+NEEDBITS(n);
+keep[want++] = BITS(n);
+DROPBITS(n);
+}
+state = STATEx;
+case STATEx:
 
-   As shown above, if the next state is also the next case, then the break
-   is omitted.
+As shown above, if the next state is also the next case, then the break
+is omitted.
 
-   A state may also return if there is not enough output space available to
-   complete that state.  Those states are copying stored data, writing a
-   literal byte, and copying a matching string.
+A state may also return if there is not enough output space available to
+complete that state.  Those states are copying stored data, writing a
+literal byte, and copying a matching string.
 
-   When returning, a "goto inf_leave" is used to update the total counters,
-   update the check value, and determine whether any progress has been made
-   during that inflate() call in order to return the proper return code.
-   Progress is defined as a change in either strm->avail_in or strm->avail_out.
-   When there is a window, goto inf_leave will update the window with the last
-   output written.  If a goto inf_leave occurs in the middle of decompression
-   and there is no window currently, goto inf_leave will create one and copy
-   output to the window for the next call of inflate().
+When returning, a "goto inf_leave" is used to update the total counters,
+update the check value, and determine whether any progress has been made
+during that inflate() call in order to return the proper return code.
+Progress is defined as a change in either strm->avail_in or strm->avail_out.
+When there is a window, goto inf_leave will update the window with the last
+output written.  If a goto inf_leave occurs in the middle of decompression
+and there is no window currently, goto inf_leave will create one and copy
+output to the window for the next call of inflate().
 
-   In this implementation, the flush parameter of inflate() only affects the
-   return code (per zlib.h).  inflate() always writes as much as possible to
-   strm->next_out, given the space available and the provided input--the effect
-   documented in zlib.h of Z_SYNC_FLUSH.  Furthermore, inflate() always defers
-   the allocation of and copying into a sliding window until necessary, which
-   provides the effect documented in zlib.h for Z_FINISH when the entire input
-   stream available.  So the only thing the flush parameter actually does is:
-   when flush is set to Z_FINISH, inflate() cannot return Z_OK.  Instead it
-   will return Z_BUF_ERROR if it has not reached the end of the stream.
- */
+In this implementation, the flush parameter of inflate() only affects the
+return code (per zlib.h).  inflate() always writes as much as possible to
+strm->next_out, given the space available and the provided input--the effect
+documented in zlib.h of Z_SYNC_FLUSH.  Furthermore, inflate() always defers
+the allocation of and copying into a sliding window until necessary, which
+provides the effect documented in zlib.h for Z_FINISH when the entire input
+stream available.  So the only thing the flush parameter actually does is:
+when flush is set to Z_FINISH, inflate() cannot return Z_OK.  Instead it
+will return Z_BUF_ERROR if it has not reached the end of the stream.
+*/
 
 int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
 {
@@ -1513,16 +1517,16 @@ int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
     int ret;                    /* return code */
     struct inflate_state state;
     static const unsigned short order[19] = /* permutation of code lengths */
-        {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+    {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
     code const *lcode;
     unsigned lmask;             /* mask for first level of length codes */
     unsigned codebits;          /* code bits, operation, was op */
-    
+
     state.mode = TYPEDO;      /* skip check */
 
     ret = 0;
-    
-/* Clear the input bit accumulator */
+
+    /* Clear the input bit accumulator */
     hold = 0;
     bits = 0;
     for (;;)
@@ -1562,7 +1566,7 @@ int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
             state.lencode = (const code *)(state.next);
             state.lenbits = 7;
             ret = inflate_table(CODES, state.lens, 19, &(state.next),
-                                &(state.lenbits), state.work);
+                &(state.lenbits), state.work);
             if (ret) {
                 state.mode = BAD;
                 break;
@@ -1624,13 +1628,13 @@ int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
             }
 
             /* build code tables -- note: do not change the lenbits or distbits
-               values here (9 and 6) without reading the comments in inftrees.h
-               concerning the ENOUGH constants, which depend on those values */
+            values here (9 and 6) without reading the comments in inftrees.h
+            concerning the ENOUGH constants, which depend on those values */
             state.next = state.codes;
             state.lencode = (const code *)(state.next);
             state.lenbits = 9;
             ret = inflate_table(LENS, state.lens, state.nlen, &(state.next),
-                                &(state.lenbits), state.work);
+                &(state.lenbits), state.work);
             if (ret) {
                 state.mode = BAD;
                 break;
@@ -1638,42 +1642,42 @@ int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
             state.mode = LEN;
 
         case LEN:
-	    lcode = state.lencode;
-	    lmask = (1U << state.lenbits) - 1;
+            lcode = state.lencode;
+            lmask = (1U << state.lenbits) - 1;
             do {
-              if (bits < 15) {
-                hold += (unsigned long)(*next++) << bits;
-                bits += 8;
-                hold += (unsigned long)(*next++) << bits;
-                bits += 8;
-              }	    
-              here = lcode[hold & lmask];
-	    dolen:
-	      codebits = (unsigned)(here.bits);
-	      hold >>= codebits;
-	      bits -= codebits;
-	      codebits = (unsigned)(here.op);
-	      if (codebits == 0) {                          /* literal */
-	        *put++ = (unsigned char)(here.val);
-	      }
-              else if ((codebits & 64) == 0) {              /* 2nd level length code */
-                here = lcode[here.val + (hold & ((1U << codebits) - 1))];
-                goto dolen;
-              }
-              else if (codebits & 32) {                     /* end-of-block */
-	        len = bits >> 3;                            /* restitute unused bytes */
-		next -= len;
-                break;
-              }
-	    } while (1);
+                if (bits < 15) {
+                    hold += (unsigned long)(*next++) << bits;
+                    bits += 8;
+                    hold += (unsigned long)(*next++) << bits;
+                    bits += 8;
+                }
+                here = lcode[hold & lmask];
+dolen:
+                codebits = (unsigned)(here.bits);
+                hold >>= codebits;
+                bits -= codebits;
+                codebits = (unsigned)(here.op);
+                if (codebits == 0) {                          /* literal */
+                    *put++ = (unsigned char)(here.val);
+                }
+                else if ((codebits & 64) == 0) {              /* 2nd level length code */
+                    here = lcode[here.val + (hold & ((1U << codebits) - 1))];
+                    goto dolen;
+                }
+                else if (codebits & 32) {                     /* end-of-block */
+                    len = bits >> 3;                            /* restitute unused bytes */
+                    next -= len;
+                    break;
+                }
+            } while (1);
             state.mode = DONE;
-	    
+
         case DONE:
             goto inf_leave;
         case BAD:
             return 0;
-        }
-  inf_leave:
+    }
+inf_leave:
     return (int)(next-compressed);
 }
 

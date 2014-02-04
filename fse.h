@@ -73,7 +73,7 @@ FSE_decompress():
 */
 
 
-/* same as FSE_compress(), but input is a table of unsigned short */
+/* same as previously, but input is a table of unsigned short */
 int FSE_compressU16  (void* dest,
                       const unsigned short* source, int sourceSize, int nbSymbols, int memLog);
 int FSE_decompressU16(unsigned short* dest, int originalSize,
@@ -95,7 +95,7 @@ FSE_compressBound():
 /*
 FSE_compress2():
     Same as FSE_compress(), but allows the selection of 'nbSymbols' and 'memLog'
-    Both parameters can be defined as '0' to means : use default value
+    Both parameters can be defined as '0' to mean : use default value
     The function will then assume that any unsigned char within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
@@ -203,7 +203,7 @@ The function returns the size of compressed data (without header), or -1 if fail
 */
 
 
-void FSE_encodeSymbol(ptrdiff_t* state, size_t* bitStream, int* bitpos, unsigned char symbol, const void* symbolTT, const void* stateTable);
+void FSE_encodeByte(ptrdiff_t* state, size_t* bitStream, int* bitpos, unsigned char symbol, const void* symbolTT, const void* stateTable);
 
 unsigned char FSE_decodeSymbol(unsigned int* state, unsigned int bitStream, int* bitsConsumed, const void* DTable);
 void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const unsigned char** ip);

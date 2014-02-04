@@ -583,7 +583,7 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
     if (eType == et_runLength285)
     {
-        U32 rl = (U32)(*ip - *anchor);
+        U32 rl = (U32)(*ip - *anchor)+210;
         if (rl >= 285) rl=285;
         *((U16*)*op) = (U16)rl;
         *op += 2;
