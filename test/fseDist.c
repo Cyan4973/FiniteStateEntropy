@@ -168,11 +168,11 @@ int FSED_writeSingleU16(void* dest, U16 distance)
 }
 
 
-inline void FSED_encodeU16(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
+static inline void FSED_encodeU16(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitStream, bitpos, nbBits, (size_t)value);
-    FSE_encodeSymbol(state, bitStream, bitpos, nbBits, symbolTT, stateTable);
+    FSE_encodeByte(state, bitStream, bitpos, nbBits, symbolTT, stateTable);
 }
 
 
@@ -383,12 +383,12 @@ int FSED_countU16Log2 (unsigned int* count, const U16* source, int sourceSize)
 }
 
 
-inline void FSED_encodeU16Log2(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
+static inline void FSED_encodeU16Log2(ptrdiff_t* state, size_t* bitStream, int* bitpos, U16 value, const void* symbolTT, const void* stateTable)
 {
     int nbBits = FSED_highbit(value>>LN);
     BYTE symbol = (BYTE)FSED_Log2(value);
     FSE_addBits(bitStream, bitpos, nbBits, (size_t)value);
-    FSE_encodeSymbol(state, bitStream, bitpos, symbol, symbolTT, stateTable);
+    FSE_encodeByte(state, bitStream, bitpos, symbol, symbolTT, stateTable);
 }
 
 
@@ -534,7 +534,7 @@ void FSED_encodeU32(ptrdiff_t* state, size_t* bitStream, int* bitpos, void** op,
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitStream, bitpos, nbBits, (size_t)value);
     if (sizeof(size_t)==4) FSE_flushBits(bitStream, op, bitpos);   // static test
-    FSE_encodeSymbol(state, bitStream, bitpos, nbBits, symbolTT, stateTable);
+    FSE_encodeByte(state, bitStream, bitpos, nbBits, symbolTT, stateTable);
 }
 
 

@@ -70,7 +70,7 @@
 //***************************************************
 #define COMPRESSOR_NAME "FSE : Finite State Entropy"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "%s, %i-bits demo by %s (%s)\n", COMPRESSOR_NAME, sizeof(void*)*8, AUTHOR, __DATE__
+#define WELCOME_MESSAGE "%s, %i-bits demo by %s (%s)\n", COMPRESSOR_NAME, (int)sizeof(void*)*8, AUTHOR, __DATE__
 #define FSE_EXTENSION ".fse"
 
 

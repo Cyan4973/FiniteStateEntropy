@@ -27,6 +27,7 @@ RELEASE=v0.1
 DESTDIR=
 CC=gcc
 CFLAGS=-I.. -std=c99 -Wall -W -Wundef
+CF32=-m32 -march=pentiumpro
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -41,13 +42,13 @@ default: fse
 all: fse fse32 probagen
 
 fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
-	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
 
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
-	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT) $(CF32)
 
 probagen: probaGenerator.c
-	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
 	@rm -f core *.o fse$(EXT) fse32$(EXT) probagen$(EXT)
