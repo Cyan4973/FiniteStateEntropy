@@ -77,7 +77,7 @@ FSE_decompress():
    All symbol values within input table must be < nbSymbols.
    Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
 int FSE_compressU16  (void* dest,
-                      const unsigned short* source, int sourceSize, int nbSymbols, int memLog);
+                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
 int FSE_decompressU16(unsigned short* dest, int originalSize,
                       const void* compressed);
 
@@ -97,13 +97,13 @@ FSE_compressBound():
 ******************************************/
 /*
 FSE_compress2():
-    Same as FSE_compress(), but allows the selection of 'nbSymbols' and 'memLog'
+    Same as FSE_compress(), but allows the selection of 'nbSymbols' and 'tableLog'
     Both parameters can be defined as '0' to mean : use default value
     The function will then assume that any unsigned char within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
 */
-int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int memLog);
+int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog);
 
 
 /******************************************
@@ -112,7 +112,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
 /*
 int FSE_compress(char* dest, const char* source, int inputSize) does the following:
 1. count symbol occurence from table source[] into table count[]
-2. normalize counters so that sum(counting[]) == Power_of_2 (== 2^memLog)
+2. normalize counters so that sum(counting[]) == Power_of_2 (== 2^tableLog)
 3. saves normalized counters to memory buffer using writeHeader()
 4. builds encoding tables from the normalized counters
 5. encodes the data stream using encoding tables
@@ -131,7 +131,7 @@ int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, 
 
 int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
-static inline int FSE_headerBound(int nbSymbols, int memLog) { (void)memLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
+static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
 int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
 
 int FSE_sizeof_CTable(int nbSymbols, int tableLog);
@@ -151,7 +151,7 @@ The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^t
 You can use 'tableLog'==0 to mean "default value".
 The result will be saved into a structure, called 'normalizedCounter', which is a table of unsigned int.
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
-FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'memlog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
+FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
 The return value is the corrected tableLog (<=maxTableLog). It is necessary to retrieve it for next steps.
 A result of '0' means that there is only a single symbol present.
@@ -251,7 +251,7 @@ Writing data to memory is performed by the flush method.
 This way, you can store several bitFields into bitStream, before calling flush a single time.
 BitStream size is 64-bits on 64-bits systems, 32-bits on 32-bits systems (size_t).
 The nb of bits already written into bitStream is stored into bitPos.
-For information, FSE_encodeByte() never writes more than 'memLog' bits at a time.
+For information, FSE_encodeByte() never writes more than 'tableLog' bits at a time.
     FSE_flushBits(&bitStream, &op, &bitpos);
 
 When you are done with compression, you must close the bitStream.
@@ -261,8 +261,11 @@ If there is an error, it returns -1.
 */
 
 
+const void* FSE_initDecompressionStream(const void** input, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog);
 unsigned char FSE_decodeSymbol(unsigned int* state, unsigned int bitStream, int* bitsConsumed, const void* DTable);
-void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const unsigned char** ip);
+unsigned int FSE_readBits(int* bitsConsumed, unsigned int bitStream, int nbBits);
+void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const void** input);
+int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
 
 /*
 Now is the turn to decompose FSE_decompress_usingDTable().
@@ -272,14 +275,16 @@ So, typically, if you encoded from end to beginning, you will now decode from be
 
 You will need a few variables to track your bitStream. They are :
 
-void* ip;               // Your input buffer (where compressed data is)
-void* DTable;           // Provided by FSE_buildDTable()
-unsigned int state;     // Store fractional bits.
-unsigned int bitStream; // Cache bitStream into register
-int bitsConsumed;       // Nb of bits already used within bitStream
+const void* input;        // Your input buffer (where compressed data is)
+const void* decompressionStreamDescriptor;   // Required to init and close the bitStream
+const void* DTable;       // Provided by FSE_buildDTable()
+int   tableLog;           // Provided by FSE_readHeader()
+unsigned int state;       // Store fractional bits.
+unsigned int bitStream;   // Cache bitStream into register
+int bitsConsumed;         // Nb of bits already used within bitStream
 
 The first thing to do is to init the bitStream.
-    FSE_initDecompressionStream(&ip, &bitsConsumed, &state);
+    decompressionStreamDescriptor = FSE_initDecompressionStream(&ip, &bitsConsumed, &state);
 
 You can then decode your data, byte after byte.
 Keep in mind data is decoded in reverse order.
@@ -287,13 +292,13 @@ Keep in mind data is decoded in reverse order.
 
 You can also retrieve any bitfield you eventually stored into the bitStream (in reverse order)
 Note : maximum allowed nbBits is 25
-    unsigned int bitField = FSE_readBits(&bitsConsumed, nbBits, bitStream);
+    unsigned int bitField = FSE_readBits(&bitsConsumed, bitStream, nbBits);
 
 Reading data to memory is performed by the update method.
 'bitConsumed' shall never > 32.
-For information the maximum number of bits read by FSE_decodeSymbol() is 'memLog'.
+For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.
 Don't hesitate to use this method frequently. The cost of this operation is very low.
-    FSE_updateBitStream(&bitStream, &bitsConsumed, &ip);
+    FSE_updateBitStream(&bitStream, &bitsConsumed, &ip);;
 
 When you are done with compression, you can close the bitStream (optional).
 The function returns the size in bytes of the compressed stream.

@@ -685,6 +685,26 @@ int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
 }
 
 
+const void* FSE_initDecompressionStream(const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog)
+{
+    const BYTE* iend;
+    const BYTE* ip = (const BYTE*)*p;
+
+    *bitsConsumed = ( ( (* (U32*) ip)-1) & 7) + 1 + 24;
+    iend = ip + ( ( (* (U32*) ip) +7) / 8);
+    ip = iend - 4;
+    *bitStream = * (U32*) ip;
+
+    *bitsConsumed = 32-*bitsConsumed;
+    *state = (*bitStream << *bitsConsumed) >> (32-tableLog);
+    *bitsConsumed += tableLog;
+
+    FSE_updateBitStream(bitStream, bitsConsumed, (const void**)&ip);
+    *p = (void*)ip;
+    return (void*)iend;
+}
+
+
 BYTE FSE_decodeSymbol(U32* state, U32 bitStream, int* bitsConsumed, const void* DTable)
 {
     const FSE_decode_t* const decodeTable = (const FSE_decode_t*) DTable;
@@ -703,7 +723,15 @@ BYTE FSE_decodeSymbol(U32* state, U32 bitStream, int* bitsConsumed, const void* 
 }
 
 
-void FSE_updateBitStream(U32* bitStream, int* bitsConsumed, const BYTE** ip)
+U32 FSE_readBits(int* bitsConsumed, U32 bitStream, int nbBits)
+{
+    U32 value = ((bitStream << *bitsConsumed) >> 1) >> (31-nbBits);
+    *bitsConsumed += nbBits;
+    return value;
+}
+
+
+void FSE_updateBitStream(U32* bitStream, int* bitsConsumed, const void** ip)
 {
     *ip -= *bitsConsumed >> 3;
     *bitStream = * (U32*) (*ip);
@@ -711,10 +739,16 @@ void FSE_updateBitStream(U32* bitStream, int* bitsConsumed, const BYTE** ip)
 }
 
 
+int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input)
+{
+    return (int)((BYTE*)decompressionStreamDescriptor - (BYTE*)input);
+}
+
+
 int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
 {
-    const BYTE* ip = (const BYTE*) compressed;
-    const BYTE* iend;
+    const void* ip = compressed;
+    const void* iend;
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + originalSize - 1;
     U32 bitStream;
@@ -722,16 +756,7 @@ int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, con
     U32 state;
 
     // Init
-    bitCount = ( ( (* (U32*) ip)-1) & 7) + 1 + 24;
-    iend = ip + ( ( (* (U32*) ip) +7) / 8);
-    ip = iend - 4;
-    bitStream = * (U32*) ip;
-
-    bitCount = 32-bitCount;
-    state = (bitStream << bitCount) >> (32-tableLog);
-    bitCount += tableLog;
-
-    FSE_updateBitStream(&bitStream, &bitCount, &ip);
+    iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
 
     // Hot loop
     while (op<oend-1)
@@ -746,7 +771,7 @@ int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, con
     // cheap last symbol storage
     *oend = (BYTE) state;
 
-    return (int) (iend- (const BYTE*) compressed);
+    return FSE_closeDecompressionStream(iend, ip);
 }
 
 
@@ -1124,7 +1149,7 @@ int FSE_decompressU16_usingDTable (unsigned short* dest, const int originalSize,
     state = (bitStream << bitCount) >> (32-tableLog);
     bitCount += tableLog;
 
-    FSE_updateBitStream(&bitStream, &bitCount, &ip);
+    FSE_updateBitStream(&bitStream, &bitCount, (const void**)&ip);
 
     // Hot loop
     while (op<oend-1)
@@ -1132,7 +1157,7 @@ int FSE_decompressU16_usingDTable (unsigned short* dest, const int originalSize,
         *op++ = FSE_decodeSymbolU16(&state, bitStream, &bitCount, DTable);
         if ((sizeof(U32)*8 > FSE_MAX_TABLELOG*2+7) && (sizeof(void*)==8))   // Need this test to be static
             *op++ = FSE_decodeSymbolU16(&state, bitStream, &bitCount, DTable);
-        FSE_updateBitStream(&bitStream, &bitCount, &ip);
+        FSE_updateBitStream(&bitStream, &bitCount, (const void**)&ip);
     }
     if (op<oend) *(oend-1) = FSE_decodeSymbolU16(&state, bitStream, &bitCount, DTable);
 
