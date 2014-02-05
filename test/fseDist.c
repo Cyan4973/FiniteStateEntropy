@@ -182,24 +182,18 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     const U16* ip;
     const U16* const iend = istart + sourceSize;
 
-    BYTE* const ostart = (BYTE*) dest;
     BYTE* op = (BYTE*) dest;
-
-    const int memLog = ( (U16*) CTable) [0];
-    const int tableSize = 1 << memLog;
-    const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const void* const symbolTT = (const void*) (stateTable + tableSize);
-
-    ptrdiff_t state=tableSize;
-    int bitpos=0;
+    U32* streamSize;
+    ptrdiff_t state;
     size_t bitStream=0;
-    U32* streamSize = (U32*) op;
-    op += 4;
+    int bitpos=0;
+    const void* stateTable;
+    const void* symbolTT;
+
+
+    streamSize = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
 
     ip=iend-1;
-    // cheap last-symbol storage
-    //if (*ip < tableSize) state += *ip--;
-
     while (ip>istart)
     {
         FSED_encodeU16(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable);
@@ -208,13 +202,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     }
     if (ip==istart) { FSED_encodeU16(&state, &bitStream, &bitpos, *ip--, symbolTT, stateTable); FSE_flushBits(&bitStream, (void**)&op, &bitpos); }
 
-    // Finalize block
-    FSE_addBits(&bitStream, &bitpos, memLog, state);
-    FSE_flushBits(&bitStream, (void**)&op, &bitpos);
-    *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
-    op += bitpos>0;
-
-    return (int) (op-ostart);
+    return FSE_closeCompressionStream(bitStream, bitpos, state, op, streamSize, CTable);
 }
 
 
@@ -544,37 +532,33 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
     const U32* ip;
     const U32* const iend = istart + sourceSize;
 
-    BYTE* const ostart = (BYTE*) dest;
     BYTE* op = (BYTE*) dest;
-
-    const int memLog = ( (U16*) CTable) [0];
-    const int tableSize = 1 << memLog;
-    const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const void* const symbolTT = (const void*) (stateTable + tableSize);
-
-    ptrdiff_t state=tableSize;
     int bitpos=0;
     size_t bitStream=0;
+
+    #if 1   // This version is bit faster for the time being
+    const int memLog = ( (U16*) CTable) [0];
+    ptrdiff_t state=1 << memLog;
+    const U16* const stateTable = ( (const U16*) CTable) + 2;
+    const void* const symbolTT = (const void*) (stateTable + (1 << memLog));
     U32* streamSize = (U32*) op;
     op += 4;
+    #else
+    ptrdiff_t state;
+    const void* stateTable;
+    const void* symbolTT;
+    U32* streamSize = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
+    #endif
+
 
     ip=iend-1;
-    // cheap last-symbol storage
-    //if (*ip < tableSize) state += *ip--;
-
     while (ip>=istart)
     {
         FSED_encodeU32(&state, &bitStream, &bitpos, (void**)&op, *ip--, symbolTT, stateTable);
         FSE_flushBits(&bitStream, (void**)&op, &bitpos);
     }
 
-    // Finalize block
-    FSE_addBits(&bitStream, &bitpos, memLog, state);
-    FSE_flushBits(&bitStream, (void**)&op, &bitpos);
-    *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
-    op += bitpos>0;
-
-    return (int) (op-ostart);
+    return FSE_closeCompressionStream(bitStream, bitpos, state, op, streamSize, CTable);
 }
 
 
