@@ -313,14 +313,31 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     int vTotal= total;
 
     // Check
-    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;
-    if ((FSE_highbit(nbSymbols-1)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;
+    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
+    if ((FSE_highbit(nbSymbols-1)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
+    // Ensure proper scale
     {
-        // Ensure minimum step is 1
-        U32 const minBase = (total + ( (total*nbSymbols) >> tableLog) + ( ( (total*nbSymbols) >> tableLog) *nbSymbols >> tableLog) ) >> tableLog;
+        int const maxLog = FSE_VIRTUAL_LOG - tableLog;
+        int srcLog = FSE_highbit(total-1)+1;
+        if (srcLog > maxLog)
+        {
+            const int shift = srcLog - maxLog;
+            const int base = (1<<shift)-1;
+            int s;
+            for (s=0; s<nbSymbols; s++)
+            {
+                vTotal -= count[s] - ((count[s]+base) >> shift);
+                count[s] = (count[s]+base) >> shift;
+            }
+        }
+    }
+
+    // Ensure minimum step is 1
+    {
+        U32 const minBase = (total + ( (total*nbSymbols) >> tableLog) + ( ( (total*nbSymbols) >> tableLog) * nbSymbols >> tableLog) ) >> tableLog;
         int s;
         for (s=0; s<nbSymbols; s++)
         {
