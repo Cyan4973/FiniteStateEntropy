@@ -458,13 +458,13 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
 
 void* FSE_initCompressionStream(void** op, ptrdiff_t* state, const void** symbolTT, const void** stateTable, const void* CTable)
 {
-    void* p = *op;
+    void* start = *op;
     const int memLog = ( (U16*) CTable) [0];
-    *op += 4;
-    *state = (1<<memLog);
+    *((BYTE**)op) += 4;
+    *state = ((ptrdiff_t)1<<memLog);
     *stateTable = (void*)(((const U16*) CTable) + 2);
-    *symbolTT = (void*)(((const U16*)(*stateTable)) + (1<<memLog));
-    return p;
+    *symbolTT = (void*)(((const U16*)(*stateTable)) + ((ptrdiff_t)1<<memLog));
+    return start;
 }
 
 
@@ -733,7 +733,7 @@ U32 FSE_readBits(int* bitsConsumed, U32 bitStream, int nbBits)
 
 void FSE_updateBitStream(U32* bitStream, int* bitsConsumed, const void** ip)
 {
-    *ip -= *bitsConsumed >> 3;
+    *((BYTE**)ip) -= *bitsConsumed >> 3;
     *bitStream = * (U32*) (*ip);
     *bitsConsumed &= 7;
 }

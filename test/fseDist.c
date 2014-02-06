@@ -264,8 +264,8 @@ int FSED_decompressSingleU16 (U16* out, int osize, U16 value)
 
 int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
 {
-    const BYTE* ip = (const BYTE*) compressed;
-    const BYTE* iend;
+    const void* ip = (const BYTE*) compressed;
+    const void* iend;
     unsigned short* op = dest;
     unsigned short* const oend = op + originalSize;
     U32 bitStream;
@@ -273,7 +273,7 @@ int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize
     U32 state;
 
     // Init
-    iend = FSE_initDecompressionStream((const void**)&ip, &bitCount, &state, &bitStream, tableLog);
+    iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
 
     // Hot loop
     while (op<oend)
@@ -285,7 +285,7 @@ int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize
         FSE_updateBitStream(&bitStream, &bitCount, (const void**)&ip);
     }
 
-    return FSE_closeDecompressionStream((void*)iend, (void*)ip);
+    return FSE_closeDecompressionStream(iend, ip);
 }
 
 
@@ -526,9 +526,9 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 
     #if 1   // This version is bit faster for the time being
     const int memLog = ( (U16*) CTable) [0];
-    ptrdiff_t state=1 << memLog;
+    ptrdiff_t state = (ptrdiff_t)1 << memLog;
     const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const void* const symbolTT = (const void*) (stateTable + (1 << memLog));
+    const void* const symbolTT = (const void*) (stateTable + ((ptrdiff_t)1 << memLog));
     U32* streamSize = (U32*) op;
     op += 4;
     #else
