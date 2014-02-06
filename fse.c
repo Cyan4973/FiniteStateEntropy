@@ -152,7 +152,6 @@ int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nb
     U32 bitStream;
     int bitCount;
     int charnum = 0;
-    int bitSent = 0;
 
     if (nbBits > FSE_MAX_TABLELOG) return -1;   // Unsupported
     if (nbBits < FSE_MIN_TABLELOG) return -1;   // Unsupported
@@ -169,29 +168,27 @@ int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nb
     threshold = tableSize;
     nbBits++;
 
-    while (remaining)
+    while (remaining>0)
     {
         int count = normalizedCounter[charnum++];
-        const int margin = ( (threshold*2-1) - remaining) & 0xFFFFFFFE;  // Need even number to not influence last bit
+        const int max = (2*threshold-1)-remaining;
         remaining -= count;
-        if (count<margin) count += margin * (remaining ? normalizedCounter[charnum] & 1 : 0);
-        else count += margin;
-        bitStream += (count >> bitSent) << bitCount;
-        bitCount += nbBits - bitSent;
-        bitSent = count < 2*margin;
+        if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
+        bitStream += count << bitCount;
+        bitCount  += nbBits;
+        bitCount  -= (count<max);
         if (bitCount>16)
         {
-            * (U16*) out = (U16) bitStream;
-            out+=2;
-            bitStream>>=16;
-            bitCount-=16;
+            *(U16*)out = (U16)bitStream;
+            out += 2;
+            bitStream >>= 16;
+            bitCount -= 16;
         }
-        while (remaining<threshold)
-        {
-            nbBits--;
-            threshold>>=1;
-        }
+        while (remaining<threshold) { nbBits--; threshold>>=1; }
     }
+
+    if (remaining<0) return -1;
+
     * (U16*) out = (U16) bitStream;
     out+= (bitCount+7) /8;
 
@@ -207,13 +204,10 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
     const BYTE* ip = (const BYTE*) header;
     int nbBits;
     int remaining;
-    U32 mask;
     int threshold;
     U32 bitStream;
     int bitCount;
     int charnum = 0;
-    int bitSent = 0;
-    int bitValue = 0;
 
     bitStream = * (U32*) ip;
     ip+=4;
@@ -226,40 +220,33 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
     remaining = (1<<nbBits);
     threshold = remaining;
     nbBits++;
-    mask = 2*threshold-1;
 
     while (remaining)
     {
-        const int readMask = mask >> bitSent;
-        int count = ( (bitStream & readMask) << bitSent) + bitValue;
-        const int margin = ( (2*threshold-1) - remaining) & 0xFFFFFFFE;
-        bitCount -= (nbBits-bitSent);
-        bitStream >>= (nbBits-bitSent);
-        if (count>=2*margin)
+        const int max = (2*threshold-1)-remaining;
+        int count = bitStream & (threshold-1);
+
+        if (count < max)
         {
-            bitSent=0;
-            bitValue=0;
-            count -= margin;
+            bitCount   -= nbBits-1;
+            bitStream >>= nbBits-1;
         }
         else
         {
-            bitSent=1;
-            bitValue = (count >= margin);
-            count -= margin*bitValue;
+            count = bitStream & (2*threshold-1);
+            if (count >= threshold) count -= max;
+            bitCount   -= nbBits;
+            bitStream >>= nbBits;
         }
+
         remaining -= count;
         normalizedCounter[charnum++] = count;
+        while (remaining<threshold) { nbBits--; threshold >>= 1; }
         if (bitCount<nbBits)
         {
-            bitStream += (* (U16*) ip) << bitCount;
+            bitStream += (*(U16*)ip) << bitCount;
             ip+=2;
             bitCount+= 16;
-        }
-        while (remaining<threshold)
-        {
-            nbBits--;
-            threshold >>= 1;
-            mask >>= 1;
         }
     }
     *nbSymbols = charnum;
@@ -300,11 +287,8 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 
     for (i=0; i<maxNbSymbols; i++) count[i] = Counting1[i] + Counting2[i] + Counting3[i] + Counting4[i];
 
-    {
-        int max = maxNbSymbols;
-        while (!count[max-1]) max--;
-        return max;
-    }
+    while (!count[maxNbSymbols-1]) maxNbSymbols--;
+    return maxNbSymbols;
 }
 
 
@@ -327,11 +311,8 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
             const int shift = srcLog - maxLog;
             const int base = (1<<shift)-1;
             int s;
-            for (s=0; s<nbSymbols; s++)
-            {
-                vTotal -= count[s] - ((count[s]+base) >> shift);
-                count[s] = (count[s]+base) >> shift;
-            }
+            vTotal=0;
+            for (s=0; s<nbSymbols; s++) vTotal += count[s] = (count[s]+base) >> shift;
         }
     }
 
@@ -354,8 +335,8 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         U32 const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
         U32 const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
         int s;
-        int cumulativeRest = ( (int) vStep + error) / 2;
-        if (error > (U32)vStep) cumulativeRest = error;   // Note : in this case, total is too large; Error will be given to first non-zero symbol
+        int cumulativeRest = ( (int)vStep + error) >> 1;
+        if (error > vStep) cumulativeRest = error;     // Note : in this case, total is too large; Error will be given to first non-zero symbol
 
         for (s=0; s<nbSymbols; s++)
         {
@@ -367,7 +348,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
                 rest = (normalizedCounter[s]*step) - (size * vStep);   // necessarily >= 0
                 cumulativeRest += rest;
                 size += cumulativeRest >> scale;
-                cumulativeRest &= (vStep - 1);
+                cumulativeRest &= vStep-1;
                 normalizedCounter[s] = size;
             }
         }
@@ -623,10 +604,9 @@ int FSE_compress (void* dest, const unsigned char* source, int sourceSize)
 }
 
 
-//****************************
-// Decompression CODE
-//****************************
-
+/*********************************************************
+   Decompression (Byte symbols)
+*********************************************************/
 typedef struct
 {
     U16  newState;
