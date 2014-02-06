@@ -888,19 +888,19 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:   strcat(localName, "rl."); nbSymbols=256; memLog=12; break;
-                case et_runLength285:strcat(localName, "rzl"); nbSymbols=  3; memLog=12; break;
-                case et_runLengthU16:strcat(localName, "r16"); nbSymbols=  0; memLog=10; break;
-                case et_runLengthLN: strcat(localName, "rLN"); nbSymbols=  2; memLog=10; break;
-                case et_offset:      strcat(localName, "of."); nbSymbols= 16; memLog=12; break;
-                case et_lastbits:    strcat(localName, "lb."); nbSymbols= 16; memLog=12; break;
-                case et_literals:    strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
-                case et_matchLength: strcat(localName, "ml."); nbSymbols=256; memLog=12; break;
-                case et_matchLengthU16:strcat(localName,"ml0");nbSymbols=  0; memLog=10; break;
-                case et_matchLengthLog2:strcat(localName,"ml2");nbSymbols= 2; memLog=10; break;
-                case et_offsetU16:   strcat(localName, "o16"); nbSymbols=  0; memLog=10; break;
-                case et_offsetHigh:  strcat(localName, "ofh"); nbSymbols=256; memLog=11; break;
-                case et_offsetU32:   strcat(localName, "o32"); nbSymbols=  1; memLog=10; break;
+                case et_runLength:    strcat(localName, "rl."); nbSymbols=256; memLog=12; break;
+                case et_runLength285: strcat(localName, "rzl"); nbSymbols=  3; memLog=12; break;
+                case et_runLengthU16: strcat(localName, "r16"); nbSymbols=  0; memLog=10; break;
+                case et_runLengthLN:  strcat(localName, "rLN"); nbSymbols=  2; memLog=10; break;
+                case et_lastbits:     strcat(localName, "lb."); nbSymbols= 16; memLog=12; break;
+                case et_literals:     strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
+                case et_matchLength:  strcat(localName, "ml."); nbSymbols=256; memLog=12; break;
+                case et_matchLengthU16:strcat(localName,"m16"); nbSymbols=  0; memLog=10; break;
+                case et_matchLengthLog2:strcat(localName,"ml2");nbSymbols=  2; memLog=10; break;
+                case et_offset:       strcat(localName, "of."); nbSymbols= 16; memLog=12; break;
+                case et_offsetHigh:   strcat(localName, "ofh"); nbSymbols=256; memLog=11; break;
+                case et_offsetU16:    strcat(localName, "o16"); nbSymbols=  0; memLog=10; break;
+                case et_offsetU32:    strcat(localName, "o32"); nbSymbols=  1; memLog=10; break;
                 }
                 strcat(localName, inFileName);
                 BMK_benchMem(chunkP, nbChunks, localName, (int)digestedSize, &totalz, &totalc, &totald, nbSymbols, memLog);
