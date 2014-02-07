@@ -128,7 +128,7 @@ typedef unsigned long long  U64;
 #define _8BITS 0xFF
 
 #define MAGICNUMBER_SIZE   4
-#define FSE_MAGIC_NUMBER   0x183E2303
+#define FSE_MAGIC_NUMBER   0x183E2304
 
 #define CACHELINE 64
 #define FSE_BLOCKSIZEID_DEFAULT  5

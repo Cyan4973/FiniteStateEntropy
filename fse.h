@@ -64,12 +64,14 @@ FSE_compress():
     'dest' buffer must be already allocated, and sized to handle worst case situations.
     Use FSE_compressBound() to determine this size.
     return : size of compressed data
+             or -1 if there is an error.
 FSE_decompress():
     Decompress compressed data from buffer 'compressed',
     into destination table of unsigned char 'dest', of size 'originalSize'.
     Destination table must be already allocated, and large enough to accomodate 'originalSize' char.
     The function will determine how many bytes are read from buffer 'compressed'.
     return : size of compressed data
+             or -1 if there is an error.
 */
 
 
@@ -153,7 +155,7 @@ The result will be saved into a structure, called 'normalizedCounter', which is 
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
 FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
-The return value is the corrected tableLog (<=maxTableLog). It is necessary to retrieve it for next steps.
+The return value is the adjusted tableLog. It is necessary to retrieve it for next steps.
 A result of '0' means that there is only a single symbol present.
 If there is an error, the function will return -1.
 
@@ -164,8 +166,8 @@ The result of the function is the number of bytes written into 'header'.
 If there is an error, the function will return -1.
 
 'normalizedCounter' can then be used to create the compression tables 'CTable'.
-The space required by 'CTable' must be already allocated.
-Its size is provided by FSE_sizeof_CTable().
+The space required by 'CTable' must be already allocated. Its size is provided by FSE_sizeof_CTable().
+You can then use FSE_buildCTable() to fill 'CTable'.
 In both cases, if there is an error, the function will return -1.
 
 'CTable' can then be used to compress 'source', with FSE_compress_usingCTable().
