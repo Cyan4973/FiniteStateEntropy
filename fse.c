@@ -554,7 +554,7 @@ typedef struct
     U16 memLog;
     U16 nbSymbols;
     U16 stateTable[FSE_MAX_TABLESIZE];
-    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];
+    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS_CHAR];
 } CTable_max_t;
 
 int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int memLog)
@@ -565,12 +565,12 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
     BYTE* const ostart = (BYTE*) dest;
     BYTE* op = ostart;
 
-    U32   counting[FSE_MAX_NB_SYMBOLS];
+    U32   counting[FSE_MAX_NB_SYMBOLS_CHAR];
     CTable_max_t CTable;
 
     // early out
     if (sourceSize <= 1) return FSE_noCompression (ostart, istart, sourceSize);
-    if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS;
+    if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS_CHAR;
     if (!memLog) memLog = FSE_MAX_TABLELOG;
 
     // Scan for stats
@@ -597,7 +597,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
 
 int FSE_compress (void* dest, const unsigned char* source, int sourceSize)
 {
-    return FSE_compress2(dest, source, sourceSize, FSE_MAX_NB_SYMBOLS, FSE_MAX_TABLELOG);
+    return FSE_compress2(dest, source, sourceSize, FSE_MAX_NB_SYMBOLS_CHAR, FSE_MAX_TABLELOG);
 }
 
 
