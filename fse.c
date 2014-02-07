@@ -210,48 +210,45 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
     int charnum = 0;
 
     bitStream = * (U32*) ip;
-    ip+=4;
     bitStream >>= 2;
-    bitCount = 30;                  // removes 2-bit headerId
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read memLog
     bitStream >>= 4;
-    bitCount -= 4;
     *tableLog = nbBits;
     remaining = (1<<nbBits);
     threshold = remaining;
     nbBits++;
+    bitCount = 6;
 
-    while (remaining)
+    while (remaining>0)
     {
-        const int max = (2*threshold-1)-remaining;
-        int count = bitStream & (threshold-1);
+        const U32 max = (2*threshold-1)-remaining;
+        int count;
 
-        if (count < max)
+        if ((bitStream & (threshold-1)) < max)
         {
-            bitCount   -= nbBits-1;
-            bitStream >>= nbBits-1;
+            count = bitStream & (threshold-1);
+            bitCount   += nbBits-1;
         }
         else
         {
             count = bitStream & (2*threshold-1);
             if (count >= threshold) count -= max;
-            bitCount   -= nbBits;
-            bitStream >>= nbBits;
+            bitCount   += nbBits;
         }
 
         remaining -= count;
         normalizedCounter[charnum++] = count;
-        while (remaining<threshold) { nbBits--; threshold >>= 1; }
-        if (bitCount<nbBits)
-        {
-            bitStream += (*(U16*)ip) << bitCount;
-            ip+=2;
-            bitCount+= 16;
-        }
+        while (remaining < threshold) { nbBits--; threshold >>= 1; }
+
+        ip += bitCount>>3;
+        bitCount &= 7;
+        bitStream = (*(U32*)ip) >> bitCount;
     }
     *nbSymbols = charnum;
+    if (remaining < 0) return -1;
+    if (nbBits > FSE_MAX_TABLELOG) return -1;  // Too large
 
-    ip -= bitCount>>3;   // realign
+    ip += bitCount>0;
     return (int) (ip-istart);
 }
 

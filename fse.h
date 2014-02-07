@@ -71,6 +71,7 @@ FSE_decompress():
     Destination table must be already allocated, and large enough to accomodate 'originalSize' char.
     The function will determine how many bytes are read from buffer 'compressed'.
     return : size of compressed data
+             or -1 if there is an error.
 */
 
 
