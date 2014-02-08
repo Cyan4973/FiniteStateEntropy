@@ -319,9 +319,10 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     {
         U32 minBase, add;
         int s;
-        minBase = (total-1) >> tableLog;
+        minBase = total;
         add = (minBase * nbSymbols) >> tableLog;
         do { minBase += add; add = (add * nbSymbols) >> tableLog; } while (add);
+        minBase >>= tableLog;
         for (s=0; s<nbSymbols; s++)
         {
             if (count[s])
@@ -337,7 +338,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         U32 const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
         U32 const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
         int s;
-        int cumulativeRest = ( (int)vStep + error) >> 1;
+        int cumulativeRest = ((int)vStep + error) >> 1;
         if (error > vStep) cumulativeRest = error;     // Note : in this case, total is too large; Error will be given to first non-zero symbol
 
         for (s=0; s<nbSymbols; s++)
@@ -389,11 +390,11 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
     const int tableMask = tableSize - 1;
     U16* tableU16 = ( (U16*) CTable) + 2;
     FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) (tableU16 + tableSize);
-    const int step = FSE_TABLESTEP (tableSize);
-    int symbolPos[FSE_MAX_NB_SYMBOLS+1];
+    const int step = FSE_TABLESTEP(tableSize);
+    int cumul[FSE_MAX_NB_SYMBOLS_CHAR+1];
     U32 position = 0;
-    BYTE tableByte[FSE_MAX_TABLESIZE];
-    BYTE s;
+    BYTE tableSymbolByte[FSE_MAX_TABLESIZE];
+    int s;
     int i;
 
     // header
@@ -401,30 +402,29 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
     tableU16[-1] = (U16) nbSymbols;
 
     // symbol start positions
-    symbolPos[0] = 0;
-    for (i=1; i<nbSymbols; i++)
-    {
-        symbolPos[i] = symbolPos[i-1] + normalizedCounter[i-1];
-    }
-    symbolPos[nbSymbols] = tableSize+1;
+    cumul[0] = 0;
+    for (i=1; i<nbSymbols; i++) cumul[i] = cumul[i-1] + normalizedCounter[i-1];
+    cumul[nbSymbols] = tableSize+1;
 
     // Spread symbols
-    s=0;
-    while (!symbolPos[s+1]) s++;
-    for (i=0; i<tableSize; i++)
+    for (s=0; s<nbSymbols; s++)
     {
-        tableByte[position] = s;
-        while (i+2 > symbolPos[s+1])
-            s++;
-        position = (position + step) & tableMask;
+        U32 i;
+        for (i=0; i<normalizedCounter[s]; i++)
+        {
+            tableSymbolByte[position] = (BYTE)s;
+            position = (position + step) & tableMask;
+        }
     }
+
+    if (position!=0)
+        return -1;   // Must have gone through all positions
 
     // Build table
     for (i=0; i<tableSize; i++)
     {
-        BYTE s = tableByte[i];
-        tableU16[symbolPos[s]] = (U16) (tableSize+i);
-        symbolPos[s]++;
+        BYTE s = tableSymbolByte[i];
+        tableU16[cumul[s]++] = (U16) (tableSize+i);
     }
 
     // Build Symbol Transformation Table
@@ -487,12 +487,14 @@ int   FSE_closeCompressionStream(size_t bitStream, int bitPos, ptrdiff_t state, 
     FSE_addBits(&bitStream, &bitPos, memLog, state);
     FSE_flushBits(&bitStream, &op, &bitPos);
 
-    p = op;
+    p = (BYTE*)op;
     *(U32*)compressionStreamDescriptor = (U32) ( ( (p - (BYTE*)compressionStreamDescriptor) *8) + bitPos);
     p += bitPos>0;
     return (int)(p-(BYTE*)compressionStreamDescriptor);
 }
 
+
+static int CBlock=0;
 
 int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourceSize, const void* CTable)
 {
@@ -580,7 +582,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
 
     // Scan for stats
     nbSymbols = FSE_count (counting, ip, sourceSize, nbSymbols);
-    if (nbSymbols==1) return FSE_writeSingleChar (ostart, *istart);
+    if (nbSymbols==1) return FSE_writeSingleChar (ostart, *istart);   // Only 0 is present
 
     // Normalize
     memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);

@@ -75,15 +75,6 @@ FSE_decompress():
 */
 
 
-/* same as previously, but data is presented as a table of unsigned short (2 bytes per symbol).
-   All symbol values within input table must be < nbSymbols.
-   Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
-int FSE_compressU16  (void* dest,
-                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
-int FSE_decompressU16(unsigned short* dest, int originalSize,
-                      const void* compressed);
-
-
 #define FSE_MAX_HEADERSIZE 512
 #define FSE_COMPRESSBOUND(size) (size + FSE_MAX_HEADERSIZE)
 static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
@@ -107,6 +98,14 @@ FSE_compress2():
 */
 int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog);
 
+
+/* same as previously, but data is presented as a table of unsigned short (2 bytes per symbol).
+   All symbol values within input table must be < nbSymbols.
+   Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
+int FSE_compressU16  (void* dest,
+                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
+int FSE_decompressU16(unsigned short* dest, int originalSize,
+                      const void* compressed);
 
 /******************************************
    FSE detailed API
@@ -264,7 +263,7 @@ If there is an error, it returns -1.
 
 
 const void* FSE_initDecompressionStream(const void** input, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog);
-unsigned char FSE_decodeSymbol(unsigned int* state, unsigned int bitStream, int* bitsConsumed, const void* DTable);
+unsigned char FSE_decodeSymbol(unsigned int* state, int* bitsConsumed, unsigned int bitStream, const void* DTable);
 unsigned int FSE_readBits(int* bitsConsumed, unsigned int bitStream, int nbBits);
 void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const void** input);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
