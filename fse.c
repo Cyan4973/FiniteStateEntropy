@@ -687,13 +687,16 @@ int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
 }
 
 
-const void* FSE_initDecompressionStream(const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog)
+FORCE_INLINE const void* FSE_initDecompressionStream_generic(
+    const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, 
+    const int tableLog, int maxCompressedSize, int safe)
 {
     const BYTE* iend;
     const BYTE* ip = (const BYTE*)*p;
 
     *bitsConsumed = ( ( (* (U32*) ip)-1) & 7) + 1 + 24;
     iend = ip + ( ( (* (U32*) ip) +7) / 8);
+    if (safe) if (iend > ip+maxCompressedSize) return NULL;
     ip = iend - 4;
     *bitStream = * (U32*) ip;
 
@@ -704,6 +707,18 @@ const void* FSE_initDecompressionStream(const void** p, int* bitsConsumed, unsig
     FSE_updateBitStream(bitStream, bitsConsumed, (const void**)&ip);
     *p = (void*)ip;
     return (void*)iend;
+}
+
+
+const void* FSE_initDecompressionStream(const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog)
+{
+    return FSE_initDecompressionStream_generic(p, bitsConsumed, state, bitStream, tableLog, 0, 0);
+}
+
+
+const void* FSE_initDecompressionStream_safe(const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog, int maxCompressedSize)
+{
+    return FSE_initDecompressionStream_generic(p, bitsConsumed, state, bitStream, tableLog, maxCompressedSize, 1);
 }
 
 
@@ -744,7 +759,9 @@ int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, cons
 }
 
 
-int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
+FORCE_INLINE int FSE_decompress_usingDTable_generic(
+    unsigned char* dest, const int originalSize, const void* compressed, int maxCompressedSize,
+    const void* DTable, const int tableLog, int safe)
 {
     const void* ip = compressed;
     const void* iend;
@@ -755,10 +772,15 @@ int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, con
     U32 state;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
+    if (safe) iend = FSE_initDecompressionStream_safe(&ip, &bitCount, &state, &bitStream, tableLog, maxCompressedSize);
+    else iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
+    if (iend==NULL) return -1;
 
     // Hot loop
-    while (op<oend-1)
+    //while ((op<oend-1) && (ip>=compressed))
+    //while (op<oend-1)
+    while( ((safe) && ((op<oend-1) && (ip>=compressed)))
+        || ((!safe) && (op<oend-1)) )
     {
         *op++ = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
         if ((sizeof(U32)*8 > FSE_MAX_TABLELOG*2+7) && (sizeof(void*)==8))   // Need this test to be static
@@ -766,18 +788,33 @@ int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, con
         FSE_updateBitStream(&bitStream, &bitCount, &ip);
     }
     if (op<oend) *(oend-1) = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
+    FSE_updateBitStream(&bitStream, &bitCount, &ip);
 
     // cheap last symbol storage
     *oend = (BYTE) state;
+
+    if ((ip!=compressed) || bitCount) return -1;   // Not fully decoded stream
 
     return FSE_closeDecompressionStream(iend, ip);
 }
 
 
-int FSE_decompress (unsigned char* dest, int originalSize,
-                    const void* compressed)
+int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
 {
-    const BYTE* const istart = (const BYTE*) compressed;
+    return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, 0, DTable, tableLog, 0);
+}
+
+int FSE_decompress_usingDTable_safe (unsigned char* dest, const int originalSize, const void* compressed, int maxCompressedSize, const void* DTable, const int tableLog)
+{
+    return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, 1);
+}
+
+
+FORCE_INLINE int FSE_decompress_generic (
+    unsigned char* dest, int originalSize,
+    const void* compressed, int maxCompressedSize, int safe)
+{
+    const BYTE* const istart = (const BYTE*)compressed;
     const BYTE* ip = istart;
     U32   counting[FSE_MAX_NB_SYMBOLS_CHAR];
     FSE_decode_t DTable[FSE_MAX_TABLESIZE];
@@ -799,11 +836,27 @@ int FSE_decompress (unsigned char* dest, int originalSize,
     errorCode = FSE_buildDTable (DTable, counting, nbSymbols, tableLog);
     if (errorCode==-1) return -1;
 
-    ip += FSE_decompress_usingDTable (dest, originalSize, ip, DTable, tableLog);
+    if (safe) errorCode = FSE_decompress_usingDTable_safe (dest, originalSize, ip, maxCompressedSize, DTable, tableLog);
+    else errorCode = FSE_decompress_usingDTable (dest, originalSize, ip, DTable, tableLog);
+    if (errorCode==-1) return -1;
+    ip += errorCode;
 
     return (int) (ip-istart);
 }
 
+
+int FSE_decompress (unsigned char* dest, int originalSize,
+                    const void* compressed)
+{
+    return FSE_decompress_generic(dest, originalSize, compressed, 0, 0);
+    //return FSE_decompress_generic(dest, originalSize, compressed, originalSize, 1);   // for tests
+}
+
+int FSE_decompress_safe (unsigned char* dest, int originalSize,
+                    const void* compressed, int maxCompressedSize)
+{
+    return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1);
+}
 
 /*********************************************************
   U16 Compression functions

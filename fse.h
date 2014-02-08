@@ -37,23 +37,23 @@ extern "C" {
 #endif
 
 
-//**************************************
-// Compiler Options
-//**************************************
+/******************************************
+   Compiler Options
+******************************************/
 #if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
 #  define inline __inline           // Visual C is not C99, but supports some kind of inline
 #endif
 
 
-//**************************************
-//* Includes
-//**************************************
+/******************************************
+   Includes
+******************************************/
 #include <stddef.h>    // size_t, ptrdiff_t
 
 
-//**************************************
-// FSE simple functions
-//**************************************
+/******************************************
+   FSE simple functions
+******************************************/
 int FSE_compress   (void* dest,
                     const unsigned char* source, int sourceSize);
 int FSE_decompress (unsigned char* dest, int originalSize,
@@ -95,8 +95,20 @@ FSE_compress2():
     The function will then assume that any unsigned char within 'source' has value < nbSymbols.
     note : If this condition is not respected, compressed data will be corrupted !
     return : size of compressed data
+             or -1 if there is an error
 */
 int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog);
+
+
+/*
+FSE_decompress_safe():
+    Same as FSE_decompress(), but ensures that the decoder never reads beyond compressed + maxCompressedSize.
+    note : you don't have to provide the exact compressed size. If you provide more, it's fine too.
+    This function is safe against malicious data.
+    return : size of compressed data
+             or -1 if there is an error
+*/
+int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* compressed, int maxCompressedSize);
 
 
 /* same as previously, but data is presented as a table of unsigned short (2 bytes per symbol).
