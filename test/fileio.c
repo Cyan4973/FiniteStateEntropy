@@ -319,16 +319,21 @@ int compress_file(char* output_filename, char* input_filename)
             *(BYTE*)out_buff = (BYTE)nbFullBlocks;
             for (i=0; i<nbFullBlocks; i++)
             {
-                op += compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
+                int errorCode = compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
+                if (errorCode==-1) EXM_THROW(22, "Compression error");
+                op += errorCode;
                 ip += inputBlockSize;
             }
             if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
             {
+                int errorCode;
                 int nbBytes = ((blockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
-                op += compressionFunction(op, (unsigned char*)ip, lastBlockSize);
+                errorCode = compressionFunction(op, (unsigned char*)ip, lastBlockSize);
+                if (errorCode==-1) EXM_THROW(22, "Compression error, last block");
+                op += errorCode;
                 ip +=  lastBlockSize;
                 lastBlockDone=1;
             }
