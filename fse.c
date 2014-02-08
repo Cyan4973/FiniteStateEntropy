@@ -63,12 +63,14 @@
 # include <stdint.h>
 typedef  uint8_t BYTE;
 typedef uint16_t U16;
+typedef  int16_t S16;
 typedef uint32_t U32;
 typedef  int32_t S32;
 typedef uint64_t U64;
 #else
 typedef unsigned char       BYTE;
 typedef unsigned short      U16;
+typedef   signed short      S16;
 typedef unsigned int        U32;
 typedef   signed int        S32;
 typedef unsigned long long  U64;
@@ -315,8 +317,11 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
     // Ensure minimum step is 1
     {
-        U32 const minBase = (total + ( (total*nbSymbols) >> tableLog) + ( ( (total*nbSymbols) >> tableLog) * nbSymbols >> tableLog) ) >> tableLog;
+        U32 minBase, add;
         int s;
+        minBase = (total-1) >> tableLog;
+        add = (minBase * nbSymbols) >> tableLog;
+        do { minBase += add; add = (add * nbSymbols) >> tableLog; } while (add);
         for (s=0; s<nbSymbols; s++)
         {
             if (count[s])
@@ -620,21 +625,22 @@ int FSE_sizeof_DTable (int memLog)
 int FSE_buildDTable (void* DTable, const unsigned int* const normalizedCounter, int nbSymbols, int tableLog)
 {
     FSE_decode_t* const tableDecode = (FSE_decode_t*) DTable;
-    const int tableSize = 1 << tableLog;
-    const int tableMask = tableSize-1;
-    const U32 step = FSE_TABLESTEP(tableSize);
-    U32 symbolNext[FSE_MAX_NB_SYMBOLS];
+    const U16 tableSize = 1 << tableLog;
+    const U16 tableMask = tableSize-1;
+    const U16 step = FSE_TABLESTEP(tableSize);
+    U16 symbolNext[FSE_MAX_NB_SYMBOLS];
     U32 position = 0;
     int s, i;
 
     // Checks
     if (nbSymbols > FSE_MAX_NB_SYMBOLS) return -1;
+    if (tableLog > FSE_MAX_TABLELOG) return -1;
 
     // symbol start positions
-    symbolNext[0] = normalizedCounter[0];
+    symbolNext[0] = (U16)normalizedCounter[0];
     for (s=1; s<nbSymbols; s++)
     {
-        symbolNext[s] = symbolNext[s-1] + normalizedCounter[s];
+        symbolNext[s] = symbolNext[s-1] + (U16)normalizedCounter[s];
     }
 
     // Spread symbols
@@ -648,7 +654,7 @@ int FSE_buildDTable (void* DTable, const unsigned int* const normalizedCounter, 
     }
 
     // Calculate symbol next
-    for (s=0; s<nbSymbols; s++) symbolNext[s] = normalizedCounter[s];
+    for (s=0; s<nbSymbols; s++) symbolNext[s] = (U16)normalizedCounter[s];
 
     // Build table Decoding table
     {
@@ -699,7 +705,15 @@ const void* FSE_initDecompressionStream(const void** p, int* bitsConsumed, unsig
 }
 
 
-BYTE FSE_decodeSymbol(U32* state, U32 bitStream, int* bitsConsumed, const void* DTable)
+U32 FSE_readBits(int* bitsConsumed, U32 bitStream, int nbBits)
+{
+    U32 value = ((bitStream << *bitsConsumed) >> 1) >> (31-nbBits);
+    *bitsConsumed += nbBits;
+    return value;
+}
+
+
+BYTE FSE_decodeSymbol(U32* state, int* bitsConsumed, U32 bitStream, const void* DTable)
 {
     const FSE_decode_t* const decodeTable = (const FSE_decode_t*) DTable;
     U32 rest;
@@ -707,21 +721,10 @@ BYTE FSE_decodeSymbol(U32* state, U32 bitStream, int* bitsConsumed, const void* 
     const int nbBits = decodeTable[*state].nbBits;
 
     symbol = decodeTable[*state].symbol;
-
-    rest = ( (bitStream << *bitsConsumed) >> 1) >> (31 - nbBits);  // faster than mask
-    *bitsConsumed += nbBits;
-
+    rest = FSE_readBits(bitsConsumed, bitStream, nbBits);
     *state = decodeTable[*state].newState + rest;
 
     return symbol;
-}
-
-
-U32 FSE_readBits(int* bitsConsumed, U32 bitStream, int nbBits)
-{
-    U32 value = ((bitStream << *bitsConsumed) >> 1) >> (31-nbBits);
-    *bitsConsumed += nbBits;
-    return value;
 }
 
 
@@ -755,12 +758,12 @@ int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, con
     // Hot loop
     while (op<oend-1)
     {
-        *op++ = FSE_decodeSymbol(&state, bitStream, &bitCount, DTable);
+        *op++ = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
         if ((sizeof(U32)*8 > FSE_MAX_TABLELOG*2+7) && (sizeof(void*)==8))   // Need this test to be static
-            *op++ = FSE_decodeSymbol(&state, bitStream, &bitCount, DTable);
+            *op++ = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
         FSE_updateBitStream(&bitStream, &bitCount, &ip);
     }
-    if (op<oend) *(oend-1) = FSE_decodeSymbol(&state, bitStream, &bitCount, DTable);
+    if (op<oend) *(oend-1) = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
 
     // cheap last symbol storage
     *oend = (BYTE) state;
@@ -774,7 +777,7 @@ int FSE_decompress (unsigned char* dest, int originalSize,
 {
     const BYTE* const istart = (const BYTE*) compressed;
     const BYTE* ip = istart;
-    U32   counting[FSE_MAX_NB_SYMBOLS];
+    U32   counting[FSE_MAX_NB_SYMBOLS_CHAR];
     FSE_decode_t DTable[FSE_MAX_TABLESIZE];
     BYTE  headerId;
     int nbSymbols;
@@ -787,12 +790,12 @@ int FSE_decompress (unsigned char* dest, int originalSize,
 
     // normal FSE decoding mode
     ip += FSE_readHeader (counting, &nbSymbols, &tableLog, istart);
+    if (ip<istart) return -1;
     FSE_buildDTable (DTable, counting, nbSymbols, tableLog);
     ip += FSE_decompress_usingDTable (dest, originalSize, ip, DTable, tableLog);
 
     return (int) (ip-istart);
 }
-
 
 
 /*********************************************************
