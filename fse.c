@@ -297,7 +297,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
     // Check
     if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
-    if ((FSE_highbit(nbSymbols-1)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
+    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
@@ -316,6 +316,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     }
 
     // Ensure minimum step is 1
+    if (total > (1<<tableLog))
     {
         U32 minBase, add;
         int s;
@@ -825,8 +826,9 @@ FORCE_INLINE int FSE_decompress_generic (
 
     // headerId early outs
     headerId = ip[0] & 3;
-    if (headerId==0) return FSE_decompressRaw (dest, originalSize, istart);
-    if (headerId==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
+    if (ip[0]==0) return FSE_decompressRaw (dest, originalSize, istart);
+    if (ip[0]==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
+    if (headerId!=2) return -1;   // unused headerId
 
     // normal FSE decoding mode
     errorCode = FSE_readHeader (counting, &nbSymbols, &tableLog, istart);
