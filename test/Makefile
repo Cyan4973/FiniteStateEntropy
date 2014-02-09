@@ -39,7 +39,7 @@ endif
 
 default: fse
 
-all: fse fse32 probagen
+all: fse fse32 fuzzer probagen
 
 fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
 	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
@@ -47,10 +47,13 @@ fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
 	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT) $(CF32)
 
+fuzzer: fuzzer.c xxhash.c ../fse.c
+	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
+
 probagen: probaGenerator.c
 	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 

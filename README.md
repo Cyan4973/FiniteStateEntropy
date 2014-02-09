@@ -37,7 +37,7 @@ It compares FSE to [zlib's Huffman codec](http://zlib.net/)
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.316</th><th>205 MS/s</th><th>270 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.316</th><th>205 MS/s</th><th>275 MS/s</th>
   </tr>
   <tr>
     <th>proba70.bin</th><th>zlib</th><th>5.575</th><th>250 MS/s</th><th>270 MS/s</th>
@@ -46,7 +46,7 @@ It compares FSE to [zlib's Huffman codec](http://zlib.net/)
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>205 MS/s</th><th>270 MS/s</th>
+    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>205 MS/s</th><th>275 MS/s</th>
   </tr>
   <tr>
     <th>proba90.bin</th><th>zlib</th><th>7.175</th><th>250 MS/s</th><th>285 MS/s</th>

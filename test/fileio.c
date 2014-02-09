@@ -319,16 +319,21 @@ int compress_file(char* output_filename, char* input_filename)
             *(BYTE*)out_buff = (BYTE)nbFullBlocks;
             for (i=0; i<nbFullBlocks; i++)
             {
-                op += compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
+                int errorCode = compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
+                if (errorCode==-1) EXM_THROW(22, "Compression error");
+                op += errorCode;
                 ip += inputBlockSize;
             }
             if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
             {
+                int errorCode;
                 int nbBytes = ((blockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
-                op += compressionFunction(op, (unsigned char*)ip, lastBlockSize);
+                errorCode = compressionFunction(op, (unsigned char*)ip, lastBlockSize);
+                if (errorCode==-1) EXM_THROW(22, "Compression error, last block");
+                op += errorCode;
                 ip +=  lastBlockSize;
                 lastBlockDone=1;
             }
@@ -421,12 +426,15 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
         while (iend-ip > FSE_compressBound(blockSize))
         {
             size_t sizeCheck;
+            int errorCode;
             if (nbFullBlocks == 0)
             {
                 nbFullBlocks = *ip++;
                 if (!nbFullBlocks) goto _lastBlock;   // goto last block
             }
-            ip += FSE_decompress((unsigned char*)out_buff, blockSize, ip);
+            errorCode = FSE_decompress((unsigned char*)out_buff, blockSize, ip);
+            if (errorCode == -1) EXM_THROW(33, "Decoding error : compressed data block corrupted");
+            ip += errorCode;
             filesize += blockSize;
             nbFullBlocks--;
 
@@ -446,6 +454,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
 
 _lastBlock:
     {
+        int errorCode;
         int nbBytes = ((blockSizeId+10)/8)+1;   // Nb Bytes to describe last block size
         U32 lastBlockSize = LITTLE_ENDIAN_32(*(U32*)ip);
         U32 mask;
@@ -459,7 +468,9 @@ _lastBlock:
         }
         lastBlockSize &= mask;
 
-        ip += FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip);
+        errorCode = FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip);
+        if (errorCode == -1) EXM_THROW(33, "Decoding error : last block failed");
+        ip += errorCode;
         filesize += lastBlockSize;
 
         sizeCheck = fwrite(out_buff, 1, lastBlockSize, foutput);

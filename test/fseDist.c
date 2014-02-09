@@ -278,7 +278,7 @@ int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, bitStream, &bitCount, DTable);
+        int nbBits = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
         unsigned short value = (U16)FSED_readBits(&bitCount, bitStream, nbBits);
         value += 1<<nbBits;
         *op++ = value;
@@ -622,7 +622,7 @@ int FSED_decompressU32_usingDTable (unsigned int* dest, const int originalSize, 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, bitStream, &bitCount, DTable);
+        int nbBits = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
         U32 value;
         FSE_updateBitStream(&bitStream, &bitCount, &ip);
         value = (U32)FSED_readBits(&bitCount, bitStream, nbBits);
