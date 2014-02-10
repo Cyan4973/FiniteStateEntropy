@@ -213,7 +213,7 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
 
     bitStream = * (U32*) ip;
     bitStream >>= 2;
-    nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read memLog
+    nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read tableLog
     bitStream >>= 4;
     *tableLog = nbBits;
     remaining = (1<<nbBits);
@@ -371,9 +371,9 @@ typedef struct
 
 /*
 CTable is a variable size structure which contains :
-    U16 memLog;
+    U16 tableLog;
     U16 nbSymbols;
-    U16 nextStateNumber[1 << memLog];                     // This size is variable
+    U16 nextStateNumber[1 << tableLog];                   // This size is variable
     FSE_symbolCompressionTransform symbolTT[nbSymbols];   // This size is variable
 Allocation is fully manual, since C standard does not support variable-size structures.
 */
@@ -459,11 +459,11 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
 void* FSE_initCompressionStream(void** op, ptrdiff_t* state, const void** symbolTT, const void** stateTable, const void* CTable)
 {
     void* start = *op;
-    const int memLog = ( (U16*) CTable) [0];
+    const int tableLog = ( (U16*) CTable) [0];
     *((BYTE**)op) += 4;
-    *state = ((ptrdiff_t)1<<memLog);
+    *state = ((ptrdiff_t)1<<tableLog);
     *stateTable = (void*)(((const U16*) CTable) + 2);
-    *symbolTT = (void*)(((const U16*)(*stateTable)) + ((ptrdiff_t)1<<memLog));
+    *symbolTT = (void*)(((const U16*)(*stateTable)) + ((ptrdiff_t)1<<tableLog));
     return start;
 }
 
@@ -481,10 +481,10 @@ void FSE_encodeByte(ptrdiff_t* state, size_t* bitStream, int* bitpos, BYTE symbo
 
 int   FSE_closeCompressionStream(size_t bitStream, int bitPos, ptrdiff_t state, void* op, void* compressionStreamDescriptor, const void* CTable)
 {
-    const int memLog = ( (U16*) CTable) [0];
+    const int tableLog = ( (U16*) CTable) [0];
     BYTE* p;
 
-    FSE_addBits(&bitStream, &bitPos, memLog, state);
+    FSE_addBits(&bitStream, &bitPos, tableLog, state);
     FSE_flushBits(&bitStream, &op, &bitPos);
 
     p = (BYTE*)op;
@@ -556,13 +556,13 @@ int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
 
 typedef struct
 {
-    U16 memLog;
+    U16 tableLog;
     U16 nbSymbols;
     U16 stateTable[FSE_MAX_TABLESIZE];
     FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];   // Also used by FSE_compressU16
 } CTable_max_t;
 
-int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int memLog)
+int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog)
 {
     const BYTE* const istart = (const BYTE*) source;
     const BYTE* ip = istart;
@@ -577,7 +577,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
     // early out
     if (sourceSize <= 1) return FSE_noCompression (ostart, istart, sourceSize);
     if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS_CHAR;
-    if (!memLog) memLog = FSE_MAX_TABLELOG;
+    if (!tableLog) tableLog = FSE_MAX_TABLELOG;
 
     // Scan input and build symbol stats
     errorCode = FSE_count (counting, ip, sourceSize, nbSymbols);
@@ -585,18 +585,18 @@ int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int 
     if (errorCode==1) return FSE_writeSingleChar (ostart, *istart);   // Only 0 is present
     nbSymbols = errorCode;
 
-    errorCode = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    errorCode = FSE_normalizeCount (counting, tableLog, counting, sourceSize, nbSymbols);
     if (errorCode==-1) return -1;
     if (errorCode==0) return FSE_writeSingleChar (ostart, *istart);
-    memLog = errorCode;
+    tableLog = errorCode;
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, counting, nbSymbols, memLog);
+    errorCode = FSE_writeHeader (op, counting, nbSymbols, tableLog);
     if (errorCode==-1) return -1;
     op += errorCode;
 
     // Compress
-    errorCode = FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
+    errorCode = FSE_buildCTable (&CTable, counting, nbSymbols, tableLog);
     if (errorCode==-1) return -1;
     op += FSE_compress_usingCTable (op, ip, sourceSize, &CTable);
 
@@ -624,9 +624,9 @@ typedef struct
 } FSE_decode_t;
 
 
-int FSE_sizeof_DTable (int memLog)
+int FSE_sizeof_DTable (int tableLog)
 {
-    return (int) ( (1<<memLog) * (int) sizeof (FSE_decode_t) );
+    return (int) ( (1<<tableLog) * (int) sizeof (FSE_decode_t) );
 }
 
 int FSE_buildDTable (void* DTable, const unsigned int* const normalizedCounter, int nbSymbols, int tableLog)
@@ -1010,8 +1010,8 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
     BYTE* const ostart = (BYTE*) dest;
     BYTE* op = (BYTE*) dest;
 
-    const int memLog = ( (U16*) CTable) [0];
-    const int tableSize = 1 << memLog;
+    const int tableLog = ( (U16*) CTable) [0];
+    const int tableSize = 1 << tableLog;
     const U16* const stateTable = ( (const U16*) CTable) + 2;
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) (stateTable + tableSize);
 
@@ -1048,7 +1048,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
     }
 
     // Finalize block
-    FSE_addBits(&bitStream, &bitpos, memLog, state);
+    FSE_addBits(&bitStream, &bitpos, tableLog, state);
     FSE_flushBits(&bitStream, (void**)&op, &bitpos);
     *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitpos);
     op += bitpos>0;
@@ -1057,7 +1057,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 }
 
 
-int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, int nbSymbols, int memLog)
+int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, int nbSymbols, int tableLog)
 {
     const U16* const istart = source;
     const U16* ip = istart;
@@ -1072,20 +1072,20 @@ int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, i
     // early out
     if (sourceSize <= 1) return FSE_noCompressionU16 (ostart, istart, sourceSize);
     if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS;
-    if (!memLog) memLog = FSE_MAX_TABLELOG;
+    if (!tableLog) tableLog = FSE_MAX_TABLELOG;
 
     // Scan for stats
     nbSymbols = FSE_countU16 (counting, ip, sourceSize, nbSymbols);
     if (nbSymbols==1) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
-    if (memLog==0) return FSE_writeSingleU16(ostart, *istart);
+    tableLog = FSE_normalizeCount (counting, tableLog, counting, sourceSize, nbSymbols);
+    if (tableLog==0) return FSE_writeSingleU16(ostart, *istart);
 
-    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
+    op += FSE_writeHeader (op, counting, nbSymbols, tableLog);
 
     // Compress
-    FSE_buildCTableU16 (&CTable, counting, nbSymbols, memLog);
+    FSE_buildCTableU16 (&CTable, counting, nbSymbols, tableLog);
     op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
