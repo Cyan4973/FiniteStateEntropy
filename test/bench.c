@@ -786,8 +786,6 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
     double totald = 0.;
 
 
-    // Init
-
     // Loop for each file
     while (fileIdx<nbFiles)
     {

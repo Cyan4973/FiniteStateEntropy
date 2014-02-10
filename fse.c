@@ -539,14 +539,14 @@ int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourc
 }
 
 
-static int FSE_writeSingleChar (BYTE *out, BYTE symbol)
+int FSE_writeSingleChar (BYTE *out, BYTE symbol)
 {
     *out++=1;     // Header means ==> 1 symbol repeated across the whole sequence
     *out=symbol;
     return 2;
 }
 
-static int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
+int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
 {
     *out++=0;     // Header means ==> uncompressed
     memcpy (out, in, isize);
@@ -559,7 +559,7 @@ typedef struct
     U16 memLog;
     U16 nbSymbols;
     U16 stateTable[FSE_MAX_TABLESIZE];
-    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS_CHAR];
+    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];   // Also used by FSE_compressU16
 } CTable_max_t;
 
 int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int memLog)
@@ -689,7 +689,7 @@ int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
 
 
 FORCE_INLINE const void* FSE_initDecompressionStream_generic(
-    const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, 
+    const void** p, int* bitsConsumed, unsigned int* state, unsigned int* bitStream,
     const int tableLog, int maxCompressedSize, int safe)
 {
     const BYTE* iend;
