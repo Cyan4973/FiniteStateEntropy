@@ -66,6 +66,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "bench.h"
 #include "fileio.h"
 #include "fse.h"
+//#include "fsehc.h"
 #include "zlibh.h"
 #include "xxhash.h"
 #include "lz4hce.h"
@@ -599,6 +600,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                 //chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
+                //chunkP[chunkNb].compressedSize = FSEHC_compress2(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
                 chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
             nbLoops++;
         }
@@ -621,8 +623,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSE_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                //chunkP[chunkNb].compressedSize = FSEHC_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
                 //chunkP[chunkNb].compressedSize = FSE_decompress_LowMem((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = FSE_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);

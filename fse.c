@@ -825,6 +825,7 @@ FORCE_INLINE int FSE_decompress_generic (
     int errorCode;
 
     // headerId early outs
+    if ((safe) && (maxCompressedSize<2)) return -1;   // too small input size
     headerId = ip[0] & 3;
     if (ip[0]==0) return FSE_decompressRaw (dest, originalSize, istart);
     if (ip[0]==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
