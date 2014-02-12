@@ -147,38 +147,58 @@ int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nb
 {
     BYTE* const ostart = (BYTE*) header;
     BYTE* out = ostart;
-    int nbBits = tableLog;
-    const int tableSize = 1 << nbBits;
+    int nbBits;
+    const int tableSize = 1 << tableLog;
     int remaining;
     int threshold;
     U32 bitStream;
     int bitCount;
     int charnum = 0;
+    int previous0 = 0;
 
-    if (nbBits > FSE_MAX_TABLELOG) return -1;   // Unsupported
-    if (nbBits < FSE_MIN_TABLELOG) return -1;   // Unsupported
+    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported
+    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported
 
     // HeaderId (normal case)
     bitStream = 2;
     bitCount  = 2;
     // Table Size
-    bitStream += (nbBits-FSE_MIN_TABLELOG) <<bitCount;
+    bitStream += (tableLog-FSE_MIN_TABLELOG) <<bitCount;
     bitCount  += 4;
 
     // Init
     remaining = tableSize;
     threshold = tableSize;
-    nbBits++;
+    nbBits = tableLog+1;
 
     while (remaining>0)
     {
-        int count = normalizedCounter[charnum++];
-        const int max = (2*threshold-1)-remaining;
-        remaining -= count;
-        if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
-        bitStream += count << bitCount;
-        bitCount  += nbBits;
-        bitCount  -= (count<max);
+        if (previous0)
+        {
+            int start = charnum;
+            while (!normalizedCounter[charnum++]); charnum--;
+            while (charnum >= start+24) { start+=24; bitStream += 0xFFFF<<bitCount; *(U16*)out=(U16)bitStream; out+=2; bitStream>>=16; }
+            while (charnum >= start+3) { start+=3; bitStream += 3 << bitCount; bitCount += 2; }
+            bitStream += (charnum-start) << bitCount; bitCount += 2;
+            if (bitCount>16)
+            {
+                *(U16*)out = (U16)bitStream;
+                out += 2;
+                bitStream >>= 16;
+                bitCount -= 16;
+            }
+        }
+        {
+            int count = normalizedCounter[charnum++];
+            const int max = (2*threshold-1)-remaining;
+            remaining -= count;
+            if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
+            bitStream += count << bitCount;
+            bitCount  += nbBits;
+            bitCount  -= (count<max);
+            previous0 = !count;
+            while (remaining<threshold) { nbBits--; threshold>>=1; }
+        }
         if (bitCount>16)
         {
             *(U16*)out = (U16)bitStream;
@@ -186,7 +206,6 @@ int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nb
             bitStream >>= 16;
             bitCount -= 16;
         }
-        while (remaining<threshold) { nbBits--; threshold>>=1; }
     }
 
     if (remaining<0) return -1;
@@ -210,6 +229,7 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
     U32 bitStream;
     int bitCount;
     int charnum = 0;
+    int previous0 = 0;
 
     bitStream = * (U32*) ip;
     bitStream >>= 2;
@@ -223,28 +243,38 @@ int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* 
 
     while (remaining>0)
     {
-        const U32 max = (2*threshold-1)-remaining;
-        int count;
-
-        if ((bitStream & (threshold-1)) < max)
+        if (previous0)
         {
-            count = bitStream & (threshold-1);
-            bitCount   += nbBits-1;
+            int n0 = charnum;
+            while ((bitStream & 0xFFFF) == 0xFFFF) { n0+=24; ip+=2; bitStream = (*(U32*)ip) >> bitCount; }
+            while ((bitStream & 3) == 3) { n0+=3; bitStream>>=2; bitCount+=2; }
+            n0 += bitStream & 3; bitCount += 2;
+            while (charnum < n0) normalizedCounter[charnum++] = 0;
+            ip += bitCount>>3; bitCount &= 7; bitStream = (*(U32*)ip) >> bitCount;
         }
-        else
         {
-            count = bitStream & (2*threshold-1);
-            if (count >= threshold) count -= max;
-            bitCount   += nbBits;
+            const U32 max = (2*threshold-1)-remaining;
+            int count;
+
+            if ((bitStream & (threshold-1)) < max)
+            {
+                count = bitStream & (threshold-1);
+                bitCount   += nbBits-1;
+            }
+            else
+            {
+                count = bitStream & (2*threshold-1);
+                if (count >= threshold) count -= max;
+                bitCount   += nbBits;
+            }
+
+            remaining -= count;
+            normalizedCounter[charnum++] = count;
+            previous0 = !count;
+            while (remaining < threshold) { nbBits--; threshold >>= 1; }
+
+            ip += bitCount>>3; bitCount &= 7; bitStream = (*(U32*)ip) >> bitCount;
         }
-
-        remaining -= count;
-        normalizedCounter[charnum++] = count;
-        while (remaining < threshold) { nbBits--; threshold >>= 1; }
-
-        ip += bitCount>>3;
-        bitCount &= 7;
-        bitStream = (*(U32*)ip) >> bitCount;
     }
     *nbSymbols = charnum;
     if (remaining < 0) return -1;
@@ -778,8 +808,6 @@ FORCE_INLINE int FSE_decompress_usingDTable_generic(
     if (iend==NULL) return -1;
 
     // Hot loop
-    //while ((op<oend-1) && (ip>=compressed))
-    //while (op<oend-1)
     while( ((safe) && ((op<oend-1) && (ip>=compressed)))
         || ((!safe) && (op<oend-1)) )
     {

@@ -186,7 +186,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
 
         /* Compression / Decompression test */
         {
-            int sizeOrig = FUZ_rand (&seed) & 0x1FFFF;
+            int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
             int sizeCompressed;
             U32 hashOrig;
             BYTE* bufferTest = bufferSrc + testNb;
@@ -201,7 +201,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
                 int result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
                     DISPLAY ("Output buffer bufferVerif corrupted !\n");
-                if (result==-1)
+                if ((result==-1) && (sizeCompressed>=2))
                     DISPLAY ("Decompression failed ! \n");
                 else
                 {
