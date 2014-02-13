@@ -89,31 +89,31 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 //******************************
 static int FUZ_GetMilliStart()
 {
-   struct timeb tb;
-   int nCount;
-   ftime( &tb );
-   nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-   return nCount;
+    struct timeb tb;
+    int nCount;
+    ftime ( &tb );
+    nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
+    return nCount;
 }
 
 
-static int FUZ_GetMilliSpan( int nTimeStart )
+static int FUZ_GetMilliSpan ( int nTimeStart )
 {
-   int nSpan = FUZ_GetMilliStart() - nTimeStart;
-   if ( nSpan < 0 )
-      nSpan += 0x100000 * 1000;
-   return nSpan;
+    int nSpan = FUZ_GetMilliStart() - nTimeStart;
+    if ( nSpan < 0 )
+        nSpan += 0x100000 * 1000;
+    return nSpan;
 }
 
 
-static unsigned int FUZ_rand(unsigned int* src)
+static unsigned int FUZ_rand (unsigned int* src)
 {
-    *src =  ((*src) * PRIME1) + PRIME2;
-    return (*src)>>7;
+    *src =  ( (*src) * PRIME1) + PRIME2;
+    return (*src) >>7;
 }
 
 
-static void generate(void* buffer, size_t buffSize, double p, U32* seed)
+static void generate (void* buffer, size_t buffSize, double p, U32* seed)
 {
     char table[PROBATABLESIZE];
     int remaining = PROBATABLESIZE;
@@ -125,11 +125,11 @@ static void generate(void* buffer, size_t buffSize, double p, U32* seed)
     // Build Table
     while (remaining)
     {
-        int n = (int)(remaining * p);
+        int n = (int) (remaining * p);
         int end;
         if (!n) n=1;
         end = pos + n;
-        while (pos<end) table[pos++]=(char)s;
+        while (pos<end) table[pos++]= (char) s;
         s++;
         remaining -= n;
     }
@@ -137,73 +137,76 @@ static void generate(void* buffer, size_t buffSize, double p, U32* seed)
     // Fill buffer
     while (op<oend)
     {
-        const int r = FUZ_rand(seed) & (PROBATABLESIZE-1);
+        const int r = FUZ_rand (seed) & (PROBATABLESIZE-1);
         *op++ = table[r];
     }
 }
 
 
-static int FUZ_checkCount(U32* normalizedCount, int tableLog, int nbSymbols)
+static int FUZ_checkCount (U32* normalizedCount, int tableLog, int nbSymbols)
 {
     int total = 1<<tableLog;
     int count = 0;
     int i;
     if (tableLog > 31) return -1;
-    for(i=0; i<nbSymbols; i++)
+    for (i=0; i<nbSymbols; i++)
         count += normalizedCount[i];
     if (count != total) return -1;
     return 0;
 }
 
 
-static void FUZ_tests(U32 seed, U32 startTestNb)
+static void FUZ_tests (U32 seed, U32 startTestNb)
 {
-    BYTE* bufferSrc   = (BYTE*)malloc(BUFFERSIZE+64);
-    BYTE* bufferDst   = (BYTE*)malloc(BUFFERSIZE+64);
-    BYTE* bufferVerif = (BYTE*)malloc(BUFFERSIZE+64);
+    BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     int testNb, nbSymbols, tableLog;
     U32 time = FUZ_GetMilliStart();
     const U32 nbRandPerLoop = 3;
 
-    generate(bufferSrc, BUFFERSIZE, 0.1, &seed);
+    generate (bufferSrc, BUFFERSIZE, 0.1, &seed);
 
     if (startTestNb)
     {
         U32 i;
         for (i=0; i<nbRandPerLoop*startTestNb; i++)
-            FUZ_rand(&seed);
+            FUZ_rand (&seed);
     }
 
     for (testNb=startTestNb; testNb<FUZ_NB_TESTS; testNb++)
     {
         int tag=0;
-        DISPLAYLEVEL(4, "\r test %5i  ", testNb);
-        if (FUZ_GetMilliSpan(time) > FUZ_UPDATERATE)
+        DISPLAYLEVEL (4, "\r test %5i  ", testNb);
+        if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
         {
-            DISPLAY("\r test %5i  ", testNb);
+            DISPLAY ("\r test %5i  ", testNb);
             time = FUZ_GetMilliStart();
         }
 
         /* Compression / Decompression test */
         {
-            int sizeOrig = FUZ_rand(&seed) & 0x1FFFF;
+            int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
             int sizeCompressed;
             U32 hashOrig;
             BYTE* bufferTest = bufferSrc + testNb;
-            DISPLAYLEVEL(4,"%3i\b\b\b", tag++);;
-            hashOrig = XXH32(bufferTest, sizeOrig, 0);
-            sizeCompressed = FSE_compress(bufferDst, bufferTest, sizeOrig);
+            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            hashOrig = XXH32 (bufferTest, sizeOrig, 0);
+            sizeCompressed = FSE_compress (bufferDst, bufferTest, sizeOrig);
             if (sizeCompressed == -1)
-                DISPLAY("Compression failed ! \n");
+                DISPLAY ("Compression failed ! \n");
             else
             {
-                int result = FSE_decompress_safe(bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                if (result==-1)
-                    DISPLAY("Decompression failed ! \n");
+                BYTE saved = bufferVerif[sizeOrig];
+                int result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                if (bufferVerif[sizeOrig] != saved)
+                    DISPLAY ("Output buffer bufferVerif corrupted !\n");
+                if ((result==-1) && (sizeCompressed>=2))
+                    DISPLAY ("Decompression failed ! \n");
                 else
                 {
-                    U32 hashEnd = XXH32(bufferVerif, sizeOrig, 0);
-                    if (hashEnd != hashOrig) DISPLAY("Data corrupted !! \n");
+                    U32 hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                    if (hashEnd != hashOrig) DISPLAY ("Data corrupted !! \n");
                 }
             }
         }
@@ -212,37 +215,43 @@ static void FUZ_tests(U32 seed, U32 startTestNb)
         {
             BYTE* bufferTest = bufferSrc + testNb;
             U32 count[256];
-            int result = FSE_readHeader(count, &nbSymbols, &tableLog, bufferTest);
-            DISPLAYLEVEL(4,"%3i\b\b\b", tag++);;
+            int result = FSE_readHeader (count, &nbSymbols, &tableLog, bufferTest);
+            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             if (result != -1)
             {
-                result = FUZ_checkCount(count, tableLog, nbSymbols);
+                result = FUZ_checkCount (count, tableLog, nbSymbols);
                 if (result==-1)
-                    DISPLAY("symbol distribution corrupted !\n");
+                    DISPLAY ("symbol distribution corrupted !\n");
             }
         }
 
         /* Attempt decompression on bogus data*/
         {
-            int sizeOrig = FUZ_rand(&seed) & 0x1FFFF;
-            int sizeCompressed = FUZ_rand(&seed) & 0x1FFFF;
+            int sizeOrig = FUZ_rand (&seed) & 0x1FFFF;
+            int sizeCompressed = FUZ_rand (&seed) & 0x1FFFF;
             BYTE* bufferTest = bufferSrc + testNb;
-            int result = FSE_decompress_safe(bufferDst, sizeOrig, bufferTest, sizeCompressed);
-            DISPLAYLEVEL(4,"%3i\b\b\b", tag++);;
+            BYTE saved = bufferDst[sizeOrig];
+            int result = FSE_decompress_safe (bufferDst, sizeOrig, bufferTest, sizeCompressed);
+            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            if (bufferDst[sizeOrig] != saved)
+                DISPLAY ("Output buffer bufferDst corrupted !\n");
             if (result != -1)
-                if (!((*bufferTest==0) || (*bufferTest==1)))
-                    DISPLAY("Decompression completed ??\n");
+                if (! ( (*bufferTest==0) || (*bufferTest==1) ) )
+                    DISPLAY ("Decompression completed ??\n");
         }
     }
 
     // exit
-    free(bufferDst);
-    free(bufferSrc);
-    free(bufferVerif);
+    free (bufferDst);
+    free (bufferSrc);
+    free (bufferVerif);
 }
 
 
-int main(int argc, char** argv) 
+/*****************************************************************
+   Command line
+*****************************************************************/
+int main (int argc, char** argv)
 {
     char userInput[80] = {0};
     U32 seed, startTestNb=0;
@@ -250,7 +259,7 @@ int main(int argc, char** argv)
     int argNb;
 
     programName = argv[0];
-    DISPLAYLEVEL(0, "FSE automated test\n");
+    DISPLAYLEVEL (0, "FSE automated test\n");
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];
@@ -259,38 +268,41 @@ int main(int argc, char** argv)
             while (argument[1]!=0)
             {
                 argument ++;
-                switch(argument[0])
+                switch (argument[0])
                 {
                     // verbose mode
-                case 'v': displayLevel=4; break;
-                default: ;
+                case 'v':
+                    displayLevel=4;
+                    break;
+                default:
+                    ;
                 }
             }
         }
     }
 
-    DISPLAY("Select an Initialisation number (default : random) : ");
-    fflush(stdout);
-    if ( fgets(userInput, sizeof(userInput), stdin) )
+    DISPLAY ("Select an Initialisation number (default : random) : ");
+    fflush (stdout);
+    if ( fgets (userInput, sizeof (userInput), stdin) )
     {
-        if ( sscanf(userInput, "%d", &seed) == 1 ) 
+        if ( sscanf (userInput, "%d", &seed) == 1 )
         {
-            DISPLAY("Select start test nb (default : 0) : ");
-            fflush(stdout);
-            if ( fgets(userInput, sizeof(userInput), stdin) )
+            DISPLAY ("Select start test nb (default : 0) : ");
+            fflush (stdout);
+            if ( fgets (userInput, sizeof (userInput), stdin) )
             {
-                if ( sscanf(userInput, "%d", &startTestNb) == 1 ) {}
+                if ( sscanf (userInput, "%d", &startTestNb) == 1 ) {}
                 else startTestNb=0;
             }
         }
-        else seed = FUZ_GetMilliSpan(timestamp);
+        else seed = FUZ_GetMilliSpan (timestamp);
     }
-    printf("Seed = %u\n", seed);
+    printf ("Seed = %u\n", seed);
 
-    FUZ_tests(seed, startTestNb);
+    FUZ_tests (seed, startTestNb);
 
-    DISPLAY("\rAll tests passed               \n");
-    DISPLAY("Press enter to exit \n");
+    DISPLAY ("\rAll tests passed               \n");
+    DISPLAY ("Press enter to exit \n");
     getchar();
     return 0;
 }
