@@ -1118,7 +1118,7 @@ int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, i
     op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
-    if ( (op-ostart) >= (sourceSize-1) )
+    if ( (size_t)(op-ostart) >= (size_t)(sourceSize-1)*(sizeof(short)) )
         return FSE_noCompressionU16 (ostart, istart, sourceSize);
 
     return (int) (op-ostart);

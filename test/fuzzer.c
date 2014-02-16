@@ -143,6 +143,15 @@ static void generate (void* buffer, size_t buffSize, double p, U32* seed)
 }
 
 
+static void generateNoise (void* buffer, size_t buffSize, U32* seed)
+{
+    BYTE* op = (BYTE*)buffer;
+    BYTE* const oend = op + buffSize;
+    // Fill buffer
+    while (op<oend) *op++ = (BYTE)FUZ_rand(seed);
+}
+
+
 static int FUZ_checkCount (U32* normalizedCount, int tableLog, int nbSymbols)
 {
     int total = 1<<tableLog;
@@ -158,14 +167,16 @@ static int FUZ_checkCount (U32* normalizedCount, int tableLog, int nbSymbols)
 
 static void FUZ_tests (U32 seed, U32 startTestNb)
 {
+    BYTE* bufferNoise = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     int testNb, nbSymbols, tableLog;
     U32 time = FUZ_GetMilliStart();
-    const U32 nbRandPerLoop = 3;
+    const U32 nbRandPerLoop = 4;
 
     generate (bufferSrc, BUFFERSIZE, 0.1, &seed);
+    generateNoise (bufferNoise, BUFFERSIZE, &seed);
 
     if (startTestNb)
     {
@@ -183,6 +194,20 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
             DISPLAY ("\r test %5i  ", testNb);
             time = FUZ_GetMilliStart();
         }
+
+        /* Noise Compression test */
+        {
+            int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
+            int sizeCompressed;
+            BYTE* bufferTest = bufferNoise + testNb;
+            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            sizeCompressed = FSE_compress (bufferDst, bufferTest, sizeOrig);
+            if (sizeCompressed == -1)
+                DISPLAY ("Noise Compression failed ! \n");
+            if (sizeCompressed > sizeOrig+1)
+                DISPLAY ("Noise Compression result too large !\n");
+        }
+
 
         /* Compression / Decompression test */
         {
