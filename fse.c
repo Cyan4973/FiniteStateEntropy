@@ -326,6 +326,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     int vTotal= total;
 
     // Check
+    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
     if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
     if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
@@ -407,7 +408,7 @@ CTable is a variable size structure which contains :
     FSE_symbolCompressionTransform symbolTT[nbSymbols];   // This size is variable
 Allocation is fully manual, since C standard does not support variable-size structures.
 */
-#define FSE_SIZEOF_CTABLE_U32(s,t) (((((2 + (1<<t))*sizeof(U16)) + (s*sizeof(FSE_symbolCompressionTransform)))+(sizeof(U32)-1)) / sizeof(U32))
+#define FSE_SIZEOF_CTABLE_U32(s,t) (((((2 + (1<<t))*sizeof(U16)) + ((s+1)*sizeof(FSE_symbolCompressionTransform)))+(sizeof(U32)-1)) / sizeof(U32))
 int FSE_sizeof_CTable (int nbSymbols, int tableLog)
 {
     if (tableLog > FSE_MAX_TABLELOG) return 0;   // Max supported value
