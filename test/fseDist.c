@@ -194,7 +194,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     }
     if (ip==istart) { FSED_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable); FSE_flushBits((void**)&op, &bitC); }
 
-    return FSE_closeCompressionStream(&bitC, state, op, streamSize, CTable);
+    return FSE_closeCompressionStream(op, &bitC, 1, state,0,0,0, streamSize, CTable);
 }
 
 
@@ -536,7 +536,7 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
         FSE_flushBits((void**)&op, &bitC);
     }
 
-    return FSE_closeCompressionStream(&bitC, state, op, streamSize, CTable);
+    return FSE_closeCompressionStream(op, &bitC, 1, state,0,0,0, streamSize, CTable);
 }
 
 

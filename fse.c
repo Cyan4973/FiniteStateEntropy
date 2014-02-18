@@ -516,22 +516,7 @@ void FSE_encodeByte(ptrdiff_t* state, bitContainer_forward_t* bitC, BYTE symbol,
 }
 
 
-int FSE_closeCompressionStream(bitContainer_forward_t* bitC, ptrdiff_t state, void* op, void* compressionStreamDescriptor, const void* CTable)
-{
-    const int tableLog = ( (U16*) CTable) [0];
-    BYTE* p;
-
-    FSE_addBits(bitC, state, tableLog);
-    FSE_flushBits(&op, bitC);
-
-    p = (BYTE*)op;
-    *(U32*)compressionStreamDescriptor = (U32) ( ( (p - (BYTE*)compressionStreamDescriptor) *8) + bitC->bitPos);
-    p += bitC->bitPos > 0;
-    return (int)(p-(BYTE*)compressionStreamDescriptor);
-}
-
-
-int FSE_closeCompressionStream2(void* outPtr, bitContainer_forward_t* bitC, 
+int FSE_closeCompressionStream(void* outPtr, bitContainer_forward_t* bitC, 
                                 int nbStates, ptrdiff_t state1, ptrdiff_t state2, ptrdiff_t state3, ptrdiff_t state4,
                                 void* compressionStreamDescriptor, const void* CTable)
 {
@@ -611,7 +596,7 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
         FSE_flushBits((void**)&op, &bitC);
     }
 
-    return FSE_closeCompressionStream2(op, &bitC, nbStreams, state1, state2, state3, 0, streamSizePtr, CTable);
+    return FSE_closeCompressionStream(op, &bitC, nbStreams, state1, state2, state3, 0, streamSizePtr, CTable);
 }
 
 

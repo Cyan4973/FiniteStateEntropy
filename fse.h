@@ -232,7 +232,7 @@ void* FSE_initCompressionStream(void** op, ptrdiff_t* state, const void** symbol
 void FSE_encodeByte(ptrdiff_t* state, bitContainer_forward_t* bitC, unsigned char symbol, const void* CTable1, const void* CTable2);
 static void FSE_addBits(bitContainer_forward_t* bitC, size_t value, int nbBits);
 static void FSE_flushBits(void** outPtr, bitContainer_forward_t* bitC);
-int FSE_closeCompressionStream(bitContainer_forward_t* bitC, ptrdiff_t state, void* op, void* compressionStreamDescriptor, const void* CTable);
+int FSE_closeCompressionStream(void* outPtr, bitContainer_forward_t* bitC, int nbStates, ptrdiff_t state1, ptrdiff_t state2, ptrdiff_t state3, ptrdiff_t state4, void* compressionStreamDescriptor, const void* CTable);
 
 /*
 We are now inside the core function FSE_compress_usingCTable().
