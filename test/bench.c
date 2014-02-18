@@ -1226,7 +1226,6 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         int maxCompressedChunkSize;
         size_t readSize;
         char* compressedBuffer; int compressedBuffSize;
-        char* destBuffer;
         int chunkSize = BMK_coreTestSize;
 
         // Check file existence
@@ -1266,7 +1265,6 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         maxCompressedChunkSize = FSE_compressBound(chunkSize);
         compressedBuffSize = nbChunks * maxCompressedChunkSize;
         compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
-        destBuffer = (char*)malloc((size_t )benchedSize);
 
 
         if (!orig_buff || !compressedBuffer)

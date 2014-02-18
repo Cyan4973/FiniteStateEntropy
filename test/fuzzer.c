@@ -240,8 +240,9 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
         {
             BYTE* bufferTest = bufferSrc + testNb;
             U32 count[256];
-            int result = FSE_readHeader (count, &nbSymbols, &tableLog, bufferTest);
-            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            int result;
+            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
+            result = FSE_readHeader (count, &nbSymbols, &tableLog, bufferTest);
             if (result != -1)
             {
                 result = FUZ_checkCount (count, tableLog, nbSymbols);
@@ -256,8 +257,9 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
             int sizeCompressed = FUZ_rand (&seed) & 0x1FFFF;
             BYTE* bufferTest = bufferSrc + testNb;
             BYTE saved = bufferDst[sizeOrig];
-            int result = FSE_decompress_safe (bufferDst, sizeOrig, bufferTest, sizeCompressed);
+            int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            result = FSE_decompress_safe (bufferDst, sizeOrig, bufferTest, sizeCompressed);
             if (bufferDst[sizeOrig] != saved)
                 DISPLAY ("Output buffer bufferDst corrupted !\n");
             if (result != -1)

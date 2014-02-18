@@ -178,7 +178,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     BYTE* op = (BYTE*) dest;
     U32* streamSize;
     ptrdiff_t state;
-    bitContainer_forward_t bitC = {0};
+    bitContainer_forward_t bitC = {0,0};
     const void* stateTable;
     const void* symbolTT;
 
@@ -375,7 +375,7 @@ int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceS
     const void* const symbolTT = (const void*) (stateTable + tableSize);
 
     ptrdiff_t state=tableSize;
-    bitContainer_forward_t bitC = {0};
+    bitContainer_forward_t bitC = {0,0};
     U32* streamSize = (U32*) op;
     op += 4;
 
@@ -512,7 +512,7 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
     const U32* const iend = istart + sourceSize;
 
     BYTE* op = (BYTE*) dest;
-    bitContainer_forward_t bitC = {0};
+    bitContainer_forward_t bitC = {0,0};
 
     #if 1   // This version is bit faster for the time being
     const int memLog = ( (U16*) CTable) [0];

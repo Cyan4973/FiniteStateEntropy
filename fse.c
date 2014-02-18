@@ -572,7 +572,7 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
     ptrdiff_t state1;
     ptrdiff_t state2;
     ptrdiff_t state3;
-    bitContainer_forward_t bitC = {0};
+    bitContainer_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. Nonetheless, GCC complains....
     const void* stateTable;
     const void* symbolTT;
 
@@ -885,7 +885,14 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
         FSE_updateBitStream(&bitC, &ip);
     }
-    while (op<oend) { *op++ = FSE_decodeSymbol(&state1, &bitC, DTable); FSE_updateBitStream(&bitC, &ip); }
+
+    // last bytes
+    while( ((safe) && ((op<oend) && (ip>=compressed)))
+        || ((!safe) && (op<oend)) )
+    { 
+        *op++ = FSE_decodeSymbol(&state1, &bitC, DTable); 
+        FSE_updateBitStream(&bitC, &ip);
+    }
 
     // cheap last symbol storage
     if (nbStates>=2) *op++ = (BYTE)state2;
@@ -1132,7 +1139,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 
 
     ptrdiff_t state=tableSize;
-    bitContainer_forward_t bitC = {0};
+    bitContainer_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. However, GCC complain....
     U32* streamSize = (U32*) op;
     op += 4;
 
