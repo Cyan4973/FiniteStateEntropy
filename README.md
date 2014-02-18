@@ -21,32 +21,32 @@ Benchmarks
 
 Benchmarks are run on an Intel Core i5-3340M (oc'ed to 2.9GHz), with Window Seven 64-bits.
 Source code is compiled using MSVC 2012, 64-bits mode.
-Core loop results are reported :
+Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usingDTable() )
 
 <table>
   <tr>
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>book1</th><th>FSE</th><th>1.764</th><th>265 MS/s</th><th>340 MS/s</th>
+    <th>book1</th><th>FSE</th><th>1.764</th><th>380 MS/s</th><th>520 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.688</th><th>265 MS/s</th><th>340 MS/s</th>
+    <th>win98-lz4-run</th><th>FSE</th><th>2.688</th><th>380 MS/s</th><th>520 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>265 MS/s</th><th>340 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>380 MS/s</th><th>520 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>265 MS/s</th><th>340 MS/s</th>
+    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>380 MS/s</th><th>520 MS/s</th>
   </tr>
 </table>
 
@@ -54,6 +54,6 @@ Core loop results are reported :
 For more detailed results, browse to [data directory](data)*
 
 As an obvious outcome, speed of FSE is stable accross all tested file.
-By design, Huffman can't break the "1 bit per symbol" limit, and therefore loses efficiency when probabilities improve.
-In contrast, FSE keeps increasing its performance, remaining close to Shannon limit.
+By design, Huffman can't break the "1 bit per symbol" limit.
+FSE is free of such limit, so its performance increase with probability, remaining close to Shannon limit.
 

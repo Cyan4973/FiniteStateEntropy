@@ -279,11 +279,16 @@ If there is an error, it returns -1.
     int size = FSE_closeCompressionStream(bitStream, bitPos, state, op, compressionStreamDescriptor, CTable);
 */
 
+typedef struct
+{
+    unsigned int bitContainer;
+    int bitsConsumed;
+} bitContainer_backward_t;
 
-const void* FSE_initDecompressionStream(const void** input, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog);
-unsigned char FSE_decodeSymbol(unsigned int* state, int* bitsConsumed, unsigned int bitStream, const void* DTable);
-unsigned int FSE_readBits(int* bitsConsumed, unsigned int bitStream, int nbBits);
-void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const void** input);
+const void* FSE_initDecompressionStream (bitContainer_backward_t* bitC, int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, const void** p, const int tableLog);
+unsigned char FSE_decodeSymbol(unsigned int* state, bitContainer_backward_t* bitC, const void* DTable);
+unsigned int FSE_readBits(bitContainer_backward_t* bitC, int nbBits);
+void FSE_updateBitStream(bitContainer_backward_t* bitC, const void** ip);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
 
 /*

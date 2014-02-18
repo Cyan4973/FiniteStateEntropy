@@ -105,13 +105,6 @@ inline int FSED_highbit (register U32 val)
 #   endif
 }
 
-U32 FSED_readBits(int* bitsConsumed, U32 bitStream, int nbBits)
-{
-    U32 value = ((bitStream << *bitsConsumed) >> 1) >> (31-nbBits);
-    *bitsConsumed += nbBits;
-    return value;
-}
-
 
 //*********************************************************
 //  U16 Compression functions
@@ -267,21 +260,21 @@ int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize
     const void* iend;
     unsigned short* op = dest;
     unsigned short* const oend = op + originalSize;
-    U32 bitStream;
-    int bitCount;
-    U32 state;
+    bitContainer_backward_t bitC;
+    int nbStates;
+    U32 state, state2, state3, state4;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
+    iend = FSE_initDecompressionStream(&bitC, &nbStates, &state, &state2, &state3, &state4, &ip, tableLog);
 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
-        unsigned short value = (U16)FSED_readBits(&bitCount, bitStream, nbBits);
+        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable);
+        unsigned short value = (U16)FSE_readBits(&bitC, nbBits);
         value += 1<<nbBits;
         *op++ = value;
-        FSE_updateBitStream(&bitStream, &bitCount, (const void**)&ip);
+        FSE_updateBitStream(&bitC, (const void**)&ip);
     }
 
     return FSE_closeDecompressionStream(iend, ip);
@@ -609,23 +602,23 @@ int FSED_decompressU32_usingDTable (unsigned int* dest, const int originalSize, 
     const void* iend;
     unsigned int* op = dest;
     unsigned int* const oend = op + originalSize;
-    U32 bitStream;
-    int bitCount;
-    U32 state;
+    bitContainer_backward_t bitC;
+    int nbStates;
+    U32 state, state2, state3, state4;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitCount, &state, &bitStream, tableLog);
+    iend = FSE_initDecompressionStream(&bitC, &nbStates, &state, &state2, &state3, &state4, &ip, tableLog);
 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitCount, bitStream, DTable);
+        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable);
         U32 value;
-        FSE_updateBitStream(&bitStream, &bitCount, &ip);
-        value = (U32)FSED_readBits(&bitCount, bitStream, nbBits);
+        FSE_updateBitStream(&bitC, &ip);
+        value = FSE_readBits(&bitC, nbBits);
         value += 1<<nbBits;
         *op++ = value;
-        FSE_updateBitStream(&bitStream, &bitCount, &ip);
+        FSE_updateBitStream(&bitC, &ip);
     }
 
     //return FSE_closeDecompressionStream(iend, ip);  // slower
@@ -656,3 +649,4 @@ int FSED_decompressU32 (U32* dest, int originalSize,
 
     return (int) (ip-istart);
 }
+

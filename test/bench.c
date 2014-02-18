@@ -66,7 +66,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "bench.h"
 #include "fileio.h"
 #include "fse.h"
-//#include "fsehc.h"
 #include "zlibh.h"
 #include "xxhash.h"
 #include "lz4hce.h"
@@ -1159,6 +1158,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             cSize = FSE_compress_usingCTable(dst, (BYTE*)src, benchedSize, CTable);
+            //cSize = FSE_compress_usingCTable_ILP2(dst, (BYTE*)src, benchedSize, CTable);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -1168,7 +1168,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
 
-        //continue;
+        //DISPLAY("\n"); continue;   // skip decompression
         // Decompression
         //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
 
