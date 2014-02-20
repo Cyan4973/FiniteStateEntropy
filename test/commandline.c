@@ -97,8 +97,9 @@ static int usage()
     DISPLAY("Usage :\n");
     DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
     DISPLAY("Arguments :\n");
-    DISPLAY("(default): benchmark core loop\n");
-    DISPLAY(" -b : benchmark (full mode)\n");
+    DISPLAY("(default): core loop timing tests\n");
+    DISPLAY(" -b : benchmark full mode\n");
+    DISPLAY(" -m : benchmark lowMem mode\n");
     DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
     DISPLAY(" -o : force compression\n");
@@ -176,6 +177,12 @@ int main(int argc, char** argv)
 
                     // Benchmark full mode
                 case 'b': bench=1; break;
+
+                    // Benchmark full mode
+                case 'm': DISPLAY("benchmark using experimental lowMem mode\n");
+                    bench=1;
+                    BMK_SetByteCompressor(2);
+                    break;
 
                     // zlib Benchmark mode
                 case 'z': bench=2; break;
