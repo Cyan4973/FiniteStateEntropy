@@ -66,11 +66,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "bench.h"
 #include "fileio.h"
 #include "fse.h"
-//#include "fsehc.h"
 #include "zlibh.h"
 #include "xxhash.h"
 #include "lz4hce.h"
 #include "fseDist.h"
+#include "fse2t.h"
 
 //**************************************
 // Compiler specifics
@@ -133,6 +133,9 @@ typedef unsigned long long  U64;
 static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
+static int BMK_byteCompressor = 1;
+
+void BMK_SetByteCompressor(int id) { BMK_byteCompressor = id; }
 
 void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
 
@@ -564,6 +567,10 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 }
 
 
+int BMK_FSE2T_compress2(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
+{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
+
+
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
                   int nbSymbols, int memLog)
@@ -574,6 +581,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     double ratio=0.;
     U32 crcCheck=0;
     U32 crcOrig;
+    int (*compressor)(void*, const unsigned char*, int, int, int);
+    int (*decompressor)(unsigned char*, int, const void*);
 
     // Init
     if (nbSymbols==0) { BMK_benchMemU16 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
@@ -581,6 +590,16 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     if (nbSymbols==2) { BMK_benchMemLog2(chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
     if (nbSymbols==3) { BMK_benchMem285 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
+    switch(BMK_byteCompressor)
+    {
+    case 2:
+        compressor = BMK_FSE2T_compress2;
+        decompressor = FSE2T_decompress;
+        break;
+    default:
+        compressor = FSE_compress2;
+        decompressor = FSE_decompress;
+    }
 
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -599,9 +618,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                //chunkP[chunkNb].compressedSize = FSE_compress_Nsymbols(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols);
-                //chunkP[chunkNb].compressedSize = FSEHC_compress2(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
-                chunkP[chunkNb].compressedSize = FSE_compress2(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                chunkP[chunkNb].compressedSize = compressor(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -623,9 +640,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                //chunkP[chunkNb].compressedSize = FSEHC_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
-                //chunkP[chunkNb].compressedSize = FSE_decompress_LowMem((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
-                chunkP[chunkNb].compressedSize = FSE_decompress((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = decompressor((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -998,7 +1013,7 @@ void BMK_benchMemZLIBH(chunkParameters_t* chunkP, int nbChunks, char* inFileName
 
     if (crcOrig==crcCheck)
     {
-        if (ratio<120.)
+        if (ratio<100.)
             DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
         else
             DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
@@ -1100,6 +1115,202 @@ int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles)
         free(orig_buff);
         free(compressedBuffer);
         free(chunkP);
+    }
+
+    if (nbFiles > 1)
+        DISPLAY("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL", (long long unsigned int)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100., (double)totals/totalc/1000., (double)totals/totald/1000.);
+
+    if (BMK_pause) { DISPLAY("press enter...\n"); getchar(); }
+
+    return 0;
+}
+
+
+
+/**********************************************************************
+   BenchCore
+**********************************************************************/
+
+static const int BMK_coreTestSize = 256 KB;
+
+
+static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize, 
+                              int nbSymbols, int tableLog, char* inFileName, 
+                              U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
+{
+    int loopNb;
+    size_t cSize=0;
+    double fastestC = 100000000., fastestD = 100000000.;
+    double ratio=0.;
+    U32 crcCheck=0;
+    U32 crcOrig;
+    U32 count[256];
+    void* CTable;
+    void* DTable;
+
+    // Init
+    crcOrig = XXH32(src, benchedSize,0);
+    nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
+    tableLog  = FSE_normalizeCount(count, tableLog, count, benchedSize, nbSymbols);
+    CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
+    FSE_buildCTable(CTable, count, nbSymbols, tableLog);
+    DTable = malloc( FSE_sizeof_DTable(tableLog) );
+    FSE_buildDTable(DTable, count, nbSymbols, tableLog);
+
+    DISPLAY("\r%79s\r", "");
+    for (loopNb = 1; loopNb <= nbIterations; loopNb++)
+    {
+        int nbLoops;
+        int milliTime;
+
+        // Compression
+        DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, benchedSize);
+        { int i; for (i=0; i<benchedSize; i++) dst[i]=(char)i; }     // warmimg up memory
+
+        nbLoops = 0;
+        milliTime = BMK_GetMilliStart();
+        while(BMK_GetMilliStart() == milliTime);
+        milliTime = BMK_GetMilliStart();
+        while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
+        {
+            cSize = FSE_compress_usingCTable(dst, (BYTE*)src, benchedSize, CTable);
+            //cSize = FSE_compress_usingCTable_ILP2(dst, (BYTE*)src, benchedSize, CTable);
+            nbLoops++;
+        }
+        milliTime = BMK_GetMilliSpan(milliTime);
+
+        if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
+        ratio = (double)cSize/(double)benchedSize*100.;
+
+        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
+
+        //DISPLAY("\n"); continue;   // skip decompression
+        // Decompression
+        //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+
+        nbLoops = 0;
+        milliTime = BMK_GetMilliStart();
+        while(BMK_GetMilliStart() == milliTime);
+        milliTime = BMK_GetMilliStart();
+        while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
+        {
+            cSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, DTable, tableLog);
+            nbLoops++;
+        }
+        milliTime = BMK_GetMilliSpan(milliTime);
+
+        if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
+        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+
+        // CRC Checking
+        crcCheck = XXH32(src, benchedSize,0);
+        if (crcOrig!=crcCheck) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOrig, (unsigned)crcCheck); break; }
+    }
+
+    if (crcOrig==crcCheck)
+    {
+        if (ratio<100.)
+            DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+        else
+            DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+    }
+    *totalCompressedSize    += cSize;
+    *totalCompressionTime   += fastestC;
+    *totalDecompressionTime += fastestD;
+}
+
+
+int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
+{
+    int fileIdx=0;
+    char* orig_buff;
+
+    U64 totals = 0;
+    U64 totalz = 0;
+    double totalc = 0.;
+    double totald = 0.;
+
+
+    // Loop for each file
+    while (fileIdx<nbFiles)
+    {
+        FILE*  inFile;
+        char*  inFileName;
+        U64    inFileSize;
+        size_t benchedSize;
+        int nbChunks;
+        int maxCompressedChunkSize;
+        size_t readSize;
+        char* compressedBuffer; int compressedBuffSize;
+        int chunkSize = BMK_coreTestSize;
+
+        // Check file existence
+        inFileName = fileNamesTable[fileIdx++];
+        inFile = fopen( inFileName, "rb" );
+        if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
+
+        // Check if file is fse compressed
+        if (strstr(inFileName,".fse"))
+        {
+            char ch;
+            DISPLAY("%s is compressed. Do you want to uncompress it (Y/N) : ", inFileName);
+            ch = (char)getchar();
+            if ((ch=='Y') || (ch=='y'))
+            {
+                size_t l = strlen(inFileName);
+                char* destName = (char*)calloc(l,1);
+                memcpy(destName, inFileName, l-4);
+                FIO_overwriteMode();
+                decompress_file (destName, inFileName);
+                free(destName);
+                fclose(inFile);
+                inFileName[l-4]=0;
+                inFile = fopen( inFileName, "rb" );
+            }
+        }
+
+        // Memory allocation & restrictions
+        inFileSize = BMK_GetFileSize(inFileName);
+        benchedSize = 256 KB;
+        if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
+        DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
+
+        // Alloc
+        orig_buff = (char*)malloc((size_t )benchedSize);
+        nbChunks = 1;
+        maxCompressedChunkSize = FSE_compressBound(chunkSize);
+        compressedBuffSize = nbChunks * maxCompressedChunkSize;
+        compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
+
+
+        if (!orig_buff || !compressedBuffer)
+        {
+            DISPLAY("\nError: not enough memory!\n");
+            free(orig_buff);
+            free(compressedBuffer);
+            fclose(inFile);
+            return 12;
+        }
+
+        // Fill input buffer
+        DISPLAY("Loading %s...       \r", inFileName);
+        readSize = fread(orig_buff, 1, benchedSize, inFile);
+        fclose(inFile);
+
+        if (readSize != benchedSize)
+        {
+            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, (int)readSize, (int)benchedSize);
+            free(orig_buff);
+            free(compressedBuffer);
+            return 13;
+        }
+
+        // Bench
+        BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 256, 0, inFileName, &totalz, &totalc, &totald);
+        totals += benchedSize;
+
+        free(orig_buff);
+        free(compressedBuffer);
     }
 
     if (nbFiles > 1)

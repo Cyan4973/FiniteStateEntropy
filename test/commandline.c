@@ -97,10 +97,12 @@ static int usage()
     DISPLAY("Usage :\n");
     DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
     DISPLAY("Arguments :\n");
+    DISPLAY("(default): core loop timing tests\n");
+    DISPLAY(" -b : benchmark full mode\n");
+    DISPLAY(" -m : benchmark lowMem mode\n");
+    DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
     DISPLAY(" -o : force compression\n");
-    DISPLAY(" -b : benchmark (default, if -o not present)\n");
-    DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
     DISPLAY(" -h/-H : display help/long help and exit\n");
     return 0;
@@ -124,7 +126,7 @@ static void waitEnter()
 int main(int argc, char** argv)
 {
     int   i,
-          forceCompress=0, decode=0, bench=1, benchLZ4e=0; // default action if no argument
+          forceCompress=0, decode=0, bench=3, benchLZ4e=0; // default action if no argument
     int   algoNb = -1;
     int   indexFileNames=0;
     char* input_filename=0;
@@ -173,8 +175,14 @@ int main(int argc, char** argv)
                     // Decoding
                 case 'd': decode=1; bench=0; break;
 
-                    // Benchmark mode (default)
+                    // Benchmark full mode
                 case 'b': bench=1; break;
+
+                    // Benchmark full mode
+                case 'm': DISPLAY("benchmark using experimental lowMem mode\n");
+                    bench=1;
+                    BMK_SetByteCompressor(2);
+                    break;
 
                     // zlib Benchmark mode
                 case 'z': bench=2; break;
@@ -247,6 +255,7 @@ int main(int argc, char** argv)
     // Check if benchmark is selected
     if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
     if (bench==2) { BMK_benchFilesZLIBH(argv+indexFileNames, argc-indexFileNames); goto _end; }
+    if (bench==3) { BMK_benchCore_Files(argv+indexFileNames, argc-indexFileNames); goto _end; }
 
     // No output filename ==> try to select one automatically (when possible)
     while (!output_filename)

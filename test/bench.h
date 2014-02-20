@@ -29,6 +29,7 @@ extern "C" {
 
 // Simple functions
 int BMK_benchFiles(char** fileNamesTable, int nbFiles);
+int BMK_benchCore_Files(char** fileNamesTable, int nbFiles);
 int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb);
 int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles);
 
@@ -36,6 +37,7 @@ int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles);
 // Parameters
 void BMK_SetBlocksize(int bsize);
 void BMK_SetNbIterations(int nbLoops);
+void BMK_SetByteCompressor(int id);
 
 
 #if defined (__cplusplus)

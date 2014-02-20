@@ -222,11 +222,17 @@ The function returns the size of compressed data (without header), or -1 if fail
 /******************************************
    FSE streaming API
 ******************************************/
+typedef struct
+{
+    size_t bitContainer;
+    int bitPos;
+} bitContainer_forward_t;
+
 void* FSE_initCompressionStream(void** op, ptrdiff_t* state, const void** symbolTT, const void** stateTable, const void* CTable);
-void  FSE_encodeByte(ptrdiff_t* state, size_t* bitStream, int* bitpos, unsigned char symbol, const void* symbolTT, const void* stateTable);
-static void FSE_addBits(size_t* bitStream, int* bitpos, int nbBits, size_t bitField);
-static void FSE_flushBits(size_t* bitStream, void** op, int* bitpos);
-int   FSE_closeCompressionStream(size_t bitStream, int bitPos, ptrdiff_t state, void* op, void* compressionStreamDescriptor, const void* CTable);
+void FSE_encodeByte(ptrdiff_t* state, bitContainer_forward_t* bitC, unsigned char symbol, const void* CTable1, const void* CTable2);
+static void FSE_addBits(bitContainer_forward_t* bitC, size_t value, int nbBits);
+static void FSE_flushBits(void** outPtr, bitContainer_forward_t* bitC);
+int FSE_closeCompressionStream(void* outPtr, bitContainer_forward_t* bitC, int nbStates, ptrdiff_t state1, ptrdiff_t state2, ptrdiff_t state3, ptrdiff_t state4, void* compressionStreamDescriptor, const void* CTable);
 
 /*
 We are now inside the core function FSE_compress_usingCTable().
@@ -273,11 +279,16 @@ If there is an error, it returns -1.
     int size = FSE_closeCompressionStream(bitStream, bitPos, state, op, compressionStreamDescriptor, CTable);
 */
 
+typedef struct
+{
+    unsigned int bitContainer;
+    int bitsConsumed;
+} bitContainer_backward_t;
 
-const void* FSE_initDecompressionStream(const void** input, int* bitsConsumed, unsigned int* state, unsigned int* bitStream, const int tableLog);
-unsigned char FSE_decodeSymbol(unsigned int* state, int* bitsConsumed, unsigned int bitStream, const void* DTable);
-unsigned int FSE_readBits(int* bitsConsumed, unsigned int bitStream, int nbBits);
-void FSE_updateBitStream(unsigned int* bitStream, int* bitsConsumed, const void** input);
+const void* FSE_initDecompressionStream (bitContainer_backward_t* bitC, int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, const void** p, const int tableLog);
+unsigned char FSE_decodeSymbol(unsigned int* state, bitContainer_backward_t* bitC, const void* DTable);
+unsigned int FSE_readBits(bitContainer_backward_t* bitC, int nbBits);
+void FSE_updateBitStream(bitContainer_backward_t* bitC, const void** ip);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
 
 /*
@@ -326,24 +337,24 @@ If there is an error, it returns -1.
    GCC is not as good as visual to inline code from other *.c files
 ***********************************************************************/
 
-static inline void FSE_flushBits(size_t* bitStream, void** p, int* bitpos)
+static inline void FSE_addBits(bitContainer_forward_t* bitC, size_t value, int nbBits)
 {
-    char** op = (char**)p;
-    ** (size_t**) op = *bitStream;
+    static const unsigned int mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   // up to 25 bits
+    bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
+    bitC->bitPos += nbBits;
+}
+
+static inline void FSE_flushBits(void** outPtr, bitContainer_forward_t* bitC)
+{
+    ** (size_t**) outPtr = bitC->bitContainer;
     {
-        size_t nbBytes = *bitpos >> 3;
-        *bitpos &= 7;
-        *op += nbBytes;
-        *bitStream >>= nbBytes*8;
+        size_t nbBytes = bitC->bitPos >> 3;
+        bitC->bitPos &= 7;
+        *(char**)outPtr += nbBytes;
+        bitC->bitContainer >>= nbBytes*8;
     }
 }
 
-static inline void FSE_addBits(size_t* bitStream, int* bitpos, int nbBits, size_t value)
-{
-    static const unsigned int mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   // up to 25 bits
-    *bitStream |= (value & mask[nbBits]) << *bitpos;
-    *bitpos += nbBits;
-}
 
 
 #if defined (__cplusplus)
