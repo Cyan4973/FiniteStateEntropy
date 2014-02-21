@@ -182,7 +182,7 @@ int FSE_writeHeader (void* header, const unsigned int* normalizedCounter, int nb
         if (previous0)
         {
             int start = charnum;
-            while (!normalizedCounter[charnum++]); charnum--;
+            while (!normalizedCounter[charnum]) charnum++;
             while (charnum >= start+24) { start+=24; bitStream += 0xFFFF<<bitCount; *(U16*)out=(U16)bitStream; out+=2; bitStream>>=16; }
             while (charnum >= start+3) { start+=3; bitStream += 3 << bitCount; bitCount += 2; }
             bitStream += (charnum-start) << bitCount; bitCount += 2;
@@ -439,6 +439,9 @@ int FSE_buildCTable (void* CTable, const unsigned int* normalizedCounter, int nb
     tableU16[-2] = (U16) tableLog;
     tableU16[-1] = (U16) nbSymbols;
 
+    // For explanations on how to distribute symbol values over the table :
+    // http://fastcompression.blogspot.fr/2014/02/fse-distributing-symbol-values.html
+
     // symbol start positions
     cumul[0] = 0;
     for (i=1; i<nbSymbols; i++) cumul[i] = cumul[i-1] + normalizedCounter[i-1];
@@ -569,20 +572,23 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
     state1 += *--ip;   // cheap last symbol storage (assumption : nbSymbols <= 1<<tableLog)
     if (ilp) state2 += *--ip;
 
-    // First symbols
+    // join to even
+    if ((sourceSize - nbStreams) & 1)
     {
-        int nbSymbolsPerLoop=2;
-        int nbCatchup;
-        nbCatchup = (sourceSize - nbStreams) % nbSymbolsPerLoop;
-        while (nbCatchup)
-        {
-            FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
-            FSE_flushBits((void**)&op, &bitC);
-            nbCatchup--;
-        }
+        FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+        FSE_flushBits((void**)&op, &bitC);
     }
 
-    // nbSymbolsPerLoop (2)
+    // join to mod 4 (if necessary)
+    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && ((sourceSize - nbStreams) & 2))   // test bit 2
+    {
+        FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+        if (ilp) FSE_encodeByte(&state2, &bitC, *--ip, symbolTT, stateTable);
+        else FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+        FSE_flushBits((void**)&op, &bitC);
+    }
+
+    // 2 or 4 per loop
     while (ip>istart)
     {
         FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
@@ -592,6 +598,14 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
 
         if (ilp) FSE_encodeByte(&state2, &bitC, *--ip, symbolTT, stateTable);
         else FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+
+        if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   // this test needs to be static (special case : small size_t, large tablelog)
+        {
+            FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+
+            if (ilp) FSE_encodeByte(&state2, &bitC, *--ip, symbolTT, stateTable);
+            else FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
+        }
 
         FSE_flushBits((void**)&op, &bitC);
     }
@@ -816,13 +830,11 @@ U32 FSE_readBits(bitContainer_backward_t* bitC, int nbBits)
 BYTE FSE_decodeSymbol(U32* state, bitContainer_backward_t* bitC, const void* DTable)
 {
     const FSE_decode_t* const decodeTable = (const FSE_decode_t*) DTable;
-    U32 rest;
     BYTE symbol;
     const int nbBits = decodeTable[*state].nbBits;
 
     symbol = decodeTable[*state].symbol;
-    rest = FSE_readBits(bitC, nbBits);
-    *state = decodeTable[*state].newState + rest;
+    *state = decodeTable[*state].newState + FSE_readBits(bitC, nbBits);
 
     return symbol;
 }

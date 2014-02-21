@@ -77,6 +77,7 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
     BYTE* op = (BYTE*) dest;
     U32* streamSizePtr;
     ptrdiff_t state;
+    ptrdiff_t state2, state3;
     bitContainer_forward_t bitC = {0,0};
     const void* stateTable;
     const void* symbolTT;
@@ -87,21 +88,31 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
     streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
     op-=4;
     streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &escapeSymbolTT, &escapeStateTable, escapeCTable);
+    state3 = state2 = state;
 
     ip=iend-1;
     state += *ip--;   // cheap last-symbol storage (assumption : nbSymbols <= 1<<tableLog)
 
     while (ip>=istart)   // simpler version, one symbol at a time
     {
-        BYTE symbol = translate[*ip];
-        if (symbol==escapeSymbol)
-            FSE_encodeByte(&state, &bitC, *ip, escapeSymbolTT, escapeStateTable);
-        FSE_encodeByte(&state, &bitC, symbol, symbolTT, stateTable);
-        ip--;
+        {
+            BYTE symbol = translate[*ip];
+            if (symbol==escapeSymbol)
+                FSE_encodeByte(&state, &bitC, *ip, escapeSymbolTT, escapeStateTable);
+            FSE_encodeByte(&state2, &bitC, symbol, symbolTT, stateTable);
+            ip--;
+        }
+        {
+            BYTE symbol = translate[*ip];
+            if (symbol==escapeSymbol)
+                FSE_encodeByte(&state, &bitC, *ip, escapeSymbolTT, escapeStateTable);
+            FSE_encodeByte(&state3, &bitC, symbol, symbolTT, stateTable);
+            ip--;
+        }
         FSE_flushBits((void**)&op, &bitC);
     }
 
-    return FSE_closeCompressionStream(op, &bitC, 1, state,0,0,0, streamSizePtr, CTable);
+    return FSE_closeCompressionStream(op, &bitC, 2, state,state2,0,0, streamSizePtr, CTable);
 }
 
 
