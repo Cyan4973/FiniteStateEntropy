@@ -775,8 +775,8 @@ void FSE_updateBitStream(bitContainer_backward_t* bitC, const void** ip)
 
 
 FORCE_INLINE const void* FSE_initDecompressionStream_generic(
-    bitContainer_backward_t* bitC, 
-    int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, 
+    bitContainer_backward_t* bitC,
+    int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4,
     const void** p,
     const int tableLog, int maxCompressedSize, int safe)
 {
@@ -804,14 +804,14 @@ FORCE_INLINE const void* FSE_initDecompressionStream_generic(
     return (void*)iend;
 }
 
-const void* FSE_initDecompressionStream (bitContainer_backward_t* bitC, 
+const void* FSE_initDecompressionStream (bitContainer_backward_t* bitC,
                                           int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, 
                                           const void** p, const int tableLog)
 {
     return FSE_initDecompressionStream_generic(bitC, nbStates, state1, state2, state3, state4, p, tableLog, 0, 0);
 }
 
-const void* FSE_initDecompressionStream_safe (bitContainer_backward_t* bitC, 
+const void* FSE_initDecompressionStream_safe (bitContainer_backward_t* bitC,
                                           int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, 
                                           const void** p, const int tableLog, int maxCompressedSize)
 {
@@ -867,24 +867,26 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     if (iend==NULL) return -1;
 
     oend -= nbStates;
-    olimit = oend - ((originalSize-nbStates) % nbStates);
+    olimit = oend - 1;
 
-    // Hot loop
+    // 2 symbols per loop
     while( ((safe) && ((op<olimit) && (ip>=compressed)))
         || ((!safe) && (op<olimit)) )
     {
         if (nbStates==2)
-        {
             *op++ = FSE_decodeSymbol(&state2, &bitC, DTable);
-            if (FSE_MAX_TABLELOG*2+7 > sizeof(U32)*8)   // Need this test to be static
-                FSE_updateBitStream(&bitC, &ip);
-        }
+        else
+            *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
+
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(U32)*8)   // Need this test to be static
+            FSE_updateBitStream(&bitC, &ip);
+
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
         FSE_updateBitStream(&bitC, &ip);
     }
 
-    // last bytes
-    while( ((safe) && ((op<oend) && (ip>=compressed)))
+    // last symbol
+    if ( ((safe) && ((op<oend) && (ip>=compressed)))
         || ((!safe) && (op<oend)) )
     { 
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable); 
