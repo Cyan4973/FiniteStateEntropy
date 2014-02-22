@@ -78,7 +78,7 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
     U32* streamSizePtr;
     ptrdiff_t state;
     ptrdiff_t state2, state3;
-    bitContainer_forward_t bitC = {0,0};
+    bitStream_forward_t bitC = {0,0};
     const void* stateTable;
     const void* symbolTT;
     const void* escapeStateTable;
@@ -222,7 +222,7 @@ int FSE2T_decompress_usingDTable(
     const void* iend;
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + originalSize - 1;
-    bitContainer_backward_t bitC;
+    bitStream_backward_t bitC;
     U32 state;
     int nbStates;
 

@@ -508,7 +508,7 @@ void* FSE_initCompressionStream(void** op, ptrdiff_t* state, const void** symbol
 }
 
 
-void FSE_encodeByte(ptrdiff_t* state, bitContainer_forward_t* bitC, BYTE symbol, const void* CTable1, const void* CTable2)
+void FSE_encodeByte(ptrdiff_t* state, bitStream_forward_t* bitC, BYTE symbol, const void* CTable1, const void* CTable2)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) CTable1;
     const U16* const stateTable = (const U16*) CTable2;
@@ -519,7 +519,7 @@ void FSE_encodeByte(ptrdiff_t* state, bitContainer_forward_t* bitC, BYTE symbol,
 }
 
 
-int FSE_closeCompressionStream(void* outPtr, bitContainer_forward_t* bitC, 
+int FSE_closeCompressionStream(void* outPtr, bitStream_forward_t* bitC, 
                                 int nbStates, ptrdiff_t state1, ptrdiff_t state2, ptrdiff_t state3, ptrdiff_t state4,
                                 void* compressionStreamDescriptor, const void* CTable)
 {
@@ -560,7 +560,7 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
     ptrdiff_t state1;
     ptrdiff_t state2;
     ptrdiff_t state3;
-    bitContainer_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. Nonetheless, GCC complains....
+    bitStream_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. Nonetheless, GCC complains....
     const void* stateTable;
     const void* symbolTT;
 
@@ -766,7 +766,7 @@ int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
 }
 
 
-void FSE_updateBitStream(bitContainer_backward_t* bitC, const void** ip)
+void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip)
 {
     *((BYTE**)ip) -= bitC->bitsConsumed >> 3;
     bitC->bitContainer = * (U32*) (*ip);
@@ -775,7 +775,7 @@ void FSE_updateBitStream(bitContainer_backward_t* bitC, const void** ip)
 
 
 FORCE_INLINE const void* FSE_initDecompressionStream_generic(
-    bitContainer_backward_t* bitC,
+    bitStream_backward_t* bitC,
     int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4,
     const void** p,
     const int tableLog, int maxCompressedSize, int safe)
@@ -804,14 +804,14 @@ FORCE_INLINE const void* FSE_initDecompressionStream_generic(
     return (void*)iend;
 }
 
-const void* FSE_initDecompressionStream (bitContainer_backward_t* bitC,
+const void* FSE_initDecompressionStream (bitStream_backward_t* bitC,
                                           int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, 
                                           const void** p, const int tableLog)
 {
     return FSE_initDecompressionStream_generic(bitC, nbStates, state1, state2, state3, state4, p, tableLog, 0, 0);
 }
 
-const void* FSE_initDecompressionStream_safe (bitContainer_backward_t* bitC,
+const void* FSE_initDecompressionStream_safe (bitStream_backward_t* bitC,
                                           int* nbStates, unsigned int* state1, unsigned int* state2, unsigned int* state3, unsigned int* state4, 
                                           const void** p, const int tableLog, int maxCompressedSize)
 {
@@ -819,7 +819,7 @@ const void* FSE_initDecompressionStream_safe (bitContainer_backward_t* bitC,
 }
 
 
-U32 FSE_readBits(bitContainer_backward_t* bitC, int nbBits)
+U32 FSE_readBits(bitStream_backward_t* bitC, U32 nbBits)
 {
     U32 value = ((bitC->bitContainer << bitC->bitsConsumed) >> 1) >> (31-nbBits);
     bitC->bitsConsumed += nbBits;
@@ -827,11 +827,11 @@ U32 FSE_readBits(bitContainer_backward_t* bitC, int nbBits)
 }
 
 
-BYTE FSE_decodeSymbol(U32* state, bitContainer_backward_t* bitC, const void* DTable)
+BYTE FSE_decodeSymbol(U32* state, bitStream_backward_t* bitC, const void* DTable)
 {
     const FSE_decode_t* const decodeTable = (const FSE_decode_t*) DTable;
     BYTE symbol;
-    const int nbBits = decodeTable[*state].nbBits;
+    const U32 nbBits = decodeTable[*state].nbBits;
 
     symbol = decodeTable[*state].symbol;
     *state = decodeTable[*state].newState + FSE_readBits(bitC, nbBits);
@@ -855,7 +855,7 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     BYTE* op = (BYTE*) dest;
     BYTE* oend = op + originalSize;
     BYTE* olimit;
-    bitContainer_backward_t bitC;
+    bitStream_backward_t bitC;
     U32 state1;
     U32 state2;
     U32 state3;   // dummy
@@ -866,21 +866,16 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     else iend = FSE_initDecompressionStream(&bitC, &nbStates, &state1, &state2, &state3, &state4, &ip, tableLog);
     if (iend==NULL) return -1;
 
-    oend -= nbStates;
+    oend -= nbStates;   // cheap last symbol storage
     olimit = oend - 1;
 
     // 2 symbols per loop
     while( ((safe) && ((op<olimit) && (ip>=compressed)))
         || ((!safe) && (op<olimit)) )
     {
-        if (nbStates==2)
-            *op++ = FSE_decodeSymbol(&state2, &bitC, DTable);
-        else
-            *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
-
-        if (FSE_MAX_TABLELOG*2+7 > sizeof(U32)*8)   // Need this test to be static
-            FSE_updateBitStream(&bitC, &ip);
-
+        if (nbStates==2) *op++ = FSE_decodeSymbol(&state2, &bitC, DTable);
+        else *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(U32)*8) FSE_updateBitStream(&bitC, &ip); // Need this test to be static
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
         FSE_updateBitStream(&bitC, &ip);
     }
@@ -921,14 +916,10 @@ FORCE_INLINE int FSE_decompress_usingDTable_generic(
 }
 
 int FSE_decompress_usingDTable (unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
-{
-    return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, 0, DTable, tableLog, 0);
-}
+{ return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, 0, DTable, tableLog, 0); }
 
 int FSE_decompress_usingDTable_safe (unsigned char* dest, const int originalSize, const void* compressed, int maxCompressedSize, const void* DTable, const int tableLog)
-{
-    return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, 1);
-}
+{ return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, 1); }
 
 
 FORCE_INLINE int FSE_decompress_generic (
@@ -967,19 +958,13 @@ FORCE_INLINE int FSE_decompress_generic (
     return (int) (ip-istart);
 }
 
+int FSE_decompress (unsigned char* dest, int originalSize, const void* compressed)
+{ return FSE_decompress_generic(dest, originalSize, compressed, 0, 0); }
 
-int FSE_decompress (unsigned char* dest, int originalSize,
-                    const void* compressed)
-{
-    return FSE_decompress_generic(dest, originalSize, compressed, 0, 0);
-    //return FSE_decompress_generic(dest, originalSize, compressed, originalSize, 1);   // for tests
-}
+int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* compressed, int maxCompressedSize)
+{ return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1); }
 
-int FSE_decompress_safe (unsigned char* dest, int originalSize,
-                    const void* compressed, int maxCompressedSize)
-{
-    return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1);
-}
+
 
 /*********************************************************
   U16 Compression functions
@@ -1111,7 +1096,7 @@ static int FSE_writeSingleU16(void* dest, U16 value)
 }
 
 
-static void FSE_encodeU16(ptrdiff_t* state, bitContainer_forward_t* bitC, U16 symbol, const void* CTable1, const void* CTable2)
+static void FSE_encodeU16(ptrdiff_t* state, bitStream_forward_t* bitC, U16 symbol, const void* CTable1, const void* CTable2)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) CTable1;
     const U16* const stateTable = (const U16*) CTable2;
@@ -1138,7 +1123,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 
 
     ptrdiff_t state=tableSize;
-    bitContainer_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. However, GCC complain....
+    bitStream_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. However, GCC complain....
     U32* streamSize = (U32*) op;
     op += 4;
 
@@ -1314,7 +1299,7 @@ int FSE_decompressU16_usingDTable (unsigned short* dest, const int originalSize,
     const BYTE* iend;
     U16* op = dest;
     U16* const oend = op + originalSize - 1;
-    bitContainer_backward_t bitC;
+    bitStream_backward_t bitC;
     U32 state;
 
     // Init
