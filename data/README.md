@@ -21,7 +21,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.693</th><th>285 MS/s</th><th>415 MS/s</th>
+    <th>win98-lz4-run</th><th>FSE</th><th>2.693</th><th>295 MS/s</th><th>415 MS/s</th>
   </tr>
   <tr>
     <th>win98-lz4-run</th><th>zlib</th><th>2.669</th><th>205 MS/s</th><th>220 MS/s</th>
@@ -30,7 +30,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba10.bin</th><th>FSE</th><th>1.696</th><th>295 MS/s</th><th>430 MS/s</th>
+    <th>proba10.bin</th><th>FSE</th><th>1.696</th><th>300 MS/s</th><th>430 MS/s</th>
   </tr>
   <tr>
     <th>proba10.bin</th><th>zlib</th><th>1.688</th><th>230 MS/s</th><th>220 MS/s</th>
@@ -39,7 +39,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba20.bin</th><th>FSE</th><th>2.207</th><th>295 MS/s</th><th>430 MS/s</th>
+    <th>proba20.bin</th><th>FSE</th><th>2.207</th><th>300 MS/s</th><th>430 MS/s</th>
   </tr>
   <tr>
     <th>proba20.bin</th><th>zlib</th><th>2.190</th><th>245 MS/s</th><th>225 MS/s</th>
@@ -48,7 +48,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba30.bin</th><th>FSE</th><th>2.712</th><th>295 MS/s</th><th>425 MS/s</th>
+    <th>proba30.bin</th><th>FSE</th><th>2.712</th><th>300 MS/s</th><th>425 MS/s</th>
   </tr>
   <tr>
     <th>proba30.bin</th><th>zlib</th><th>2.692</th><th>250 MS/s</th><th>235 MS/s</th>
@@ -57,7 +57,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba40.bin</th><th>FSE</th><th>3.283</th><th>295 MS/s</th><th>425 MS/s</th>
+    <th>proba40.bin</th><th>FSE</th><th>3.283</th><th>300 MS/s</th><th>425 MS/s</th>
   </tr>
   <tr>
     <th>proba40.bin</th><th>zlib</th><th>3.187</th><th>250 MS/s</th><th>235 MS/s</th>
@@ -66,7 +66,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba50.bin</th><th>FSE</th><th>3.987</th><th>295 MS/s</th><th>425 MS/s</th>
+    <th>proba50.bin</th><th>FSE</th><th>3.987</th><th>300 MS/s</th><th>425 MS/s</th>
   </tr>
   <tr>
     <th>proba50.bin</th><th>zlib</th><th>3.986</th><th>255 MS/s</th><th>255 MS/s</th>
@@ -75,7 +75,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba60.bin</th><th>FSE</th><th>4.916</th><th>295 MS/s</th><th>425 MS/s</th>
+    <th>proba60.bin</th><th>FSE</th><th>4.916</th><th>300 MS/s</th><th>425 MS/s</th>
   </tr>
   <tr>
     <th>proba60.bin</th><th>zlib</th><th>4.777</th><th>255 MS/s</th><th>265 MS/s</th>
@@ -84,7 +84,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>295 MS/s</th><th>420 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.313</th><th>300 MS/s</th><th>420 MS/s</th>
   </tr>
   <tr>
     <th>proba70.bin</th><th>zlib</th><th>5.575</th><th>255 MS/s</th><th>275 MS/s</th>
@@ -93,7 +93,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba80.bin</th><th>FSE</th><th>8.802</th><th>295 MS/s</th><th>420 MS/s</th>
+    <th>proba80.bin</th><th>FSE</th><th>8.802</th><th>300 MS/s</th><th>420 MS/s</th>
   </tr>
   <tr>
     <th>proba80.bin</th><th>zlib</th><th>6.375</th><th>250 MS/s</th><th>280 MS/s</th>
@@ -102,7 +102,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>295 MS/s</th><th>420 MS/s</th>
+    <th>proba90.bin</th><th>FSE</th><th>15.21</th><th>300 MS/s</th><th>420 MS/s</th>
   </tr>
   <tr>
     <th>proba90.bin</th><th>zlib</th><th>7.175</th><th>250 MS/s</th><th>290 MS/s</th>
@@ -111,7 +111,7 @@ ProbaXX files are created using the ProbaGen test program.
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba95.bin</th><th>FSE</th><th>26.08</th><th>290 MS/s</th><th>420 MS/s</th>
+    <th>proba95.bin</th><th>FSE</th><th>26.08</th><th>300 MS/s</th><th>420 MS/s</th>
   </tr>
   <tr>
     <th>proba95.bin</th><th>zlib</th><th>7.574</th><th>250 MS/s</th><th>290 MS/s</th>
