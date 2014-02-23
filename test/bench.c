@@ -631,7 +631,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         //DISPLAY("\n"); continue;   // skip decompression
         // Decompression
-        //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+        { size_t i; for (i=0; i<benchedSize; i++) chunkP[0].origBuffer[i]=0; }     // zeroing area, for CRC checking
 
         nbLoops = 0;
         milliTime = BMK_GetMilliStart();

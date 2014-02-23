@@ -84,11 +84,10 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
     const void* escapeStateTable;
     const void* escapeSymbolTT;
 
-
-    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
-    op-=4;
-    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &escapeSymbolTT, &escapeStateTable, escapeCTable);
-    state3 = state2 = state;
+    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op);
+    FSE_initStateAndPtrs(&state2, &symbolTT, &stateTable, CTable);
+    FSE_initStateAndPtrs(&state, &escapeSymbolTT, &escapeStateTable, escapeCTable);
+    state3 = state2;
 
     ip=iend-1;
     state += *ip--;   // cheap last-symbol storage (assumption : nbSymbols <= 1<<tableLog)

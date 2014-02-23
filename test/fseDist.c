@@ -183,7 +183,8 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     const void* symbolTT;
 
 
-    streamSize = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
+    streamSize = (U32*)FSE_initCompressionStream((void**)&op);
+    FSE_initStateAndPtrs(&state, &symbolTT, &stateTable, CTable);
 
     ip=iend-1;
     while (ip>istart)
