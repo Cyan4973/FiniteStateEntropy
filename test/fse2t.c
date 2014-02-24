@@ -111,7 +111,7 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
         FSE_flushBits((void**)&op, &bitC);
     }
 
-    return FSE_closeCompressionStream(op, &bitC, 2, state,state2,0,0, streamSizePtr, CTable);
+    return FSE_closeCompressionStream(op, &bitC, streamSizePtr, 3);
 }
 
 
@@ -226,8 +226,9 @@ int FSE2T_decompress_usingDTable(
     int nbStates;
 
     // Init
-    iend = FSE_initDecompressionStream(&bitC, &nbStates, &state, &state, &state, &state, &ip, tableLog);
+    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
     if (iend==NULL) return -1;
+    state = FSE_readBits(&bitC, tableLog);
 
     // Hot loop
     while(op<oend)
