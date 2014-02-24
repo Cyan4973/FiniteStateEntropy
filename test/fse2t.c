@@ -84,11 +84,10 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
     const void* escapeStateTable;
     const void* escapeSymbolTT;
 
-
-    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
-    op-=4;
-    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op, &state, &escapeSymbolTT, &escapeStateTable, escapeCTable);
-    state3 = state2 = state;
+    streamSizePtr = (U32*)FSE_initCompressionStream((void**)&op);
+    FSE_initStateAndPtrs(&state2, &symbolTT, &stateTable, CTable);
+    FSE_initStateAndPtrs(&state, &escapeSymbolTT, &escapeStateTable, escapeCTable);
+    state3 = state2;
 
     ip=iend-1;
     state += *ip--;   // cheap last-symbol storage (assumption : nbSymbols <= 1<<tableLog)
@@ -112,7 +111,7 @@ int FSE2T_compress_usingCTable (void* dest, const unsigned char* source, int sou
         FSE_flushBits((void**)&op, &bitC);
     }
 
-    return FSE_closeCompressionStream(op, &bitC, 2, state,state2,0,0, streamSizePtr, CTable);
+    return FSE_closeCompressionStream(op, &bitC, streamSizePtr, 3);
 }
 
 
@@ -227,8 +226,9 @@ int FSE2T_decompress_usingDTable(
     int nbStates;
 
     // Init
-    iend = FSE_initDecompressionStream(&bitC, &nbStates, &state, &state, &state, &state, &ip, tableLog);
+    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
     if (iend==NULL) return -1;
+    state = FSE_readBits(&bitC, tableLog);
 
     // Hot loop
     while(op<oend)

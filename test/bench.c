@@ -631,7 +631,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         //DISPLAY("\n"); continue;   // skip decompression
         // Decompression
-        //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+        { int i; for (i=0; i<benchedSize; i++) chunkP[0].origBuffer[i]=0; }     // zeroing area, for CRC checking
 
         nbLoops = 0;
         milliTime = BMK_GetMilliStart();
@@ -1174,7 +1174,6 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             cSize = FSE_compress_usingCTable(dst, (BYTE*)src, benchedSize, CTable);
-            //cSize = FSE_compress_usingCTable_ILP2(dst, (BYTE*)src, benchedSize, CTable);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -1186,7 +1185,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
 
         //DISPLAY("\n"); continue;   // skip decompression
         // Decompression
-        //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+        { int i; for (i=0; i<benchedSize; i++) src[i]=0; }     // zeroing area, for CRC checking
 
         nbLoops = 0;
         milliTime = BMK_GetMilliStart();
@@ -1248,26 +1247,6 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         inFileName = fileNamesTable[fileIdx++];
         inFile = fopen( inFileName, "rb" );
         if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
-
-        // Check if file is fse compressed
-        if (strstr(inFileName,".fse"))
-        {
-            char ch;
-            DISPLAY("%s is compressed. Do you want to uncompress it (Y/N) : ", inFileName);
-            ch = (char)getchar();
-            if ((ch=='Y') || (ch=='y'))
-            {
-                size_t l = strlen(inFileName);
-                char* destName = (char*)calloc(l,1);
-                memcpy(destName, inFileName, l-4);
-                FIO_overwriteMode();
-                decompress_file (destName, inFileName);
-                free(destName);
-                fclose(inFile);
-                inFileName[l-4]=0;
-                inFile = fopen( inFileName, "rb" );
-            }
-        }
 
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
