@@ -39,7 +39,7 @@
 // Increasing memory usage improves compression ratio
 // Reduced memory usage can improve speed, due to cache effect
 // Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
-#define FSE_MEMORY_USAGE 13
+#define FSE_MEMORY_USAGE 14
 
 // FSE_MAX_NB_SYMBOLS :
 // Maximum nb of symbol values authorized.
