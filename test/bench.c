@@ -1238,10 +1238,9 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         U64    inFileSize;
         size_t benchedSize;
         int nbChunks;
-        int maxCompressedChunkSize;
+        size_t maxCompressedChunkSize;
         size_t readSize;
-        char* compressedBuffer; int compressedBuffSize;
-        int chunkSize = BMK_coreTestSize;
+        char* compressedBuffer; size_t compressedBuffSize;
 
         // Check file existence
         inFileName = fileNamesTable[fileIdx++];
@@ -1250,16 +1249,16 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
 
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
-        benchedSize = 256 KB;
+        benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 
         // Alloc
-        orig_buff = (char*)malloc((size_t )benchedSize);
+        orig_buff = (char*)malloc(benchedSize);
         nbChunks = 1;
-        maxCompressedChunkSize = FSE_compressBound(chunkSize);
+        maxCompressedChunkSize = FSE_compressBound((int)benchedSize);
         compressedBuffSize = nbChunks * maxCompressedChunkSize;
-        compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
+        compressedBuffer = (char*)malloc(compressedBuffSize);
 
 
         if (!orig_buff || !compressedBuffer)

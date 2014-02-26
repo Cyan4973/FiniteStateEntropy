@@ -164,7 +164,7 @@ int FSED_writeSingleU16(void* dest, U16 distance)
 static inline void FSED_encodeU16(ptrdiff_t* state, bitStream_forward_t* bitC, U16 value, const void* symbolTT, const void* stateTable)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
-    FSE_addBits(bitC, nbBits, (size_t)value);
+    FSE_addBits(bitC, (size_t)value, nbBits);
     FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
 }
 
@@ -503,7 +503,7 @@ int FSED_writeSingleU32(void* dest, U32 val)
 void FSED_encodeU32(ptrdiff_t* state, bitStream_forward_t* bitC, void** op, U32 value, const void* symbolTT, const void* stateTable)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
-    FSE_addBits(bitC, nbBits, (size_t)value);
+    FSE_addBits(bitC, (size_t)value, nbBits);
     if (sizeof(size_t)==4) FSE_flushBits(op, bitC);   // static test
     FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
 }
@@ -519,25 +519,18 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
     int tableLog = *(U16*)CTable;
     bitStream_forward_t bitC = {0,0};
 
-    #if 1   // This version is bit faster for the time being
-    const int memLog = ( (U16*) CTable) [0];
-    ptrdiff_t state = (ptrdiff_t)1 << memLog;
-    const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const void* const symbolTT = (const void*) (stateTable + ((ptrdiff_t)1 << memLog));
-    U32* streamSize = (U32*) op;
-    op += 4;
-    #else
+    void* streamSize;
     ptrdiff_t state;
-    const void* stateTable;
-    const void* symbolTT;
-    U32* streamSize = (U32*)FSE_initCompressionStream((void**)&op, &state, &symbolTT, &stateTable, CTable);
-    #endif
+    const void* CTablePtr1;
+    const void* CTablePtr2;
 
+    streamSize = (U32*)FSE_initCompressionStream((void**)&op);
+    FSE_initStateAndPtrs(&state, &CTablePtr1, &CTablePtr2, CTable);
 
-    ip=iend-1;
-    while (ip>=istart)
+    ip=iend;
+    while (ip>istart)
     {
-        FSED_encodeU32(&state, &bitC, (void**)&op, *ip--, symbolTT, stateTable);
+        FSED_encodeU32(&state, &bitC, (void**)&op, *--ip, CTablePtr1, CTablePtr2);
         FSE_flushBits((void**)&op, &bitC);
     }
 

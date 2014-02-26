@@ -39,7 +39,7 @@
 // Increasing memory usage improves compression ratio
 // Reduced memory usage can improve speed, due to cache effect
 // Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
-#define FSE_MEMORY_USAGE 14
+#define FSE_MEMORY_USAGE 13
 
 // FSE_MAX_NB_SYMBOLS :
 // Maximum nb of symbol values authorized.
@@ -73,6 +73,7 @@ typedef  int16_t S16;
 typedef uint32_t U32;
 typedef  int32_t S32;
 typedef uint64_t U64;
+typedef  int64_t S64;
 #else
 typedef unsigned char       BYTE;
 typedef unsigned short      U16;
@@ -80,9 +81,11 @@ typedef   signed short      S16;
 typedef unsigned int        U32;
 typedef   signed int        S32;
 typedef unsigned long long  U64;
+typedef   signed long long  S64;
 #endif
 
 typedef size_t bitContainer_t;
+typedef size_t scale_t;
 
 
 //****************************************************************
@@ -94,8 +97,8 @@ typedef size_t bitContainer_t;
 #define FSE_MAXTABLESIZE_MASK (FSE_MAX_TABLESIZE-1)
 #define FSE_MIN_TABLELOG 5
 
-#define FSE_VIRTUAL_LOG   30
-#define FSE_VIRTUAL_RANGE (1U<<FSE_VIRTUAL_LOG)
+#define FSE_VIRTUAL_LOG   ((sizeof(scale_t)*8)-2)
+#define FSE_VIRTUAL_RANGE ((scale_t)1<<FSE_VIRTUAL_LOG)
 
 #if FSE_MAX_TABLELOG>15
 #error "FSE_MAX_TABLELOG>15 isn't supported"
@@ -327,6 +330,161 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 }
 
 
+void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
+{
+    int s;
+    (void)key2;
+    resultTable[0]=0;
+    for(s=1; s<N; s++)
+    {
+        int current = s-1;
+        resultTable[s] = (BYTE)s;
+        while ((current>=0) && (key1[s] > key1[resultTable[current]])) 
+        {
+            resultTable[current+1] = resultTable[current];
+            current--;
+        }
+        resultTable[current+1] = (BYTE)s;
+    }
+    for(s=N; s<nbSymbols; s++)
+        if (key1[s] > key1[resultTable[N-1]])
+        {
+            int largerId = N-2;
+            int currentId;
+            while (largerId>=0)
+            {
+                if (key1[resultTable[largerId]] > key1[s]) break;
+                largerId--;
+            }
+            for (currentId = N-1; currentId > largerId+1; currentId--)
+                resultTable[currentId] = resultTable[currentId-1];
+            resultTable[largerId+1] = (BYTE)s;
+        }
+}
+
+
+void FSE_getNLowestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
+{
+    // Lowest key1, then largest key2 if equal
+    int s;
+    S64 const dontSelect =  (S64)1 << 62;
+    if (key2[0]<=1) key1[0]=dontSelect;
+    resultTable[0]=0;
+    for(s=1; s<N; s++)
+    {
+        int current = s-1;
+        resultTable[s] = (BYTE)s;
+        if (key2[s] <= 1) key1[s] = dontSelect;
+        while ((current>=0) && (key1[s] < key1[resultTable[current]]))
+        {
+            resultTable[current+1] = resultTable[current];
+            current--;
+        }
+        resultTable[current+1] = (BYTE)s;
+    }
+    for(s=N; s<nbSymbols; s++)
+    {
+        if (key2[s] <= 1) key1[s] = dontSelect;
+        if (key1[s] < key1[resultTable[N-1]])
+        {
+            int smallerId = N-2;
+            int currentId;
+            while (smallerId>=0) 
+            {
+                if (key1[s] >= key1[resultTable[smallerId]]) break;
+                //if ((key1[resultTable[smallerId]] == key1[s]) && (key2[resultTable[smallerId]] > key2[s])) break;
+                smallerId --;
+            }
+            for (currentId = N-1; currentId > smallerId+1; currentId--)
+                resultTable[currentId] = resultTable[currentId-1];
+            resultTable[smallerId+1] = (BYTE)s;
+        }
+    }
+}
+
+
+int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
+{
+    // Checks
+    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
+    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
+    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
+    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
+    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
+
+    {
+        U64 const scale = 62 - tableLog;
+        U64 const vStep = (U64)1 << scale;
+        U64 const step = ((U64)1<<62) / total;   // OK, here we have a (lone) division...
+        S64 rest[FSE_MAX_NB_SYMBOLS];
+        BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
+        int stillToDistribute = 1<<tableLog;
+        int s;
+
+        for (s=0; s<nbSymbols; s++)
+        {
+            if (count[s]== (U32) total) return 0;   // There is only one symbol
+            if (count[s]>0)
+            {
+                U32 size = (U32)((count[s]*step) >> scale);
+                size += !size;   // avoid 0
+                rest[s] = (count[s]*step) - (size * vStep);   // <= vStep-1
+                normalizedCounter[s] = size;
+                stillToDistribute -= size;
+            }
+        }
+
+        if (stillToDistribute>0)
+        {
+            int i;
+            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, count, nbSymbols);
+            for (i=0; i<stillToDistribute; i++)
+                normalizedCounter[orderedSymbols[i]]++;
+        }
+        else if (stillToDistribute<0)
+        {
+            int i;
+            int nbDiminutions = -stillToDistribute;
+            int nbNon1Symbols = 0;
+            for (i=0; i<nbSymbols; i++)
+                nbNon1Symbols += (normalizedCounter[i]>1);
+            while (nbNon1Symbols < nbDiminutions)
+            {
+                nbNon1Symbols = 0;
+                for (i=0; i<nbSymbols; i++)
+                    if (normalizedCounter[i]>1)
+                    {
+                        normalizedCounter[i]--;
+                        nbDiminutions--;
+                        if (normalizedCounter[i]>1) nbNon1Symbols++;
+                    }
+            }
+            FSE_getNLowestSymbols(orderedSymbols, nbDiminutions, rest, count, nbSymbols);
+            for (i=0; i<nbDiminutions; i++)
+                normalizedCounter[orderedSymbols[i]]--;
+        }
+    }
+
+    /*
+    {   // Check normalized table
+        int i;
+        int total=0;
+        for (i=0; i<nbSymbols; i++) 
+        {
+            if ((int)normalizedCounter[i]<0)
+                printf("Pb!!! <0 !\n");
+            total += normalizedCounter[i];
+        }
+        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
+    }
+    */
+
+    return tableLog;
+}
+
+
+/*
+// Legacy version
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
     int vTotal= total;
@@ -348,7 +506,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
             const int base = (1<<shift)-1;
             int s;
             vTotal=0;
-            for (s=0; s<nbSymbols; s++) vTotal += count[s] = (count[s]+base) >> shift;
+            for (s=0; s<nbSymbols; s++) vTotal += count[s] = (count[s]+base) >> shift;   // *count is modified
         }
     }
 
@@ -357,9 +515,11 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     {
         U32 minBase, add;
         int s;
+        int non0Symbols = 0;
+        for (s=0; s<nbSymbols; s++) { if (count[s]) non0Symbols++; }
         minBase = total;
-        add = (minBase * nbSymbols) >> tableLog;
-        do { minBase += add; add = (add * nbSymbols) >> tableLog; } while (add);
+        add = (minBase * non0Symbols) >> tableLog;
+        do { minBase += add; add = (add * non0Symbols) >> tableLog; } while (add);
         minBase >>= tableLog;
         for (s=0; s<nbSymbols; s++)
         {
@@ -372,23 +532,23 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     }
     {
         U32 const scale = FSE_VIRTUAL_LOG - tableLog;
-        U32 const vStep = 1 << scale;
-        U32 const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
-        U32 const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
+        scale_t const vStep = (scale_t)1 << scale;
+        scale_t const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
+        scale_t const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
+        scale_t cumulativeRest = (vStep + error) >> 1;
         int s;
-        int cumulativeRest = ((int)vStep + error) >> 1;
+
         if (error > vStep) cumulativeRest = error;     // Note : in this case, total is too large; Error will be given to first non-zero symbol
 
         for (s=0; s<nbSymbols; s++)
         {
-            if (normalizedCounter[s]== (U32) vTotal) return 0; // There is only one symbol
+            if (normalizedCounter[s]== (U32) vTotal) return 0;   // There is only one symbol
             if (count[s]>0)
             {
-                int rest;
-                U32 size = (normalizedCounter[s]*step) >> scale;
-                rest = (normalizedCounter[s]*step) - (size * vStep);   // necessarily >= 0
+                U32 size = (U32)((normalizedCounter[s]*step) >> scale);
+                scale_t rest = (normalizedCounter[s]*step) - (size * vStep);   // necessarily >= 0
                 cumulativeRest += rest;
-                size += cumulativeRest >> scale;
+                size += (U32)(cumulativeRest >> scale);
                 cumulativeRest &= vStep-1;
                 normalizedCounter[s] = size;
             }
@@ -397,6 +557,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
     return tableLog;
 }
+*/
 
 
 typedef struct

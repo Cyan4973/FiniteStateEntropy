@@ -119,6 +119,7 @@ int FSE_compressU16  (void* dest,
 int FSE_decompressU16(unsigned short* dest, int originalSize,
                       const void* compressed);
 
+
 /******************************************
    FSE detailed API
 ******************************************/
@@ -342,7 +343,6 @@ If there is an error, it returns -1.
 */
 
 
-
 /***********************************************************************
    *** inlined functions (for performance) ***
    GCC is not as good as visual to inline code from other *.c files
@@ -365,7 +365,6 @@ static inline void FSE_flushBits(void** outPtr, bitStream_forward_t* bitC)
         bitC->bitContainer >>= nbBytes*8;
     }
 }
-
 
 
 #if defined (__cplusplus)
