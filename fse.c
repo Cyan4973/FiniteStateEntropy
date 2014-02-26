@@ -39,7 +39,7 @@
 // Increasing memory usage improves compression ratio
 // Reduced memory usage can improve speed, due to cache effect
 // Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
-#define FSE_MEMORY_USAGE 14
+#define FSE_MEMORY_USAGE 13
 
 // FSE_MAX_NB_SYMBOLS :
 // Maximum nb of symbol values authorized.
@@ -367,7 +367,6 @@ void FSE_getNLowestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int n
 {
     // Lowest key1, then largest key2 if equal
     int s;
-    int printit=0;
     S64 const dontSelect =  (S64)1 << 62;
     if (key2[0]<=1) key1[0]=dontSelect;
     resultTable[0]=0;
@@ -376,7 +375,6 @@ void FSE_getNLowestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int n
         int current = s-1;
         resultTable[s] = (BYTE)s;
         if (key2[s] <= 1) key1[s] = dontSelect;
-        //if (printit) printf("insert s:%3i  count=%4i  rest=%llu\n", s, key2[s], key1[s]);
         while ((current>=0) && (key1[s] < key1[resultTable[current]]))
         {
             resultTable[current+1] = resultTable[current];
@@ -387,12 +385,10 @@ void FSE_getNLowestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int n
     for(s=N; s<nbSymbols; s++)
     {
         if (key2[s] <= 1) key1[s] = dontSelect;
-        if (printit) printf("insert s:%3i  count=%4i  rest=%llu\n", s, key2[s], key1[s]);
         if (key1[s] < key1[resultTable[N-1]])
         {
             int smallerId = N-2;
             int currentId;
-            //if (printit) printf("s:%3i | %llu < %llu | %3i\n", s, key1[s], key1[resultTable[N-1]]);
             while (smallerId>=0) 
             {
                 if (key1[s] >= key1[resultTable[smallerId]]) break;
