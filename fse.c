@@ -330,10 +330,11 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 }
 
 
-void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
+#if 1
+
+void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
 {
     int s;
-    (void)key2;
     resultTable[0]=0;
     for(s=1; s<N; s++)
     {
@@ -363,43 +364,19 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int 
 }
 
 
-void FSE_getNLowestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
+int FSE_largestSymbol(U32* count, int nbSymbols)
 {
-    // Lowest key1, then largest key2 if equal
-    int s;
-    S64 const dontSelect =  (S64)1 << 62;
-    if (key2[0]<=1) key1[0]=dontSelect;
-    resultTable[0]=0;
-    for(s=1; s<N; s++)
+    int s, largestSymbol=0;
+    U32 largestCount=0;
+    for (s=1; s<nbSymbols; s++)
     {
-        int current = s-1;
-        resultTable[s] = (BYTE)s;
-        if (key2[s] <= 1) key1[s] = dontSelect;
-        while ((current>=0) && (key1[s] < key1[resultTable[current]]))
+        if (count[s] > largestCount)
         {
-            resultTable[current+1] = resultTable[current];
-            current--;
-        }
-        resultTable[current+1] = (BYTE)s;
-    }
-    for(s=N; s<nbSymbols; s++)
-    {
-        if (key2[s] <= 1) key1[s] = dontSelect;
-        if (key1[s] < key1[resultTable[N-1]])
-        {
-            int smallerId = N-2;
-            int currentId;
-            while (smallerId>=0) 
-            {
-                if (key1[s] >= key1[resultTable[smallerId]]) break;
-                //if ((key1[resultTable[smallerId]] == key1[s]) && (key2[resultTable[smallerId]] > key2[s])) break;
-                smallerId --;
-            }
-            for (currentId = N-1; currentId > smallerId+1; currentId--)
-                resultTable[currentId] = resultTable[currentId-1];
-            resultTable[smallerId+1] = (BYTE)s;
+            largestCount = count[s];
+            largestSymbol = s;
         }
     }
+    return largestSymbol;
 }
 
 
@@ -437,31 +414,14 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         if (stillToDistribute>0)
         {
             int i;
-            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, count, nbSymbols);
+            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, nbSymbols);
             for (i=0; i<stillToDistribute; i++)
                 normalizedCounter[orderedSymbols[i]]++;
         }
         else if (stillToDistribute<0)
         {
-            int i;
-            int nbDiminutions = -stillToDistribute;
-            int nbNon1Symbols = 0;
-            for (i=0; i<nbSymbols; i++)
-                nbNon1Symbols += (normalizedCounter[i]>1);
-            while (nbNon1Symbols < nbDiminutions)
-            {
-                nbNon1Symbols = 0;
-                for (i=0; i<nbSymbols; i++)
-                    if (normalizedCounter[i]>1)
-                    {
-                        normalizedCounter[i]--;
-                        nbDiminutions--;
-                        if (normalizedCounter[i]>1) nbNon1Symbols++;
-                    }
-            }
-            FSE_getNLowestSymbols(orderedSymbols, nbDiminutions, rest, count, nbSymbols);
-            for (i=0; i<nbDiminutions; i++)
-                normalizedCounter[orderedSymbols[i]]--;
+            int s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
+            normalizedCounter[s] += stillToDistribute;
         }
     }
 
@@ -482,8 +442,8 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     return tableLog;
 }
 
+#else
 
-/*
 // Legacy version
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
@@ -557,7 +517,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
     return tableLog;
 }
-*/
+#endif
 
 
 typedef struct
