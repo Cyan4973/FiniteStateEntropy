@@ -368,7 +368,7 @@ int FSE_largestSymbol(U32* count, int nbSymbols)
 {
     int s, largestSymbol=0;
     U32 largestCount=0;
-    for (s=1; s<nbSymbols; s++)
+    for (s=0; s<nbSymbols; s++)
     {
         if (count[s] > largestCount)
         {
@@ -392,7 +392,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     {
         U64 const scale = 62 - tableLog;
         U64 const vStep = (U64)1 << scale;
-        U64 const step = ((U64)1<<62) / total;   // OK, here we have a (lone) division...
+        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
         S64 rest[FSE_MAX_NB_SYMBOLS];
         BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
         int stillToDistribute = 1<<tableLog;
@@ -403,11 +403,11 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
             if (count[s]== (U32) total) return 0;   // There is only one symbol
             if (count[s]>0)
             {
-                U32 size = (U32)((count[s]*step) >> scale);
-                size += !size;   // avoid 0
-                rest[s] = (count[s]*step) - (size * vStep);   // <= vStep-1
-                normalizedCounter[s] = size;
-                stillToDistribute -= size;
+                U32 proba = (U32)((count[s]*step) >> scale);
+                proba += !proba;   // avoid 0
+                rest[s] = (count[s]*step) - (proba * vStep);   // <= vStep-1, can be <0
+                normalizedCounter[s] = proba;
+                stillToDistribute -= proba;
             }
         }
 
@@ -425,6 +425,14 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         }
     }
 
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
     /*
     {   // Check normalized table
         int i;
@@ -515,6 +523,14 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         }
     }
 
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
     return tableLog;
 }
 #endif
