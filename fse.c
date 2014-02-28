@@ -332,7 +332,7 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 
 #if 1
 
-void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
+void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
 {
     int s;
     resultTable[0]=0;
@@ -340,7 +340,9 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
     {
         int current = s-1;
         resultTable[s] = (BYTE)s;
-        while ((current>=0) && (key1[s] > key1[resultTable[current]])) 
+        while ((current>=0) && 
+            ((key1[s] > key1[resultTable[current]]) ||
+            (key1[s] == key1[resultTable[current]]) && (key2[s] < key2[resultTable[current]]))) 
         {
             resultTable[current+1] = resultTable[current];
             current--;
@@ -348,13 +350,14 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
         resultTable[current+1] = (BYTE)s;
     }
     for(s=N; s<nbSymbols; s++)
-        if (key1[s] > key1[resultTable[N-1]])
+        if (key1[s] >= key1[resultTable[N-1]])
         {
             int largerId = N-2;
             int currentId;
             while (largerId>=0)
             {
                 if (key1[resultTable[largerId]] > key1[s]) break;
+                if ((key1[resultTable[largerId]] == key1[s]) && (key2[s] >= key2[resultTable[largerId]])) break;
                 largerId--;
             }
             for (currentId = N-1; currentId > largerId+1; currentId--)
@@ -414,13 +417,15 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         if (stillToDistribute>0)
         {
             int i;
-            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, nbSymbols);
+            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, normalizedCounter, nbSymbols);
             for (i=0; i<stillToDistribute; i++)
                 normalizedCounter[orderedSymbols[i]]++;
         }
         else if (stillToDistribute<0)
         {
-            int s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
+            int s;
+            S64 thresholdOne = (vStep * 15) >> 4; for (s=0; s<nbSymbols; s++) if ((normalizedCounter[s] == 1) && (rest[s] >= thresholdOne)) { normalizedCounter[s]=2; stillToDistribute--; }   // Small potential gain, but requires inputSize >= 16x TableSize
+            s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
             normalizedCounter[s] += stillToDistribute;
         }
     }
