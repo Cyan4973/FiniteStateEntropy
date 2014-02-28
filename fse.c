@@ -332,7 +332,7 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 
 #if 1
 
-void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
+void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
 {
     int s;
     resultTable[0]=0;
@@ -340,7 +340,9 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
     {
         int current = s-1;
         resultTable[s] = (BYTE)s;
-        while ((current>=0) && (key1[s] > key1[resultTable[current]])) 
+        while ((current>=0) && 
+            ((key1[s] > key1[resultTable[current]]) ||
+            ((key1[s] == key1[resultTable[current]]) && (key2[s] < key2[resultTable[current]])))) 
         {
             resultTable[current+1] = resultTable[current];
             current--;
@@ -348,13 +350,14 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
         resultTable[current+1] = (BYTE)s;
     }
     for(s=N; s<nbSymbols; s++)
-        if (key1[s] > key1[resultTable[N-1]])
+        if (key1[s] >= key1[resultTable[N-1]])
         {
             int largerId = N-2;
             int currentId;
             while (largerId>=0)
             {
                 if (key1[resultTable[largerId]] > key1[s]) break;
+                if ((key1[resultTable[largerId]] == key1[s]) && (key2[s] >= key2[resultTable[largerId]])) break;
                 largerId--;
             }
             for (currentId = N-1; currentId > largerId+1; currentId--)
@@ -368,7 +371,7 @@ int FSE_largestSymbol(U32* count, int nbSymbols)
 {
     int s, largestSymbol=0;
     U32 largestCount=0;
-    for (s=1; s<nbSymbols; s++)
+    for (s=0; s<nbSymbols; s++)
     {
         if (count[s] > largestCount)
         {
@@ -392,7 +395,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     {
         U64 const scale = 62 - tableLog;
         U64 const vStep = (U64)1 << scale;
-        U64 const step = ((U64)1<<62) / total;   // OK, here we have a (lone) division...
+        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
         S64 rest[FSE_MAX_NB_SYMBOLS];
         BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
         int stillToDistribute = 1<<tableLog;
@@ -403,28 +406,38 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
             if (count[s]== (U32) total) return 0;   // There is only one symbol
             if (count[s]>0)
             {
-                U32 size = (U32)((count[s]*step) >> scale);
-                size += !size;   // avoid 0
-                rest[s] = (count[s]*step) - (size * vStep);   // <= vStep-1
-                normalizedCounter[s] = size;
-                stillToDistribute -= size;
+                U32 proba = (U32)((count[s]*step) >> scale);
+                proba += !proba;   // avoid 0
+                rest[s] = (count[s]*step) - (proba * vStep);   // <= vStep-1, can be <0
+                normalizedCounter[s] = proba;
+                stillToDistribute -= proba;
             }
         }
 
         if (stillToDistribute>0)
         {
             int i;
-            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, nbSymbols);
+            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, normalizedCounter, nbSymbols);
             for (i=0; i<stillToDistribute; i++)
                 normalizedCounter[orderedSymbols[i]]++;
         }
         else if (stillToDistribute<0)
         {
-            int s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
+            int s;
+            S64 thresholdOne = (vStep * 15) >> 4; for (s=0; s<nbSymbols; s++) if ((normalizedCounter[s] == 1) && (rest[s] >= thresholdOne)) { normalizedCounter[s]=2; stillToDistribute--; }   // Small potential gain, but requires inputSize >= 16x TableSize
+            s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
             normalizedCounter[s] += stillToDistribute;
         }
     }
 
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
     /*
     {   // Check normalized table
         int i;
@@ -515,6 +528,14 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         }
     }
 
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
     return tableLog;
 }
 #endif
