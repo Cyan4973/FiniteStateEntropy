@@ -342,7 +342,7 @@ void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int 
         resultTable[s] = (BYTE)s;
         while ((current>=0) && 
             ((key1[s] > key1[resultTable[current]]) ||
-            (key1[s] == key1[resultTable[current]]) && (key2[s] < key2[resultTable[current]]))) 
+            ((key1[s] == key1[resultTable[current]]) && (key2[s] < key2[resultTable[current]])))) 
         {
             resultTable[current+1] = resultTable[current];
             current--;
