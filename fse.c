@@ -424,7 +424,6 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         else if (stillToDistribute<0)
         {
             int s;
-            S64 thresholdOne = (vStep * 15) >> 4; for (s=0; s<nbSymbols; s++) if ((normalizedCounter[s] == 1) && (rest[s] >= thresholdOne)) { normalizedCounter[s]=2; stillToDistribute--; }   // Small potential gain, but requires inputSize >= 16x TableSize
             s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
             normalizedCounter[s] += stillToDistribute;
         }
@@ -454,6 +453,141 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
     return tableLog;
 }
+
+
+
+#include "logDiffCost.h"
+void FSE_sortLogDiff(U32* next, U32* head, U64* cost, U32* realCount, U32* normalizedCount, int nbSymbols)
+{
+    int s;
+    int smallest=0;
+
+    for (s=0; s<nbSymbols; s++)
+    {
+        if (normalizedCount[s]<=1) cost[s] = 1ULL<<62;
+        else cost[s] = realCount[s] * logDiffCost[normalizedCount[s]];
+    }
+
+    for(s=1; s<nbSymbols; s++)
+    {
+        if (cost[s] <= cost[smallest])
+        {
+            next[s]=smallest;
+            smallest=s;
+            continue;
+        }
+        {
+            int previous = smallest;
+            int current = next[smallest];
+            int rank=1;
+            while ((rank<s) && (cost[s] > cost[current]))
+            {
+                rank++;
+                previous = current;
+                current = next[current];
+            }
+
+            if (rank==s)
+            {
+                next[previous]=s;
+            }
+            else
+            {
+                next[previous] = s;
+                next[s] = current;
+            }
+        }
+    }
+    *head = smallest;
+}
+
+
+void FSE_updateSort(U32* head, U32* next, U64* cost, int nbSymbols)
+{
+    const U64 newCost = cost[*head];
+    U32 currentId = next[*head];
+    U32 previousId, nextHead;
+    int rank;
+
+    if (newCost < cost[currentId]) return;
+
+    nextHead = previousId = currentId;
+    currentId = next[currentId];
+    rank=2;
+
+    while ((rank<nbSymbols) && (cost[currentId] < newCost)) { previousId = currentId; currentId = next[currentId]; rank++; }
+    next[previousId] = *head;
+    next[*head] = currentId;
+    *head = nextHead;
+}
+
+
+int FSE_normalizeCountHC (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
+{
+    // Checks
+    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
+    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
+    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
+    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
+    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
+
+    {
+        U64 const scale = 62 - tableLog;
+        U64 const vStep = (U64)1 << scale;
+        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
+        U32 realCount[FSE_MAX_NB_SYMBOLS];
+        U32 next[FSE_MAX_NB_SYMBOLS];
+        U64 cost[FSE_MAX_NB_SYMBOLS];
+        U32 smallest;
+        int attributed = 0;
+        int s;
+
+        // save to realCount, in case count == normalizedCount
+        for (s=0; s<nbSymbols; s++) realCount[s] = count[s];
+
+        for (s=0; s<nbSymbols; s++)
+        {
+            if (count[s]== (U32) total) return 0;   // There is only one symbol
+            attributed += normalizedCounter[s] = (U32)(((realCount[s]*step) + (vStep-1)) >> scale);   // Round up
+        }
+
+        FSE_sortLogDiff(next, &smallest, cost, realCount, normalizedCounter, nbSymbols);
+
+        while (attributed > (1<<tableLog))
+        {
+            //printf("smallest : %3i : cost %6.1f bits  -  count %6i : %.2f  (from %i -> %i)\n", smallest, (double)cost[smallest] / logDiffCost[2], realCount[smallest], (double)realCount[smallest] / total * (1<<tableLog), normalizedCounter[smallest], normalizedCounter[smallest]-1);
+            normalizedCounter[smallest]--;
+            attributed--;
+            cost[smallest] = realCount[smallest] * logDiffCost[normalizedCounter[smallest]];
+            FSE_updateSort(&smallest, next, cost, nbSymbols);
+        }
+    }
+
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
+    /*
+    {   // Check normalized table
+        int i;
+        int total=0;
+        for (i=0; i<nbSymbols; i++) 
+        {
+            if ((int)normalizedCounter[i]<0)
+                printf("Pb!!! <0 !\n");
+            total += normalizedCounter[i];
+        }
+        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
+    }
+    */
+
+    return tableLog;
+}
+
 
 #else
 

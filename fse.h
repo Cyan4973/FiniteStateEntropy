@@ -144,6 +144,7 @@ The following API allows to target specific sub-functions.
 int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
 
 int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
+int FSE_normalizeCountHC(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
 static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
 int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
@@ -162,11 +163,13 @@ FSE_count() will return the highest symbol value detected into 'source' (necessa
 If there is an error, the function will return -1.
 
 The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^tableLog.
-You can use 'tableLog'==0 to mean "default value".
+This is performed by function FSE_normalizeCount()
+Alternatively, function FSE_normalizeCountHC() do the same, but is slower and provides the best achievable normalization.
 The result will be saved into a structure, called 'normalizedCounter', which is a table of unsigned int.
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
 FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
+You can use input 'tableLog'==0 to mean "default value".
 The return value is the adjusted tableLog. It is necessary to retrieve it for next steps.
 A result of '0' means that there is only a single symbol present.
 If there is an error, the function will return -1.

@@ -909,16 +909,17 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
                 char localName[50] = {0};
                 switch(eType)
                 {
-                case et_runLength:    strcat(localName, "rl."); nbSymbols=256; memLog=12; break;
-                case et_runLength285: strcat(localName, "rzl"); nbSymbols=  3; memLog=12; break;
-                case et_runLengthU16: strcat(localName, "r16"); nbSymbols=  0; memLog=10; break;
+                case et_runLength:    strcat(localName, "rl."); nbSymbols=256; memLog=11; break;
+                case et_runLengthU16: strcat(localName, "r16"); nbSymbols=  0; memLog= 9; break;
+                case et_runLengthU32: strcat(localName, "r32"); nbSymbols=  1; memLog=10; break;
                 case et_runLengthLN:  strcat(localName, "rLN"); nbSymbols=  2; memLog=10; break;
-                case et_lastbits:     strcat(localName, "lb."); nbSymbols= 16; memLog=12; break;
-                case et_literals:     strcat(localName, "lit.");nbSymbols=256; memLog=12; break;
-                case et_matchLength:  strcat(localName, "ml."); nbSymbols=256; memLog=12; break;
+                case et_runLength285: strcat(localName, "rzl"); nbSymbols=  3; memLog=11; break;
+                case et_lastbits:     strcat(localName, "lb."); nbSymbols= 16; memLog=11; break;
+                case et_literals:     strcat(localName, "lit.");nbSymbols=256; memLog=11; break;
+                case et_matchLength:  strcat(localName, "ml."); nbSymbols=256; memLog=11; break;
                 case et_matchLengthU16:strcat(localName,"m16"); nbSymbols=  0; memLog=10; break;
                 case et_matchLengthLog2:strcat(localName,"ml2");nbSymbols=  2; memLog=10; break;
-                case et_offset:       strcat(localName, "of."); nbSymbols= 16; memLog=12; break;
+                case et_offset:       strcat(localName, "of."); nbSymbols= 16; memLog=11; break;
                 case et_offsetHigh:   strcat(localName, "ofh"); nbSymbols=256; memLog=11; break;
                 case et_offsetU16:    strcat(localName, "o16"); nbSymbols=  0; memLog=10; break;
                 case et_offsetU32:    strcat(localName, "o32"); nbSymbols=  1; memLog=10; break;
@@ -1151,7 +1152,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
     // Init
     crcOrig = XXH32(src, benchedSize,0);
     nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
-    tableLog  = FSE_normalizeCount(count, tableLog, count, benchedSize, nbSymbols);
+    tableLog  = FSE_normalizeCountHC(count, tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
     FSE_buildCTable(CTable, count, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );
@@ -1251,7 +1252,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         inFileSize = BMK_GetFileSize(inFileName);
         benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
-        DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
+        else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 
         // Alloc
         orig_buff = (char*)malloc(benchedSize);
