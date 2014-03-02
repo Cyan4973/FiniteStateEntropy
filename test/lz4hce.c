@@ -605,6 +605,18 @@ FORCE_INLINE int LZ4HC_encodeSequence (
         return 0;
     }
 
+    if (eType == et_runLengthU32)
+    {
+        U32 rl = (U32)(*ip - *anchor)+1;
+        if (rl >= 255) rl=255;
+        *((U32*)*op) = (U32)rl;
+        *op += 4;
+        // Prepare next loop
+        *ip += matchLength;
+        *anchor = *ip;
+        return 0;
+    }
+
     if (eType == et_runLengthLN)
     {
         U32 rl = (U32)(*ip - *anchor)+8;
