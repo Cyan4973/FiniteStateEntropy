@@ -330,132 +330,6 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 }
 
 
-#if 1
-
-void FSE_getNLargestSymbols(BYTE* resultTable, int N, S64* key1, U32* key2, int nbSymbols)
-{
-    int s;
-    resultTable[0]=0;
-    for(s=1; s<N; s++)
-    {
-        int current = s-1;
-        resultTable[s] = (BYTE)s;
-        while ((current>=0) && 
-            ((key1[s] > key1[resultTable[current]]) ||
-            ((key1[s] == key1[resultTable[current]]) && (key2[s] < key2[resultTable[current]])))) 
-        {
-            resultTable[current+1] = resultTable[current];
-            current--;
-        }
-        resultTable[current+1] = (BYTE)s;
-    }
-    for(s=N; s<nbSymbols; s++)
-        if (key1[s] >= key1[resultTable[N-1]])
-        {
-            int largerId = N-2;
-            int currentId;
-            while (largerId>=0)
-            {
-                if (key1[resultTable[largerId]] > key1[s]) break;
-                if ((key1[resultTable[largerId]] == key1[s]) && (key2[s] >= key2[resultTable[largerId]])) break;
-                largerId--;
-            }
-            for (currentId = N-1; currentId > largerId+1; currentId--)
-                resultTable[currentId] = resultTable[currentId-1];
-            resultTable[largerId+1] = (BYTE)s;
-        }
-}
-
-
-int FSE_largestSymbol(U32* count, int nbSymbols)
-{
-    int s, largestSymbol=0;
-    U32 largestCount=0;
-    for (s=0; s<nbSymbols; s++)
-    {
-        if (count[s] > largestCount)
-        {
-            largestCount = count[s];
-            largestSymbol = s;
-        }
-    }
-    return largestSymbol;
-}
-
-
-int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
-{
-    // Checks
-    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
-    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
-    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
-    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
-
-    {
-        U64 const scale = 62 - tableLog;
-        U64 const vStep = (U64)1 << scale;
-        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
-        S64 rest[FSE_MAX_NB_SYMBOLS];
-        BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
-        int stillToDistribute = 1<<tableLog;
-        int s;
-
-        for (s=0; s<nbSymbols; s++)
-        {
-            if (count[s]== (U32) total) return 0;   // There is only one symbol
-            if (count[s]>0)
-            {
-                U32 proba = (U32)((count[s]*step) >> scale);
-                proba += !proba;   // avoid 0
-                rest[s] = (count[s]*step) - (proba * vStep);   // <= vStep-1, can be <0
-                normalizedCounter[s] = proba;
-                stillToDistribute -= proba;
-            }
-        }
-
-        if (stillToDistribute>0)
-        {
-            int i;
-            FSE_getNLargestSymbols(orderedSymbols, stillToDistribute, rest, normalizedCounter, nbSymbols);
-            for (i=0; i<stillToDistribute; i++)
-                normalizedCounter[orderedSymbols[i]]++;
-        }
-        else if (stillToDistribute<0)
-        {
-            int s;
-            s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
-            normalizedCounter[s] += stillToDistribute;
-        }
-    }
-
-    /*
-    {   // Print Table
-        int s;
-        for (s=0; s<nbSymbols; s++)
-            printf("%3i: %4i \n", s, normalizedCounter[s]);
-        getchar();
-    }
-    */
-    /*
-    {   // Check normalized table
-        int i;
-        int total=0;
-        for (i=0; i<nbSymbols; i++) 
-        {
-            if ((int)normalizedCounter[i]<0)
-                printf("Pb!!! <0 !\n");
-            total += normalizedCounter[i];
-        }
-        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
-    }
-    */
-
-    return tableLog;
-}
-
-
-
 #include "logDiffCost.h"
 void FSE_sortLogDiff(U32* next, U32* head, U64* cost, U32* realCount, U32* normalizedCount, int nbSymbols)
 {
@@ -587,6 +461,131 @@ int FSE_normalizeCountHC (unsigned int* normalizedCounter, int tableLog, unsigne
 
     return tableLog;
 }
+
+
+#if 1
+
+void FSE_getNLargestRestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
+{
+    int s;
+    resultTable[0]=0;
+    for(s=1; s<N; s++)
+    {
+        int current = s-1;
+        resultTable[s] = (BYTE)s;
+        while ((current>=0) && (key1[s] > key1[resultTable[current]]))
+        {
+            resultTable[current+1] = resultTable[current];
+            current--;
+        }
+        resultTable[current+1] = (BYTE)s;
+    }
+    for(s=N; s<nbSymbols; s++)
+    {
+        if (key1[s] >= key1[resultTable[N-1]])
+        {
+            int largerId = N-2;
+            int currentId;
+            while (largerId>=0)
+            {
+                if (key1[resultTable[largerId]] > key1[s]) break;
+                largerId--;
+            }
+            for (currentId = N-1; currentId > largerId+1; currentId--)
+                resultTable[currentId] = resultTable[currentId-1];
+            resultTable[largerId+1] = (BYTE)s;
+        }
+    }
+}
+
+
+int FSE_largestSymbol(U32* count, int nbSymbols)
+{
+    int s, largestSymbol=0;
+    U32 largestCount=0;
+    for (s=0; s<nbSymbols; s++)
+    {
+        if (count[s] > largestCount)
+        {
+            largestCount = count[s];
+            largestSymbol = s;
+        }
+    }
+    return largestSymbol;
+}
+
+
+int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
+{
+    // Checks
+    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
+    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
+    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
+    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
+    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
+
+    {
+        U64 const scale = 62 - tableLog;
+        U64 const vStep = (U64)1 << scale;
+        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
+        S64 rest[FSE_MAX_NB_SYMBOLS];
+        int stillToDistribute = 1<<tableLog;
+        int s;
+
+        for (s=0; s<nbSymbols; s++)
+        {
+            if (count[s] == (U32) total) return 0;   // There is only one symbol
+            if (count[s] > 0)
+            {
+                U32 proba = (U32)((count[s]*step) >> scale);
+                proba += !proba;   // avoid 0
+                rest[s] = (count[s]*step) - (proba * vStep) - (proba);   // solves ties; works if step is much > proba
+                normalizedCounter[s] = proba;
+                stillToDistribute -= proba;
+            }
+        }
+
+        if (stillToDistribute>0)
+        {
+            int i;
+            BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
+            FSE_getNLargestRestSymbols(orderedSymbols, stillToDistribute, rest, nbSymbols);
+            for (i=0; i<stillToDistribute; i++)
+                normalizedCounter[orderedSymbols[i]]++;
+        }
+        else if (stillToDistribute<0)
+        {
+            int s;
+            s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
+            normalizedCounter[s] += stillToDistribute;
+        }
+    }
+
+    /*
+    {   // Print Table
+        int s;
+        for (s=0; s<nbSymbols; s++)
+            printf("%3i: %4i \n", s, normalizedCounter[s]);
+        getchar();
+    }
+    */
+    /*
+    {   // Check normalized table
+        int i;
+        int total=0;
+        for (i=0; i<nbSymbols; i++) 
+        {
+            if ((int)normalizedCounter[i]<0)
+                printf("Pb!!! <0 !\n");
+            total += normalizedCounter[i];
+        }
+        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
+    }
+    */
+
+    return tableLog;
+}
+
 
 
 #else
