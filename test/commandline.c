@@ -226,6 +226,16 @@ int main(int argc, char** argv)
                     // Pause at the end (hidden option)
                 case 'p': fse_pause=1; break;
 
+                    // Change FSE table size (hidden option)
+                case 'M': 
+                    if ((argument[1] >='1') && (argument[1] <='9'))
+                    {
+                        int tableLog = argument[1] - '0';
+                        BMK_SetTableLog(tableLog); 
+                        argument++;
+                    }
+                    break;
+
                     // Unrecognised command
                 default : badusage();
                 }

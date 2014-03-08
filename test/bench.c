@@ -118,7 +118,7 @@ typedef unsigned long long  U64;
 #define GB *(1U<<30)
 
 #define KNUTH               2654435761U
-#define MAX_MEM             (2 GB - 64 MB)
+#define MAX_MEM             (sizeof(void*)==4) ? (2 GB - 64 MB) : (8ULL GB)
 #define DEFAULT_CHUNKSIZE   (32 KB)
 
 
@@ -135,10 +135,13 @@ static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 static int BMK_byteCompressor = 1;
+static int BMK_tableLog = 0;
 
 void BMK_SetByteCompressor(int id) { BMK_byteCompressor = id; }
 
 void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
+
+void BMK_SetTableLog(int tableLog) { BMK_tableLog = 5 + tableLog; }
 
 void BMK_SetNbIterations(int nbLoops)
 {
@@ -776,7 +779,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, 0);
+        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, BMK_tableLog);
         totals += benchedSize;
 
         free(orig_buff);
@@ -1133,9 +1136,6 @@ int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles)
    BenchCore
 **********************************************************************/
 
-static const int BMK_coreTestSize = 256 KB;
-
-
 static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
                               int nbSymbols, int tableLog, char* inFileName,
                               U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
@@ -1153,7 +1153,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
     // Init
     crcOrig = XXH32(src, benchedSize,0);
     nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
-    tableLog  = FSE_normalizeCount(count, tableLog, count, benchedSize, nbSymbols);
+    tableLog  = FSE_normalizeCountHC(count, tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
     FSE_buildCTable(CTable, count, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );
@@ -1286,7 +1286,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 256, 0, inFileName, &totalz, &totalc, &totald);
+        BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 256, BMK_tableLog, inFileName, &totalz, &totalc, &totald);
         totals += benchedSize;
 
         free(orig_buff);

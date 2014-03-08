@@ -382,6 +382,7 @@ int FSE_largestSymbol(U32* count, int nbSymbols)
 }
 
 
+// Improved fast normalize : http://fastcompression.blogspot.fr/2014/03/better-normalization-for-better.html
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
     // Checks
@@ -453,14 +454,18 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
     {
-        U32 rtbTable[16] = {     0, 464199, 488955, 499185, 504806, 508365, 510823, 512623,
-                            513998, 515083, 515961, 516686, 517295, 517813, 518260, 518649 };
+        /*U32 rtbTable[] = {     0, 467774, 495066, 507798, 515911, 521957, 526899, 531181,
+                            535037, 538602, 541960, 545165, 548253, 551251, 554177, 557045 };
+        U32 const rtbTable[] = {     0, 473195, 504333, 520860, 532750, 542566, 551274, 559321,
+                                566939, 574266, 581385, 588349, 595197, 601954, 608639, 615266,
+                                621846, 634893, 641373, 647828, 654263, 660681, 667083, 673471 }; */
+        U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
         U64 const scale = 62 - tableLog;
         U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
-        U64 const vStepM = 1ULL<<(scale-1);
+        U64 const vStep = 1ULL<<(scale-20);
         int stillToDistribute = 1<<tableLog;
         int s;
-        int largest=0, largestP=0;
+        U32 largest=0, largestP=0;
 
         for (s=0; s<nbSymbols; s++)
         {
@@ -470,8 +475,11 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
 
                 U32 proba = (U32)((count[s]*step) >> scale);
                 U64 restToBeat;
-                if (proba<16) restToBeat = (vStepM>>19) * rtbTable[proba]; else restToBeat = vStepM;
-                proba += (count[s]*step) - ((U64)proba<<scale) > restToBeat;
+                if (proba<8)
+                {
+                    restToBeat = vStep * rtbTable[proba];
+                    proba += (count[s]*step) - ((U64)proba<<scale) > restToBeat;
+                }
                 if (proba > largestP) { largestP=proba; largest=s; }
                 normalizedCounter[s] = proba;
                 stillToDistribute -= proba;
@@ -479,6 +487,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         }
         normalizedCounter[largest] += stillToDistribute;
     }
+    
     /*
     {   // Print Table
         int s;
@@ -487,6 +496,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         getchar();
     }
     */
+    
     return tableLog;
 }
 

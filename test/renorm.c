@@ -63,6 +63,24 @@ typedef   signed long long  S64;
 #endif
 
 
+//****************************************************************
+//* Compiler specifics
+//****************************************************************
+#ifdef _MSC_VER    // Visual Studio
+#  define FORCE_INLINE static __forceinline
+#  include <intrin.h>                    // For Visual 2005
+#  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
+#  pragma warning(disable : 4214)        // disable: C4214: non-int bitfields
+#else
+#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+#  ifdef __GNUC__
+#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  else
+#    define FORCE_INLINE static inline
+#  endif
+#endif
+
+
 /****************************************************************
   Internal functions
 ****************************************************************/
@@ -159,6 +177,7 @@ void FSE_updateSort(U32* head, U32* next, U64* cost, int nbSymbols)
 }
 
 
+// For explanations on how it works, see : http://fastcompression.blogspot.fr/2014/03/perfect-normalization.html
 int FSE_normalizeCountHC (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
     // Checks
@@ -192,7 +211,7 @@ int FSE_normalizeCountHC (unsigned int* normalizedCounter, int tableLog, unsigne
 
         while (attributed > (1<<tableLog))
         {
-            //printf("smallest : %3i : cost %6.1f bits  -  count %6i : %.2f  (from %i -> %i)\n", smallest, (double)cost[smallest] / logDiffCost[2], realCount[smallest], (double)realCount[smallest] / total * (1<<tableLog), normalizedCounter[smallest], normalizedCounter[smallest]-1);
+            //printf("symbol : %3i : cost %6.1f bits  -  count %6i : %.2f  (from %i -> %i)\n", smallest, (double)cost[smallest] / logDiffCost[2], realCount[smallest], (double)realCount[smallest] / total * (1<<tableLog), normalizedCounter[smallest], normalizedCounter[smallest]-1);
             normalizedCounter[smallest]--;
             attributed--;
             cost[smallest] = realCount[smallest] * logDiffCost[normalizedCounter[smallest]];

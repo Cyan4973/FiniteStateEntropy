@@ -38,6 +38,7 @@ int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles);
 void BMK_SetBlocksize(int bsize);
 void BMK_SetNbIterations(int nbLoops);
 void BMK_SetByteCompressor(int id);
+void BMK_SetTableLog(int tableLog);
 
 
 #if defined (__cplusplus)
