@@ -73,6 +73,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "fse2t.h"
 #include "renorm.h"     // FSE_normalizeCountHC
 
+
 //**************************************
 // Compiler specifics
 //**************************************
@@ -1251,7 +1252,8 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
 
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
-        benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
+        //benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
+        benchedSize = 16 MB;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 

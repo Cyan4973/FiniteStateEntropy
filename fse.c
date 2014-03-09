@@ -487,7 +487,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         }
         normalizedCounter[largest] += stillToDistribute;
     }
-    
+
     /*
     {   // Print Table
         int s;
@@ -496,7 +496,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         getchar();
     }
     */
-    
+
     return tableLog;
 }
 
@@ -682,18 +682,16 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
     state2 = state1;
 
     ip=iend;
-    state1 += *--ip;   // cheap last symbol storage; requires nbSymbols<=2^tableLog (condition ensured by FSE_normalizeCount)
-    if (ilp) state2 += *--ip;
 
     // join to even
-    if ((sourceSize - nbStreams) & 1)
+    if (sourceSize & 1)
     {
         FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
         FSE_flushBits((void**)&op, &bitC);
     }
 
     // join to mod 4 (if necessary)
-    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && ((sourceSize - nbStreams) & 2))   // test bit 2
+    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (sourceSize & 2))   // test bit 2
     {
         FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
         if (ilp) FSE_encodeByte(&state2, &bitC, *--ip, symbolTT, stateTable);
@@ -962,8 +960,8 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     const void* ip = compressed;
     const void* iend;
     BYTE* op = (BYTE*) dest;
-    BYTE* oend = op + originalSize;
-    BYTE* olimit;
+    BYTE* const oend = op + originalSize;
+    BYTE* const olimit = oend-1;
     bitStream_backward_t bitC;
     U32 state1;
     U32 state2;
@@ -973,9 +971,6 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     else iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
     if (iend==NULL) return -1;
     FSE_initDStates(nbStates, &state1, &state2, &ip, &bitC, tableLog);
-
-    oend -= nbStates;
-    olimit = oend-1;
 
     // 2 symbols per loop
     while( ((safe) && ((op<olimit) && (ip>=compressed)))
@@ -995,10 +990,6 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
         FSE_updateBitStream(&bitC, &ip);
     }
-
-    // cheap last symbol storage
-    if (nbStates>=2) *op++ = (BYTE)state2;
-    *op++ = (BYTE)state1;
 
     if ((ip!=compressed) || bitC.bitsConsumed) return -1;   // Not fully decoded stream
 
