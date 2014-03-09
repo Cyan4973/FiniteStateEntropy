@@ -71,6 +71,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "lz4hce.h"
 #include "fseDist.h"
 #include "fse2t.h"
+#include "renorm.h"     // FSE_normalizeCountHC
+
 
 //**************************************
 // Compiler specifics
@@ -117,7 +119,7 @@ typedef unsigned long long  U64;
 #define GB *(1U<<30)
 
 #define KNUTH               2654435761U
-#define MAX_MEM             (2 GB - 64 MB)
+#define MAX_MEM             (sizeof(void*)==4) ? (2 GB - 64 MB) : (8ULL GB)
 #define DEFAULT_CHUNKSIZE   (32 KB)
 
 
@@ -134,10 +136,13 @@ static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 static int BMK_byteCompressor = 1;
+static int BMK_tableLog = 0;
 
 void BMK_SetByteCompressor(int id) { BMK_byteCompressor = id; }
 
 void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
+
+void BMK_SetTableLog(int tableLog) { BMK_tableLog = 5 + tableLog; }
 
 void BMK_SetNbIterations(int nbLoops)
 {
@@ -775,7 +780,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, 0);
+        BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 256, BMK_tableLog);
         totals += benchedSize;
 
         free(orig_buff);
@@ -1132,11 +1137,8 @@ int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles)
    BenchCore
 **********************************************************************/
 
-static const int BMK_coreTestSize = 256 KB;
-
-
-static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize, 
-                              int nbSymbols, int tableLog, char* inFileName, 
+static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
+                              int nbSymbols, int tableLog, char* inFileName,
                               U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
 {
     int loopNb;
@@ -1250,7 +1252,8 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
 
         // Memory allocation & restrictions
         inFileSize = BMK_GetFileSize(inFileName);
-        benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
+        //benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
+        benchedSize = 16 MB;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 
@@ -1285,7 +1288,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         }
 
         // Bench
-        BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 256, 0, inFileName, &totalz, &totalc, &totald);
+        BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 256, BMK_tableLog, inFileName, &totalz, &totalc, &totald);
         totals += benchedSize;
 
         free(orig_buff);

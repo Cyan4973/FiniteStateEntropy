@@ -330,140 +330,7 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 }
 
 
-#include "logDiffCost.h"
-void FSE_sortLogDiff(U32* next, U32* head, U64* cost, U32* realCount, U32* normalizedCount, int nbSymbols)
-{
-    int s;
-    int smallest=0;
-
-    for (s=0; s<nbSymbols; s++)
-    {
-        if (normalizedCount[s]<=1) cost[s] = 1ULL<<62;
-        else cost[s] = realCount[s] * logDiffCost[normalizedCount[s]];
-    }
-
-    for(s=1; s<nbSymbols; s++)
-    {
-        if (cost[s] <= cost[smallest])
-        {
-            next[s]=smallest;
-            smallest=s;
-            continue;
-        }
-        {
-            int previous = smallest;
-            int current = next[smallest];
-            int rank=1;
-            while ((rank<s) && (cost[s] > cost[current]))
-            {
-                rank++;
-                previous = current;
-                current = next[current];
-            }
-
-            if (rank==s)
-            {
-                next[previous]=s;
-            }
-            else
-            {
-                next[previous] = s;
-                next[s] = current;
-            }
-        }
-    }
-    *head = smallest;
-}
-
-
-void FSE_updateSort(U32* head, U32* next, U64* cost, int nbSymbols)
-{
-    const U64 newCost = cost[*head];
-    U32 currentId = next[*head];
-    U32 previousId, nextHead;
-    int rank;
-
-    if (newCost < cost[currentId]) return;
-
-    nextHead = previousId = currentId;
-    currentId = next[currentId];
-    rank=2;
-
-    while ((rank<nbSymbols) && (cost[currentId] < newCost)) { previousId = currentId; currentId = next[currentId]; rank++; }
-    next[previousId] = *head;
-    next[*head] = currentId;
-    *head = nextHead;
-}
-
-
-int FSE_normalizeCountHC (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
-{
-    // Checks
-    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
-    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
-    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
-    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
-
-    {
-        U64 const scale = 62 - tableLog;
-        U64 const vStep = (U64)1 << scale;
-        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
-        U32 realCount[FSE_MAX_NB_SYMBOLS];
-        U32 next[FSE_MAX_NB_SYMBOLS];
-        U64 cost[FSE_MAX_NB_SYMBOLS];
-        U32 smallest;
-        int attributed = 0;
-        int s;
-
-        // save to realCount, in case count == normalizedCount
-        for (s=0; s<nbSymbols; s++) realCount[s] = count[s];
-
-        for (s=0; s<nbSymbols; s++)
-        {
-            if (count[s]== (U32) total) return 0;   // There is only one symbol
-            attributed += normalizedCounter[s] = (U32)(((realCount[s]*step) + (vStep-1)) >> scale);   // Round up
-        }
-
-        FSE_sortLogDiff(next, &smallest, cost, realCount, normalizedCounter, nbSymbols);
-
-        while (attributed > (1<<tableLog))
-        {
-            //printf("smallest : %3i : cost %6.1f bits  -  count %6i : %.2f  (from %i -> %i)\n", smallest, (double)cost[smallest] / logDiffCost[2], realCount[smallest], (double)realCount[smallest] / total * (1<<tableLog), normalizedCounter[smallest], normalizedCounter[smallest]-1);
-            normalizedCounter[smallest]--;
-            attributed--;
-            cost[smallest] = realCount[smallest] * logDiffCost[normalizedCounter[smallest]];
-            FSE_updateSort(&smallest, next, cost, nbSymbols);
-        }
-    }
-
-    /*
-    {   // Print Table
-        int s;
-        for (s=0; s<nbSymbols; s++)
-            printf("%3i: %4i \n", s, normalizedCounter[s]);
-        getchar();
-    }
-    */
-    /*
-    {   // Check normalized table
-        int i;
-        int total=0;
-        for (i=0; i<nbSymbols; i++) 
-        {
-            if ((int)normalizedCounter[i]<0)
-                printf("Pb!!! <0 !\n");
-            total += normalizedCounter[i];
-        }
-        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
-    }
-    */
-
-    return tableLog;
-}
-
-
-#if 1
+#if 0
 
 void FSE_getNLargestRestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
 {
@@ -515,6 +382,7 @@ int FSE_largestSymbol(U32* count, int nbSymbols)
 }
 
 
+// Improved fast normalize : http://fastcompression.blogspot.fr/2014/03/better-normalization-for-better.html
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
     // Checks
@@ -569,32 +437,15 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         getchar();
     }
     */
-    /*
-    {   // Check normalized table
-        int i;
-        int total=0;
-        for (i=0; i<nbSymbols; i++) 
-        {
-            if ((int)normalizedCounter[i]<0)
-                printf("Pb!!! <0 !\n");
-            total += normalizedCounter[i];
-        }
-        if (total != 1<<tableLog) printf("\nPb!!! wrong total !\n");
-    }
-    */
-
     return tableLog;
 }
 
 
-
 #else
 
-// Legacy version
+// New faster version
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
 {
-    int vTotal= total;
-
     // Check
     if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
     if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
@@ -602,63 +453,39 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
-    // Ensure proper scale
     {
-        int const maxLog = FSE_VIRTUAL_LOG - tableLog;
-        int srcLog = FSE_highbit(total-1)+1;
-        if (srcLog > maxLog)
-        {
-            const int shift = srcLog - maxLog;
-            const int base = (1<<shift)-1;
-            int s;
-            vTotal=0;
-            for (s=0; s<nbSymbols; s++) vTotal += count[s] = (count[s]+base) >> shift;   // *count is modified
-        }
-    }
-
-    // Ensure minimum step is 1
-    if (total > (1<<tableLog))
-    {
-        U32 minBase, add;
+        /*U32 rtbTable[] = {     0, 467774, 495066, 507798, 515911, 521957, 526899, 531181,
+                            535037, 538602, 541960, 545165, 548253, 551251, 554177, 557045 };
+        U32 const rtbTable[] = {     0, 473195, 504333, 520860, 532750, 542566, 551274, 559321,
+                                566939, 574266, 581385, 588349, 595197, 601954, 608639, 615266,
+                                621846, 634893, 641373, 647828, 654263, 660681, 667083, 673471 }; */
+        U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
+        U64 const scale = 62 - tableLog;
+        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
+        U64 const vStep = 1ULL<<(scale-20);
+        int stillToDistribute = 1<<tableLog;
         int s;
-        int non0Symbols = 0;
-        for (s=0; s<nbSymbols; s++) { if (count[s]) non0Symbols++; }
-        minBase = total;
-        add = (minBase * non0Symbols) >> tableLog;
-        do { minBase += add; add = (add * non0Symbols) >> tableLog; } while (add);
-        minBase >>= tableLog;
-        for (s=0; s<nbSymbols; s++)
-        {
-            if (count[s])
-            {
-                normalizedCounter[s] = count[s] + minBase;
-                vTotal += minBase;
-            }
-        }
-    }
-    {
-        U32 const scale = FSE_VIRTUAL_LOG - tableLog;
-        scale_t const vStep = (scale_t)1 << scale;
-        scale_t const step = FSE_VIRTUAL_RANGE / vTotal;   // OK, here we have a (lone) division...
-        scale_t const error = FSE_VIRTUAL_RANGE - (step * vTotal);   // >= 0
-        scale_t cumulativeRest = (vStep + error) >> 1;
-        int s;
-
-        if (error > vStep) cumulativeRest = error;     // Note : in this case, total is too large; Error will be given to first non-zero symbol
+        U32 largest=0, largestP=0;
 
         for (s=0; s<nbSymbols; s++)
         {
-            if (normalizedCounter[s]== (U32) vTotal) return 0;   // There is only one symbol
-            if (count[s]>0)
+            if (count[s] == (U32) total) return 0;   // There is only one symbol
+            if (count[s] > 0)
             {
-                U32 size = (U32)((normalizedCounter[s]*step) >> scale);
-                scale_t rest = (normalizedCounter[s]*step) - (size * vStep);   // necessarily >= 0
-                cumulativeRest += rest;
-                size += (U32)(cumulativeRest >> scale);
-                cumulativeRest &= vStep-1;
-                normalizedCounter[s] = size;
+
+                U32 proba = (U32)((count[s]*step) >> scale);
+                U64 restToBeat;
+                if (proba<8)
+                {
+                    restToBeat = vStep * rtbTable[proba];
+                    proba += (count[s]*step) - ((U64)proba<<scale) > restToBeat;
+                }
+                if (proba > largestP) { largestP=proba; largest=s; }
+                normalizedCounter[s] = proba;
+                stillToDistribute -= proba;
             }
         }
+        normalizedCounter[largest] += stillToDistribute;
     }
 
     /*
@@ -669,8 +496,10 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
         getchar();
     }
     */
+
     return tableLog;
 }
+
 #endif
 
 
@@ -805,26 +634,26 @@ int FSE_closeCompressionStream(void* outPtr, bitStream_forward_t* bitC, void* co
     U32 descriptor;
 
     FSE_flushBits(&outPtr, bitC);
-    
+
     p = (BYTE*)outPtr; p += bitC->bitPos > 0;
     bitC->bitPos = 8 - bitC->bitPos; if (bitC->bitPos==8) bitC->bitPos=0;
-    
+
     descriptor = (U32)(p - (BYTE*)compressionStreamDescriptor) << 3;
     descriptor += bitC->bitPos;
     descriptor += (id-1)<<30;   // optional field [1-4]
     *(U32*)compressionStreamDescriptor = descriptor;
-    
+
     return (int)(p-(BYTE*)compressionStreamDescriptor);
 }
 
 
-int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC, 
+int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC,
                     int nbStates, ptrdiff_t state1, ptrdiff_t state2, const void* CTable)
 {
     const int tableLog = ( (U16*) CTable) [0];
 
     if ((nbStates > 2) || (nbStates < 1)) return -1;
-    
+
     if (nbStates==2) { FSE_addBits(bitC, state2, tableLog); FSE_flushBits(outPtr, bitC); }
     FSE_addBits(bitC, state1, tableLog); FSE_flushBits(outPtr, bitC);
 
@@ -853,18 +682,16 @@ FORCE_INLINE int FSE_compress_usingCTable_generic (void* dest, const unsigned ch
     state2 = state1;
 
     ip=iend;
-    state1 += *--ip;   // cheap last symbol storage; requires nbSymbols<=2^tableLog (condition ensured by FSE_normalizeCount)
-    if (ilp) state2 += *--ip;
 
     // join to even
-    if ((sourceSize - nbStreams) & 1)
+    if (sourceSize & 1)
     {
         FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
         FSE_flushBits((void**)&op, &bitC);
     }
 
     // join to mod 4 (if necessary)
-    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && ((sourceSize - nbStreams) & 2))   // test bit 2
+    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (sourceSize & 2))   // test bit 2
     {
         FSE_encodeByte(&state1, &bitC, *--ip, symbolTT, stateTable);
         if (ilp) FSE_encodeByte(&state2, &bitC, *--ip, symbolTT, stateTable);
@@ -1133,8 +960,8 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     const void* ip = compressed;
     const void* iend;
     BYTE* op = (BYTE*) dest;
-    BYTE* oend = op + originalSize;
-    BYTE* olimit;
+    BYTE* const oend = op + originalSize;
+    BYTE* const olimit = oend-1;
     bitStream_backward_t bitC;
     U32 state1;
     U32 state2;
@@ -1144,9 +971,6 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     else iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
     if (iend==NULL) return -1;
     FSE_initDStates(nbStates, &state1, &state2, &ip, &bitC, tableLog);
-
-    oend -= nbStates;
-    olimit = oend-1;
 
     // 2 symbols per loop
     while( ((safe) && ((op<olimit) && (ip>=compressed)))
@@ -1162,14 +986,10 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     // last symbol
     if ( ((safe) && ((op<oend) && (ip>=compressed)))
         || ((!safe) && (op<oend)) )
-    { 
-        *op++ = FSE_decodeSymbol(&state1, &bitC, DTable); 
+    {
+        *op++ = FSE_decodeSymbol(&state1, &bitC, DTable);
         FSE_updateBitStream(&bitC, &ip);
     }
-
-    // cheap last symbol storage
-    if (nbStates>=2) *op++ = (BYTE)state2;
-    *op++ = (BYTE)state1;
 
     if ((ip!=compressed) || bitC.bitsConsumed) return -1;   // Not fully decoded stream
 
