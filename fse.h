@@ -144,7 +144,6 @@ The following API allows to target specific sub-functions.
 int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
 
 int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
-int FSE_normalizeCountHC(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
 static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
 int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
