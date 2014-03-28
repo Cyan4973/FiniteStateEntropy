@@ -377,7 +377,7 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     // Check
     if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
     if ((FSE_highbit(total-1)-1) < tableLog) tableLog = FSE_highbit(total-1)-1;   // Useless accuracy
-    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
+    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols)+1;   // Need a minimum to represent all symbol values
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
