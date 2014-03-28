@@ -185,7 +185,10 @@ int main(int argc, char** argv)
                     break;
 
                     // zlib Benchmark mode
-                case 'z': bench=2; break;
+                case 'z':
+                    bench=1;
+                    BMK_SetByteCompressor(3);
+                    break;
 
                     // Benchmark LZ4 extracted fields (hidden)
                 case 'l': benchLZ4e=1;
@@ -227,11 +230,11 @@ int main(int argc, char** argv)
                 case 'p': fse_pause=1; break;
 
                     // Change FSE table size (hidden option)
-                case 'M': 
+                case 'M':
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
                         int tableLog = argument[1] - '0';
-                        BMK_SetTableLog(tableLog); 
+                        BMK_SetTableLog(tableLog);
                         argument++;
                     }
                     break;
@@ -264,7 +267,6 @@ int main(int argc, char** argv)
 
     // Check if benchmark is selected
     if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
-    if (bench==2) { BMK_benchFilesZLIBH(argv+indexFileNames, argc-indexFileNames); goto _end; }
     if (bench==3) { BMK_benchCore_Files(argv+indexFileNames, argc-indexFileNames); goto _end; }
 
     // No output filename ==> try to select one automatically (when possible)

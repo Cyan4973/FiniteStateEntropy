@@ -31,7 +31,6 @@ extern "C" {
 int BMK_benchFiles(char** fileNamesTable, int nbFiles);
 int BMK_benchCore_Files(char** fileNamesTable, int nbFiles);
 int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb);
-int BMK_benchFilesZLIBH(char** fileNamesTable, int nbFiles);
 
 
 // Parameters
