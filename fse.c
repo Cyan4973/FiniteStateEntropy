@@ -330,118 +330,46 @@ int FSE_count (unsigned int* count, const unsigned char* source, int sourceSize,
 }
 
 
-#if 0
-
-void FSE_getNLargestRestSymbols(BYTE* resultTable, int N, S64* key1, int nbSymbols)
+// Emergency distribution; compression will be hurt (corner case); consider increasing table size
+static void FSE_distribNpts(unsigned int* normalizedCounter, int nbSymbols, int points)
 {
     int s;
-    resultTable[0]=0;
-    for(s=1; s<N; s++)
+    int rank[5] = {0};
+
+    // Sort 4 largest
+    for (s=1; s<nbSymbols; s++)
     {
-        int current = s-1;
-        resultTable[s] = (BYTE)s;
-        while ((current>=0) && (key1[s] > key1[resultTable[current]]))
-        {
-            resultTable[current+1] = resultTable[current];
-            current--;
-        }
-        resultTable[current+1] = (BYTE)s;
+        int i, b=3;
+        if (b>=s) b=s-1;
+        while ((b>=0) && (normalizedCounter[s]>normalizedCounter[rank[b]])) b--;
+        for (i=3; i>b; i--) rank[i+1] = rank[i];
+        rank[b+1]=s;
     }
-    for(s=N; s<nbSymbols; s++)
+
+    // Distribute points
+    s = 0;
+    while (points)
     {
-        if (key1[s] >= key1[resultTable[N-1]])
+        int limit = normalizedCounter[rank[s+1]]+1;
+        if (normalizedCounter[rank[s]] >= limit + points )
         {
-            int largerId = N-2;
-            int currentId;
-            while (largerId>=0)
-            {
-                if (key1[resultTable[largerId]] > key1[s]) break;
-                largerId--;
-            }
-            for (currentId = N-1; currentId > largerId+1; currentId--)
-                resultTable[currentId] = resultTable[currentId-1];
-            resultTable[largerId+1] = (BYTE)s;
+            normalizedCounter[rank[s]] -= points;
+            break;
+        }
+        points -= normalizedCounter[rank[s]] - limit;
+        normalizedCounter[rank[s]] = limit;
+        s++;
+        if (s==3)
+        {
+            int reduction = points>>2;
+            if (reduction < 1) reduction=1;
+            if (reduction >= normalizedCounter[rank[3]]) reduction=normalizedCounter[rank[3]]-1;   // risk of infinite loop in extreme circumstances; consider increasing table size
+            normalizedCounter[rank[3]]-=reduction;
+            points-=reduction;
+            s=0;
         }
     }
 }
-
-
-int FSE_largestSymbol(U32* count, int nbSymbols)
-{
-    int s, largestSymbol=0;
-    U32 largestCount=0;
-    for (s=0; s<nbSymbols; s++)
-    {
-        if (count[s] > largestCount)
-        {
-            largestCount = count[s];
-            largestSymbol = s;
-        }
-    }
-    return largestSymbol;
-}
-
-
-// Improved fast normalize : http://fastcompression.blogspot.fr/2014/03/better-normalization-for-better.html
-int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
-{
-    // Checks
-    if (tableLog==0) tableLog = FSE_MAX_TABLELOG;
-    if ((FSE_highbit(total-1)+1) < tableLog) tableLog = FSE_highbit(total-1)+1;   // Useless accuracy
-    if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols-1)+1;   // Need a minimum to represent all symbol values
-    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
-
-    {
-        U64 const scale = 62 - tableLog;
-        U64 const vStep = (U64)1 << scale;
-        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
-        S64 rest[FSE_MAX_NB_SYMBOLS];
-        int stillToDistribute = 1<<tableLog;
-        int s;
-
-        for (s=0; s<nbSymbols; s++)
-        {
-            if (count[s] == (U32) total) return 0;   // There is only one symbol
-            if (count[s] > 0)
-            {
-                U32 proba = (U32)((count[s]*step) >> scale);
-                proba += !proba;   // avoid 0
-                rest[s] = (count[s]*step) - (proba * vStep) - (proba);   // solves ties; works if step is much > proba
-                normalizedCounter[s] = proba;
-                stillToDistribute -= proba;
-            }
-        }
-
-        if (stillToDistribute>0)
-        {
-            int i;
-            BYTE orderedSymbols[FSE_MAX_NB_SYMBOLS];
-            FSE_getNLargestRestSymbols(orderedSymbols, stillToDistribute, rest, nbSymbols);
-            for (i=0; i<stillToDistribute; i++)
-                normalizedCounter[orderedSymbols[i]]++;
-        }
-        else if (stillToDistribute<0)
-        {
-            int s;
-            s = FSE_largestSymbol(normalizedCounter, nbSymbols);   // largestSymbol least affected by full_step underestimation
-            normalizedCounter[s] += stillToDistribute;
-        }
-    }
-
-    /*
-    {   // Print Table
-        int s;
-        for (s=0; s<nbSymbols; s++)
-            printf("%3i: %4i \n", s, normalizedCounter[s]);
-        getchar();
-    }
-    */
-    return tableLog;
-}
-
-
-#else
 
 // New faster version
 int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned int* count, int total, int nbSymbols)
@@ -454,11 +382,6 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
 
     {
-        /*U32 rtbTable[] = {     0, 467774, 495066, 507798, 515911, 521957, 526899, 531181,
-                            535037, 538602, 541960, 545165, 548253, 551251, 554177, 557045 };
-        U32 const rtbTable[] = {     0, 473195, 504333, 520860, 532750, 542566, 551274, 559321,
-                                566939, 574266, 581385, 588349, 595197, 601954, 608639, 615266,
-                                621846, 634893, 641373, 647828, 654263, 660681, 667083, 673471 }; */
         U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
         U64 const scale = 62 - tableLog;
         U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
@@ -485,7 +408,9 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
                 stillToDistribute -= proba;
             }
         }
-        normalizedCounter[largest] += stillToDistribute;
+        if ((int)normalizedCounter[largest] <= -stillToDistribute+8)   // largest cant accomodate that amount
+            FSE_distribNpts(normalizedCounter, nbSymbols, -stillToDistribute);
+        else normalizedCounter[largest] += stillToDistribute;
     }
 
     /*
@@ -500,7 +425,6 @@ int FSE_normalizeCount (unsigned int* normalizedCounter, int tableLog, unsigned 
     return tableLog;
 }
 
-#endif
 
 
 typedef struct

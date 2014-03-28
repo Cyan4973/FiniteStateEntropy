@@ -1092,7 +1092,6 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         compressedBuffSize = nbChunks * maxCompressedChunkSize;
         compressedBuffer = (char*)malloc(compressedBuffSize);
 
-
         if (!orig_buff || !compressedBuffer)
         {
             DISPLAY("\nError: not enough memory!\n");
