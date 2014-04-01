@@ -70,7 +70,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "xxhash.h"
 #include "lz4hce.h"
 #include "fseDist.h"
-#include "fse2t.h"
 #include "renorm.h"     // FSE_normalizeCountHC
 
 
@@ -119,7 +118,7 @@ typedef unsigned long long  U64;
 #define GB *(1U<<30)
 
 #define KNUTH               2654435761U
-#define MAX_MEM             (sizeof(void*)==4) ? (2 GB - 64 MB) : (8ULL GB)
+#define MAX_MEM             ((sizeof(void*)==4) ? (2 GB - 64 MB) : (9ULL GB))
 #define DEFAULT_CHUNKSIZE   (32 KB)
 
 
@@ -572,8 +571,8 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 }
 
 
-int BMK_FSE2T_compress2(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
-{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
+//int BMK_FSE2T_compress2(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
+//{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
 
 
 int BMK_ZLIBH_compress(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
@@ -608,9 +607,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         decompressor = BMK_ZLIBH_decompress;
         break;
     case 2:
-        compressor = BMK_FSE2T_compress2;
-        decompressor = FSE2T_decompress;
-        break;
+        //compressor = BMK_FSE2T_compress2;
+        //decompressor = FSE2T_decompress;
+        //break;
     default:
         compressor = FSE_compress2;
         decompressor = FSE_decompress;
@@ -644,7 +643,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
 
-        //DISPLAY("\n"); continue;   // skip decompression
+        //if (loopNb == nbIterations) DISPLAY("\n"); continue;   // skip decompression
         // Decompression
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].origBuffer[i]=0; }     // zeroing area, for CRC checking
 
@@ -976,17 +975,18 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
     U32 crcCheck=0;
     U32 crcOrig;
     U32 count[256];
+    short norm[256];
     void* CTable;
     void* DTable;
 
     // Init
     crcOrig = XXH32(src, benchedSize,0);
     nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
-    tableLog  = FSE_normalizeCountHC(count, tableLog, count, benchedSize, nbSymbols);
+    tableLog  = FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
-    FSE_buildCTable(CTable, count, nbSymbols, tableLog);
+    FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );
-    FSE_buildDTable(DTable, count, nbSymbols, tableLog);
+    FSE_buildDTable(DTable, norm, nbSymbols, tableLog);
 
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -1060,6 +1060,8 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
     double totalc = 0.;
     double totald = 0.;
 
+    // Default
+    if (BMK_tableLog==0) BMK_tableLog=12;
 
     // Loop for each file
     while (fileIdx<nbFiles)

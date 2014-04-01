@@ -143,13 +143,13 @@ The following API allows to target specific sub-functions.
 
 int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
 
-int FSE_normalizeCount(unsigned int* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
+int FSE_normalizeCount(short* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
 
 static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
-int FSE_writeHeader(void* header, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
+int FSE_writeHeader (void* header, const short* normalizedCounter, int nbSymbols, int tableLog);
 
 int FSE_sizeof_CTable(int nbSymbols, int tableLog);
-int FSE_buildCTable(void* CTable, const unsigned int* normalizedCounter, int nbSymbols, int tableLog);
+int FSE_buildCTable(void* CTable, const short* normalizedCounter, int nbSymbols, int tableLog);
 
 int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourceSize, const void* CTable);
 
@@ -192,10 +192,10 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (unsigned int* const normalizedCounter, int* nbSymbols, int* tableLog, const void* header);
+int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLog, const void* header);
 
 int FSE_sizeof_DTable(int tableLog);
-int FSE_buildDTable(void* DTable, const unsigned int* const normalizedCounter, int nbSymbols, int tableLog);
+int FSE_buildDTable (void* DTable, const short* const normalizedCounter, int nbSymbols, int tableLog);
 
 int FSE_decompress_usingDTable(unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
 

@@ -41,10 +41,10 @@ default: fse
 
 all: fse fse32 fuzzer probagen
 
-fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c fse2t.c zlibh.c renorm.c ../fse.c
+fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c
 	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
 
-fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c fse2t.c zlibh.c renorm.c ../fse.c
+fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c
 	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT) $(CF32)
 
 fuzzer: fuzzer.c xxhash.c ../fse.c
