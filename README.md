@@ -51,7 +51,7 @@ Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usi
 </table>
 
 *Speed is provided in MS/s (Millions of Symbols per second).
-For more detailed results, browse to [data directory](data)*
+For more detailed results, browse the [benchmark results](benchmarkResults)*
 
 As an obvious outcome, speed of FSE is stable accross all tested file.
 By design, Huffman can't break the "1 bit per symbol" limit.
