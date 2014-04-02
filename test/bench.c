@@ -664,7 +664,16 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         // CRC Checking
         crcCheck = XXH32(chunkP[0].origBuffer, benchedSize,0);
-        if (crcOrig!=crcCheck) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOrig, (unsigned)crcCheck); break; }
+        if (crcOrig!=crcCheck)
+        {
+            const char* src = chunkP[0].origBuffer;
+            const char* fin = chunkP[0].destBuffer;
+            const char* const srcStart = src;
+            while (*src==*fin) src++, fin++;
+            DISPLAY("\n!!! %14s : Invalid Checksum !!! pos %i/%i\n", inFileName, (int)(src-srcStart), benchedSize);
+            break;
+        }
+
     }
 
     if (crcOrig==crcCheck)
@@ -751,6 +760,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             DISPLAY("\nError: not enough memory!\n");
             free(orig_buff);
             free(compressedBuffer);
+            free(destBuffer);
             free(chunkP);
             fclose(inFile);
             return 12;
@@ -784,6 +794,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, (int)readSize, (int)benchedSize);
             free(orig_buff);
             free(compressedBuffer);
+            free(destBuffer);
             free(chunkP);
             return 13;
         }
@@ -794,6 +805,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         free(orig_buff);
         free(compressedBuffer);
+        free(destBuffer);
         free(chunkP);
     }
 
