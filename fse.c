@@ -1209,7 +1209,7 @@ int FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
         {
             tableSymbol[position] = (FSE_FUNCTION_TYPE)s;
             position = (position + step) & tableMask;
-            if (position > highThreshold) position = (position + step) & tableMask;   // Lowprob area
+            while (position > highThreshold) position = (position + step) & tableMask;   // Lowprob area
         }
     }
 
@@ -1286,7 +1286,7 @@ int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         {
             tableDecode[position].symbol = (FSE_FUNCTION_TYPE)s;
             position = (position + step) & tableMask;
-            if (position > highThreshold) position = (position + step) & tableMask;   // lowprob area
+            while (position > highThreshold) position = (position + step) & tableMask;   // lowprob area
         }
     }
 

@@ -632,7 +632,15 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = compressor(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+            {
+                int errorCode = compressor(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                if (errorCode==-1)
+                {
+                    DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb);
+                    return;
+                }
+                chunkP[chunkNb].compressedSize = errorCode;
+            }
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -645,7 +653,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         //if (loopNb == nbIterations) DISPLAY("\n"); continue;   // skip decompression
         // Decompression
-        { int i; for (i=0; i<benchedSize; i++) chunkP[0].origBuffer[i]=0; }     // zeroing area, for CRC checking
+        { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     // zeroing area, for CRC checking
 
         nbLoops = 0;
         milliTime = BMK_GetMilliStart();
@@ -654,7 +662,14 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = decompressor((unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+            {
+                int errorCode = decompressor((unsigned char*)chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                if (errorCode != chunkP[chunkNb].compressedSize)
+                {
+                    DISPLAY("!!! Error decompressing block %i  !!!!    \n", chunkNb);
+                    return;
+                }
+            }
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -663,13 +678,14 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         // CRC Checking
-        crcCheck = XXH32(chunkP[0].origBuffer, benchedSize,0);
+        crcCheck = XXH32(chunkP[0].destBuffer, benchedSize,0);
         if (crcOrig!=crcCheck)
         {
             const char* src = chunkP[0].origBuffer;
             const char* fin = chunkP[0].destBuffer;
             const char* const srcStart = src;
-            while (*src==*fin) src++, fin++;
+            while (*src==*fin)
+                src++, fin++;
             DISPLAY("\n!!! %14s : Invalid Checksum !!! pos %i/%i\n", inFileName, (int)(src-srcStart), benchedSize);
             break;
         }
