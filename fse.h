@@ -111,15 +111,6 @@ FSE_decompress_safe():
 int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* compressed, int maxCompressedSize);
 
 
-/* same as previously, but data is presented as a table of unsigned short (2 bytes per symbol).
-   All symbol values within input table must be < nbSymbols.
-   Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
-int FSE_compressU16  (void* dest,
-                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
-int FSE_decompressU16(unsigned short* dest, int originalSize,
-                      const void* compressed);
-
-
 /******************************************
    FSE detailed API
 ******************************************/

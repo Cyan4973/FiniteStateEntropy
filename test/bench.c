@@ -66,6 +66,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "bench.h"
 #include "fileio.h"
 #include "fse.h"
+#include "fseU16.h"
 #include "zlibh.h"
 #include "xxhash.h"
 #include "lz4hce.h"
