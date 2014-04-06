@@ -31,7 +31,6 @@
 ****************************************************************** */
 
 #ifndef FSE_DONTINCLUDECORE
-#define FSE_DONTINCLUDECORE
 
 //****************************************************************
 // Tuning parameters
@@ -54,6 +53,15 @@
 // (Instruction Level Parallelism)
 // Default : Recommended
 #define FSE_ILP 1
+
+
+/****************************************************************
+   Generic function type & suffix (C template temulation)
+****************************************************************/
+#define FSE_FUNCTION_TYPE BYTE
+#define FSE_FUNCTION_EXTENSION
+
+#endif    // FSE_DONTINCLUDECORE
 
 
 //****************************************************************
@@ -127,6 +135,25 @@ typedef size_t scale_t;
 
 
 /****************************************************************
+  Complex types
+****************************************************************/
+typedef struct
+{
+    int  deltaFindState;
+    U16  maxState;
+    unsigned char minBitsOut;
+} FSE_symbolCompressionTransform;
+
+typedef struct
+{
+    U16 tableLog;
+    U16 nbSymbols;
+    U16 stateTable[FSE_MAX_TABLESIZE];
+    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];   // Also used by FSE_compressU16
+} CTable_max_t;
+
+
+/****************************************************************
   Internal functions
 ****************************************************************/
 FORCE_INLINE int FSE_highbit (register U32 val)
@@ -154,9 +181,11 @@ FORCE_INLINE int FSE_highbit (register U32 val)
 static short FSE_abs(short a) { return a<0? -a : a; }
 
 
-//****************************************************************
-//* Header bitstream
-//****************************************************************
+#ifndef FSE_DONTINCLUDECORE
+
+/****************************************************************
+   Header bitstream management
+****************************************************************/
 int FSE_writeHeader (void* header, const short* normalizedCounter, int nbSymbols, int tableLog)
 {
     BYTE* const ostart = (BYTE*) header;
@@ -304,13 +333,6 @@ int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLo
 //****************************
 // FSE Compression Code
 //****************************
-
-typedef struct
-{
-    int  deltaFindState;
-    U16  maxState;
-    BYTE minBitsOut;
-} FSE_symbolCompressionTransform;
 
 /*
 CTable is a variable size structure which contains :
@@ -602,14 +624,6 @@ int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
 }
 
 
-typedef struct
-{
-    U16 tableLog;
-    U16 nbSymbols;
-    U16 stateTable[FSE_MAX_TABLESIZE];
-    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];
-} CTable_max_t;
-
 int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog)
 {
     const BYTE* const istart = (const BYTE*) source;
@@ -864,12 +878,6 @@ int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* comp
 { return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1); }
 
 
-/********************************************************************
-   Type-specific Functions (C template emulation)
-********************************************************************/
-#define FSE_FUNCTION_TYPE BYTE
-#define FSE_FUNCTION_EXTENSION
-
 #endif   // FSE_DONTINCLUDECORE
 
 /*
@@ -1072,16 +1080,4 @@ int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
 
     return 0;
 }
-
-// remove definitions
-#undef FSE_FUNCTION_EXTENSION
-#undef FSE_FUNCTION_TYPE
-#undef FSE_CAT
-#undef FSE_FUNCTION_NAME
-#undef FSE_TYPE_NAME
-#undef FSE_DECODE_TYPE
-#undef FSE_TABLESTEP
-
-
-
 

@@ -56,72 +56,14 @@
 //****************************************************************
 //* Includes
 //****************************************************************
-#include "fse.h"
 #include "fseU16.h"
-#include <stddef.h>    // ptrdiff_t
-#include <string.h>    // memcpy, memset
-#include <stdio.h>     // printf (debug)
-
-
-//****************************************************************
-//* Basic Types
-//****************************************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef  int16_t S16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-typedef  int64_t S64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef   signed short      S16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-typedef   signed long long  S64;
-#endif
-
-typedef size_t bitContainer_t;
-typedef size_t scale_t;
-
-
-//****************************************************************
-//* Constants
-//****************************************************************
-#define FSE_MAX_NB_SYMBOLS_CHAR (FSE_MAX_NB_SYMBOLS>256 ? 256 : FSE_MAX_NB_SYMBOLS)
-#define FSE_MAX_TABLELOG  (FSE_MAX_MEMORY_USAGE-2)
-#define FSE_MAX_TABLESIZE (1U<<FSE_MAX_TABLELOG)
-#define FSE_MAXTABLESIZE_MASK (FSE_MAX_TABLESIZE-1)
-#define FSE_DEFAULT_TABLELOG (FSE_DEFAULT_MEMORY_USAGE-2)
-#define FSE_MIN_TABLELOG 5
-
-#define FSE_VIRTUAL_LOG   ((sizeof(scale_t)*8)-2)
-#define FSE_VIRTUAL_RANGE ((scale_t)1<<FSE_VIRTUAL_LOG)
-
-#if FSE_MAX_TABLELOG>15
-#error "FSE_MAX_TABLELOG>15 isn't supported"
-#endif
 
 
 //****************************************************************
 //* Compiler specifics
 //****************************************************************
 #ifdef _MSC_VER    // Visual Studio
-#  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    // For Visual 2005
-#  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
 #  pragma warning(disable : 4214)        // disable: C4214: non-int bitfields
-#else
-#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  else
-#    define FORCE_INLINE static inline
-#  endif
 #endif
 
 
@@ -130,53 +72,10 @@ typedef size_t scale_t;
 ****************************************************************/
 typedef struct
 {
-    int  deltaFindState;
-    U16  maxState;
-    BYTE minBitsOut;
-} FSE_symbolCompressionTransform;
-
-typedef struct
-{
-    U16  newState;
-    BYTE nbBits : 4;
-    U16  symbol : 12;
+    unsigned short newState;
+    unsigned char  nbBits : 4;
+    unsigned short symbol : 12;
 } FSE_decode_tU16;
-
-typedef struct
-{
-    U16 tableLog;
-    U16 nbSymbols;
-    U16 stateTable[FSE_MAX_TABLESIZE];
-    FSE_symbolCompressionTransform symbolTT[FSE_MAX_NB_SYMBOLS];   // Also used by FSE_compressU16
-} CTable_max_t;
-
-
-/****************************************************************
-  Internal functions
-****************************************************************/
-FORCE_INLINE int FSE_highbit (register U32 val)
-{
-#   if defined(_MSC_VER)   // Visual
-    unsigned long r;
-    _BitScanReverse ( &r, val );
-    return (int) r;
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304)   // GCC Intrinsic
-    return 31 - __builtin_clz (val);
-#   else   // Software version
-    static const int DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
-    U32 v = val;
-    int r;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    r = DeBruijnClz[ (U32) (v * 0x07C4ACDDU) >> 27];
-    return r;
-#   endif
-}
-
-static short FSE_abs(short a) { return a<0? -a : a; }
 
 
 /********************************************************************
