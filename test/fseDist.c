@@ -54,12 +54,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 # include <stdint.h>
 typedef uint8_t  BYTE;
 typedef uint16_t U16;
+typedef  int16_t S16;
 typedef uint32_t U32;
 typedef  int32_t S32;
 typedef uint64_t U64;
 #else
 typedef unsigned char       BYTE;
 typedef unsigned short      U16;
+typedef   signed short      S16;
 typedef unsigned int        U32;
 typedef   signed int        S32;
 typedef unsigned long long  U64;
@@ -202,7 +204,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
 
 
 #define FSED_U16_MAXMEMLOG 10
-int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int memLog)
+int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int tableLog)
 {
     const U16* const istart = (const U16*) source;
     const U16* ip = istart;
@@ -212,10 +214,11 @@ int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int memLog)
 
     int nbSymbols = 16;
     U32 counting[16];
+    S16 norm[16];
     U32 CTable[2 + 16 + (1<<FSED_U16_MAXMEMLOG)];
 
 
-    if (memLog > FSED_U16_MAXMEMLOG) return -1;
+    if (tableLog > FSED_U16_MAXMEMLOG) return -1;
     // early out
     if (sourceSize <= 1) return FSED_noCompressU16 (ostart, istart, sourceSize);
 
@@ -223,13 +226,13 @@ int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int memLog)
     nbSymbols = FSED_countU16 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
-    if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
+    tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, nbSymbols);
+    if (tableLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
-    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
+    op += FSE_writeHeader (op, norm, nbSymbols, tableLog);
 
     // Compress
-    FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
+    FSE_buildCTable (&CTable, norm, nbSymbols, tableLog);
     op += FSED_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
@@ -290,7 +293,7 @@ int FSED_decompressU16 (U16* dest, int originalSize,
 {
     const BYTE* const istart = (const BYTE*) compressed;
     const BYTE* ip = istart;
-    U32  counting[16];
+    short norm[16];
     U32  DTable[1<<FSED_U16_MAXMEMLOG];
     BYTE headerId;
     int  nbSymbols;
@@ -302,8 +305,8 @@ int FSED_decompressU16 (U16* dest, int originalSize,
     if (headerId==1) return FSED_decompressSingleU16 (dest, originalSize, (U16)(*(U16*)(istart+1)));
 
     // normal FSE decoding mode
-    ip += FSE_readHeader (counting, &nbSymbols, &tableLog, istart);
-    FSE_buildDTable (DTable, counting, nbSymbols, tableLog);
+    ip += FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
     ip += FSED_decompressU16_usingDTable (dest, originalSize, ip, DTable, tableLog);
 
     return (int) (ip-istart);
@@ -416,6 +419,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int mem
 
     int nbSymbols = 16;
     U32 counting[64];
+    short norm[64];
     U32 CTable[2 + 16 + (1<<FSED_U16LOG2_MAXMEMLOG)];
 
 
@@ -427,13 +431,13 @@ int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int mem
     nbSymbols = FSED_countU16Log2 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
-    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
+    op += FSE_writeHeader (op, norm, nbSymbols, memLog);
 
     // Compress
-    FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
+    FSE_buildCTable (&CTable, norm, nbSymbols, memLog);
     op += FSED_compressU16Log2_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
@@ -550,6 +554,7 @@ int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
 
     int nbSymbols = FSED_MAXBITS_U32;
     U32 counting[FSED_MAXBITS_U32];
+    short norm[FSED_MAXBITS_U32];
     U32 CTable[2 + FSED_MAXBITS_U32 + (1<<FSED_U32_MAXMEMLOG)];
 
 
@@ -561,13 +566,13 @@ int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
     nbSymbols = FSED_countU32 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (counting, memLog, counting, sourceSize, nbSymbols);
+    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU32 (ostart, *source);
 
-    op += FSE_writeHeader (op, counting, nbSymbols, memLog);
+    op += FSE_writeHeader (op, norm, nbSymbols, memLog);
 
     // Compress
-    FSE_buildCTable (&CTable, counting, nbSymbols, memLog);
+    FSE_buildCTable (&CTable, norm, nbSymbols, memLog);
     op += FSED_compressU32_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
@@ -632,7 +637,7 @@ int FSED_decompressU32 (U32* dest, int originalSize,
 {
     const BYTE* const istart = (const BYTE*) compressed;
     const BYTE* ip = istart;
-    U32  counting[FSED_MAXBITS_U32];
+    short norm[FSED_MAXBITS_U32];
     U32  DTable[1<<FSED_U32_MAXMEMLOG];
     BYTE headerId;
     int  nbSymbols;
@@ -644,8 +649,8 @@ int FSED_decompressU32 (U32* dest, int originalSize,
     if (headerId==1) return FSED_decompressSingleU32 (dest, originalSize, (U32)(*(U32*)(istart+1)));
 
     // normal FSE decoding mode
-    ip += FSE_readHeader (counting, &nbSymbols, &tableLog, istart);
-    FSE_buildDTable (DTable, counting, nbSymbols, tableLog);
+    ip += FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
     ip += FSED_decompressU32_usingDTable (dest, originalSize, ip, DTable, tableLog);
 
     return (int) (ip-istart);

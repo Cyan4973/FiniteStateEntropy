@@ -152,7 +152,7 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
 }
 
 
-static int FUZ_checkCount (U32* normalizedCount, int tableLog, int nbSymbols)
+static int FUZ_checkCount (short* normalizedCount, int tableLog, int nbSymbols)
 {
     int total = 1<<tableLog;
     int count = 0;
@@ -208,7 +208,6 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
                 DISPLAY ("Noise Compression result too large !\n");
         }
 
-
         /* Compression / Decompression test */
         {
             int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
@@ -239,7 +238,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
         /* check header read*/
         {
             BYTE* bufferTest = bufferSrc + testNb;
-            U32 count[256];
+            short count[256];
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
             result = FSE_readHeader (count, &nbSymbols, &tableLog, bufferTest);

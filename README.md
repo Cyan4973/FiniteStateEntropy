@@ -28,7 +28,7 @@ Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usi
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>book1</th><th>FSE</th><th>1.765</th><th>430 MS/s</th><th>520 MS/s</th>
+    <th>book1</th><th>FSE</th><th>1.766</th><th>430 MS/s</th><th>520 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
@@ -40,18 +40,18 @@ Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usi
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.333</th><th>430 MS/s</th><th>520 MS/s</th>
+    <th>proba70.bin</th><th>FSE</th><th>6.337</th><th>430 MS/s</th><th>520 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.28</th><th>430 MS/s</th><th>520 MS/s</th>
+    <th>proba90.bin</th><th>FSE</th><th>15.29</th><th>430 MS/s</th><th>520 MS/s</th>
   </tr>
 </table>
 
 *Speed is provided in MS/s (Millions of Symbols per second).
-For more detailed results, browse to [data directory](data)*
+For more detailed results, browse the [benchmark results](benchmarkResults)*
 
 As an obvious outcome, speed of FSE is stable accross all tested file.
 By design, Huffman can't break the "1 bit per symbol" limit.
