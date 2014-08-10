@@ -494,6 +494,9 @@ int FSED_noCompressU32(void* dest, const U32* source, int sourceSize)
 }
 
 
+static unsigned ECounter = 0;
+
+
 int FSED_writeSingleU32(void* dest, const U32* source, int sourceSize)
 {
     BYTE* header = (BYTE*) dest;
@@ -510,7 +513,7 @@ int FSED_writeSingleU32(void* dest, const U32* source, int sourceSize)
         val = *source++;
         container += (size_t)(val & mask) << pos;
         pos += nb_bits;
-        if (pos > max)
+        if (pos >= max)   // Note : avoid filling container entirely, because container >> 64 == container (!= 0)
         {
             const unsigned nb_bytes = pos >> 3;
             *(size_t*)header = container;
@@ -533,7 +536,7 @@ int FSED_writeSingleU32(void* dest, const U32* source, int sourceSize)
 
 void FSED_encodeU32(ptrdiff_t* state, bitStream_forward_t* bitC, void** op, U32 value, const void* symbolTT, const void* stateTable)
 {
-    BYTE nbBits = (BYTE) FSED_highbit(value);
+    BYTE nbBits = (BYTE)FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
     if (sizeof(size_t)==4) FSE_flushBits(op, bitC);   // static test
     FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
