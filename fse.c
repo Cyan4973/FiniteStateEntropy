@@ -851,7 +851,13 @@ FORCE_INLINE int FSE_decompress_generic (
     // headerId early outs
     if ((safe) && (maxCompressedSize<2)) return -1;   // too small input size
     headerId = ip[0] & 3;
-    if (ip[0]==0) return FSE_decompressRaw (dest, originalSize, istart);
+    if (ip[0]==0) {
+        if (safe && maxCompressedSize < originalSize + 1) {
+            return -1;
+        } else {
+            return FSE_decompressRaw (dest, originalSize, istart);
+        }
+    }
     if (ip[0]==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
     if (headerId!=2) return -1;   // unused headerId
 
