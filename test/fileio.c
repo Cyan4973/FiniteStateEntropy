@@ -157,7 +157,7 @@ static const int one = 1;
 //**************************************
 static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 static int   overwrite = 0;
-static int   blockSizeId = FSE_BLOCKSIZEID_DEFAULT;
+static int   globalBlockSizeId = FSE_BLOCKSIZEID_DEFAULT;
 static int   bufferSizeId = FSE_BUFFERSIZEID_DEFAULT;
 
 
@@ -186,7 +186,7 @@ static int   bufferSizeId = FSE_BUFFERSIZEID_DEFAULT;
 //**************************************
 // Parameters
 //**************************************
-void FIO_overwriteMode() { overwrite=1; }
+void FIO_overwriteMode(void) { overwrite=1; }
 
 
 //****************************
@@ -275,7 +275,7 @@ int compress_file(char* output_filename, char* input_filename)
     FILE* finput;
     FILE* foutput;
     size_t sizeCheck;
-    size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(blockSizeId);
+    size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(globalBlockSizeId);
     size_t inputBufferSize = FIO_GetBufferSize_FromBufferId(bufferSizeId);
     int nbBlocksPerBuffer;
     int lastBlockDone=0;
@@ -294,7 +294,7 @@ int compress_file(char* output_filename, char* input_filename)
 
     // Write Archive Header
     *(U32*)out_buff = LITTLE_ENDIAN_32(FSE_MAGIC_NUMBER);   // Magic Number
-    out_buff[4] = (char)blockSizeId;                              // Block Size descriptor
+    out_buff[4] = (char)globalBlockSizeId;                  // Block Size descriptor
     sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE+1, foutput);
     if (sizeCheck!=MAGICNUMBER_SIZE+1) EXM_THROW(22, "Write error : cannot write header");
     compressedfilesize += MAGICNUMBER_SIZE+1;
@@ -327,7 +327,7 @@ int compress_file(char* output_filename, char* input_filename)
             if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
             {
                 int errorCode;
-                int nbBytes = ((blockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
+                int nbBytes = ((globalBlockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
@@ -425,7 +425,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
         // Decode while enough data
         while (iend-ip > FSE_compressBound(blockSize))
         {
-            size_t sizeCheck;
+            size_t writeSizeCheck;
             int errorCode;
             if (nbFullBlocks == 0)
             {
@@ -438,8 +438,8 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
             filesize += blockSize;
             nbFullBlocks--;
 
-            sizeCheck = fwrite(out_buff, 1, blockSize, foutput);
-            if (sizeCheck != blockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
+            writeSizeCheck = fwrite(out_buff, 1, blockSize, foutput);
+            if (writeSizeCheck != blockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
             XXH32_update(hashCtx, out_buff, blockSize);
         }
 

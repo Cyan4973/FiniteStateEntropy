@@ -57,3 +57,8 @@ As an obvious outcome, speed of FSE is stable accross all tested file.
 By design, Huffman can't break the "1 bit per symbol" limit.
 FSE is free of such limit, so its performance increase with probability, remaining close to Shannon limit.
 
+Branch Policy
+-------------------------
+The "master" branch will reflect the status of stable releases of FSE.
+The "dev" branch is the one where all contributions will be merged. If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted. Feature branches will also exist, typically to introduce new requirements, and be temporarily available for testing before merge into "dev" branch.
+

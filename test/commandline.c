@@ -92,7 +92,7 @@ static int   fse_pause = 0;
 //***************************************************
 // Functions
 //***************************************************
-static int usage()
+static int usage(void)
 {
     DISPLAY("Usage :\n");
     DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
@@ -109,7 +109,7 @@ static int usage()
 }
 
 
-static int badusage()
+static int badusage(void)
 {
     DISPLAYLEVEL(1, "Incorrect parameters\n");
     if (displayLevel >= 1) usage();
@@ -117,7 +117,7 @@ static int badusage()
 }
 
 
-static void waitEnter()
+static void waitEnter(void)
 {
     DISPLAY("Press enter to continue...\n");
     getchar();
