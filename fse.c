@@ -111,8 +111,9 @@ typedef size_t scale_t;
 #define FSE_VIRTUAL_LOG   ((sizeof(scale_t)*8)-2)
 #define FSE_VIRTUAL_RANGE ((scale_t)1<<FSE_VIRTUAL_LOG)
 
-#if FSE_MAX_TABLELOG>15
-#error "FSE_MAX_TABLELOG>15 isn't supported"
+#define FSE_TABLELOG_ABSOLUTE_MAX 15
+#if FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX
+#error "FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX isn't supported"
 #endif
 
 
@@ -278,6 +279,7 @@ int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLo
     bitStream = * (U32*) ip;
     bitStream >>= 2;
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read tableLog
+    if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return -1;
     bitStream >>= 4;
     *tableLog = nbBits;
     remaining = (1<<nbBits)+1;
@@ -679,10 +681,10 @@ int FSE_compress (void* dest, const unsigned char* source, int sourceSize)
 /*********************************************************
    Decompression (Byte symbols)
 *********************************************************/
-int FSE_decompressRaw (void* out, int osize, const BYTE* in)
+int FSE_decompressRaw (void* out, int originalSize, const BYTE* in)
 {
-    memcpy (out, in+1, osize);
-    return osize+1;
+    memcpy (out, in+1, originalSize);
+    return originalSize+1;
 }
 
 int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
@@ -851,7 +853,11 @@ FORCE_INLINE int FSE_decompress_generic (
     // headerId early outs
     if ((safe) && (maxCompressedSize<2)) return -1;   // too small input size
     headerId = ip[0] & 3;
-    if (ip[0]==0) return FSE_decompressRaw (dest, originalSize, istart);
+    if (ip[0]==0)   // Raw (uncompressed) data
+    {
+        if (safe && maxCompressedSize < originalSize + 1) return -1;
+        return FSE_decompressRaw (dest, originalSize, istart);
+    }
     if (ip[0]==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
     if (headerId!=2) return -1;   // unused headerId
 
@@ -948,7 +954,7 @@ int FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     U32 position = 0;
     FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE];
     U32 highThreshold = tableSize-1;
-    int s;
+    int symbol;
     int i;
 
     // header
@@ -973,12 +979,12 @@ int FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     cumul[nbSymbols] = tableSize+1;
 
     // Spread symbols
-    for (s=0; s<nbSymbols; s++)
+    for (symbol=0; symbol<nbSymbols; symbol++)
     {
-        int i;
-        for (i=0; i<normalizedCounter[s]; i++)
+        int nbOccurences;
+        for (nbOccurences=0; nbOccurences<normalizedCounter[symbol]; nbOccurences++)
         {
-            tableSymbol[position] = (FSE_FUNCTION_TYPE)s;
+            tableSymbol[position] = (FSE_FUNCTION_TYPE)symbol;
             position = (position + step) & tableMask;
             while (position > highThreshold) position = (position + step) & tableMask;   // Lowprob area
         }
@@ -1005,16 +1011,16 @@ int FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
                 break;
             case -1:
             case 1:
-                symbolTT[s].minBitsOut = (BYTE) tableLog;
+                symbolTT[s].minBitsOut = (BYTE)tableLog;
                 symbolTT[s].deltaFindState = total - 1;
                 total ++;
-                symbolTT[s].maxState = (U16) ( (tableSize*2) - 1);   // ensures state <= maxState
+                symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   // ensures state <= maxState
                 break;
             default :
-                symbolTT[s].minBitsOut = (BYTE) ( (tableLog-1) - FSE_highbit (normalizedCounter[s]-1) );
+                symbolTT[s].minBitsOut = (BYTE)( (tableLog-1) - FSE_highbit (normalizedCounter[s]-1) );
                 symbolTT[s].deltaFindState = total - normalizedCounter[s];
                 total +=  normalizedCounter[s];
-                symbolTT[s].maxState = (U16) ( (normalizedCounter[s]<< (symbolTT[s].minBitsOut+1) ) - 1);
+                symbolTT[s].maxState = (U16)( (normalizedCounter[s] << (symbolTT[s].minBitsOut+1)) - 1);
             }
         }
     }
@@ -1071,8 +1077,8 @@ int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         U32 i;
         for (i=0; i<tableSize; i++)
         {
-            FSE_FUNCTION_TYPE s = tableDecode[i].symbol;
-            U16 nextState = symbolNext[s]++;
+            FSE_FUNCTION_TYPE symbol = tableDecode[i].symbol;
+            U16 nextState = symbolNext[symbol]++;
             tableDecode[i].nbBits = (BYTE) (tableLog - FSE_highbit (nextState) );
             tableDecode[i].newState = (U16) ( (nextState << tableDecode[i].nbBits) - tableSize);
         }

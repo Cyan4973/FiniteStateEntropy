@@ -74,7 +74,7 @@ ZLIBH_compressBound():
     Used to know how much memory to allocate for destination buffer.
 */
 
-int ZLIBH_getDistributionTotal();
+int ZLIBH_getDistributionTotal(void);
 int ZLIBH_encode(char* dest, const char* source, int inputSize);
 /*
 ZLIBH_encode():

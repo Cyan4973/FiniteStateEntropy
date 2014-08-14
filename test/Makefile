@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - tester Makefile
-# Copyright (C) Yann Collet 2011-2013
+# Copyright (C) Yann Collet 2011-2014
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -23,11 +23,13 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE=v0.1
-DESTDIR=
-CC=gcc
-CFLAGS=-I.. -std=c99 -Wall -W -Wundef
-CF32=-m32 -march=pentiumpro
+RELEASE=v0.1.1
+
+DESTDIR?=
+CC     := $(CC)
+CFLAGS ?= -O3
+CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow
+CF32    = -m32 -march=pentiumpro
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -39,21 +41,29 @@ endif
 
 default: fse
 
-all: fse fse32 fuzzer probagen
+all: fse fse32 fuzzer fuzzer32 probagen
 
 fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c ../fseU16.c
-	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c ../fseU16.c
-	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT) $(CF32)
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
 fuzzer: fuzzer.c xxhash.c ../fse.c
-	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+
+fuzzer32: fuzzer.c xxhash.c ../fse.c
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
-	$(CC) -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
+
+test: fuzzer fuzzer32
+	./fuzzer   -s0
+	./fuzzer32 -s0
+	@echo test completed
 

@@ -29,7 +29,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 //******************************
 // Include
 //******************************
-#include <stdlib.h>    // malloc
+#include <stdlib.h>    // malloc, abs
 #include <stdio.h>     // printf
 #include <string.h>    // memset
 #include <sys/timeb.h> // timeb
@@ -109,7 +109,7 @@ static int FUZ_GetMilliSpan ( int nTimeStart )
 static unsigned int FUZ_rand (unsigned int* src)
 {
     *src =  ( (*src) * PRIME1) + PRIME2;
-    return (*src) >>7;
+    return (*src) >> 11;
 }
 
 
@@ -159,7 +159,7 @@ static int FUZ_checkCount (short* normalizedCount, int tableLog, int nbSymbols)
     int i;
     if (tableLog > 31) return -1;
     for (i=0; i<nbSymbols; i++)
-        count += normalizedCount[i];
+        count += abs(normalizedCount[i]);
     if (count != total) return -1;
     return 0;
 }
@@ -224,20 +224,20 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
                 BYTE saved = bufferVerif[sizeOrig];
                 int result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
-                    DISPLAY ("Output buffer bufferVerif corrupted !\n");
+                    DISPLAY ("Output buffer (bufferVerif) overrun (write beyond specified end) !\n");
                 if ((result==-1) && (sizeCompressed>=2))
                     DISPLAY ("Decompression failed ! \n");
                 else
                 {
                     U32 hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    if (hashEnd != hashOrig) DISPLAY ("Data corrupted !! \n");
+                    if (hashEnd != hashOrig) DISPLAY ("Decompressed data corrupted !! \n");
                 }
             }
         }
 
-        /* check header read*/
+        /* check header read function*/
         {
-            BYTE* bufferTest = bufferSrc + testNb;
+            BYTE* bufferTest = bufferSrc + testNb;   // Read some random noise
             short count[256];
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
@@ -280,12 +280,12 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
 int main (int argc, char** argv)
 {
     char userInput[80] = {0};
-    U32 seed, startTestNb=0;
+    U32 seed=0, seedset=0, startTestNb=0;
     U32 timestamp=FUZ_GetMilliStart();
     int argNb;
 
     programName = argv[0];
-    DISPLAYLEVEL (0, "FSE automated test\n");
+    DISPLAYLEVEL (0, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];
@@ -296,7 +296,31 @@ int main (int argc, char** argv)
                 argument ++;
                 switch (argument[0])
                 {
-                    // verbose mode
+                // seed setting
+                case 's':
+                    argument++;
+                    seed=0; seedset=1;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        seed *= 10;
+                        seed += *argument - '0';
+                        argument++;
+                    }
+                    break;
+
+                // jumpt to test nb
+                case 't':
+                    argument++;
+                    startTestNb=0;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        startTestNb *= 10;
+                        startTestNb += *argument - '0';
+                        argument++;
+                    }
+                    break;
+
+                // verbose mode
                 case 'v':
                     displayLevel=4;
                     break;
@@ -307,28 +331,34 @@ int main (int argc, char** argv)
         }
     }
 
-    DISPLAY ("Select an Initialisation number (default : random) : ");
-    fflush (stdout);
-    if ( fgets (userInput, sizeof (userInput), stdin) )
+    if (!seedset)
     {
-        if ( sscanf (userInput, "%d", &seed) == 1 )
+        DISPLAY ("Select an Initialisation number (default : random) : ");
+        fflush (stdout);
+        if ( fgets (userInput, sizeof (userInput), stdin) )
         {
-            DISPLAY ("Select start test nb (default : 0) : ");
-            fflush (stdout);
-            if ( fgets (userInput, sizeof (userInput), stdin) )
+            if ( sscanf (userInput, "%d", &seed) == 1 )
             {
-                if ( sscanf (userInput, "%d", &startTestNb) == 1 ) {}
-                else startTestNb=0;
+                DISPLAY ("Select start test nb (default : 0) : ");
+                fflush (stdout);
+                if ( fgets (userInput, sizeof (userInput), stdin) )
+                {
+                    if ( sscanf (userInput, "%d", &startTestNb) == 1 ) {}
+                    else startTestNb=0;
+                }
             }
+            else seed = FUZ_GetMilliSpan (timestamp);
         }
-        else seed = FUZ_GetMilliSpan (timestamp);
+        printf ("Seed = %u\n", seed);
     }
-    printf ("Seed = %u\n", seed);
 
     FUZ_tests (seed, startTestNb);
 
     DISPLAY ("\rAll tests passed               \n");
-    DISPLAY ("Press enter to exit \n");
-    getchar();
+    if (!seedset)
+    {
+        DISPLAY ("Press enter to exit \n");
+        getchar();
+    }
     return 0;
 }
