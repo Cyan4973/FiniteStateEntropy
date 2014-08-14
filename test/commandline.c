@@ -192,7 +192,10 @@ int main(int argc, char** argv)
 
                     // Benchmark LZ4 extracted fields (hidden)
                 case 'l': benchLZ4e=1;
-                    if ((argument[1]>='1') && (argument[1]<='1'+et_final)) { algoNb = argument[1] - '1'; argument++; }
+                    algoNb = 0;
+                    while ((argument[1]>='0') && (argument[1]<='9')) { algoNb *= 10; algoNb += argument[1]-'0'; argument++; }
+                    algoNb -= 1;
+                    if (algoNb >= et_final) algoNb = et_final-1;
                     break;
 
                     // Test

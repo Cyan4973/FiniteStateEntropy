@@ -850,8 +850,9 @@ FORCE_INLINE int FSE_decompress_generic (
     int tableLog;
     int errorCode;
 
-    // headerId early outs
     if ((safe) && (maxCompressedSize<2)) return -1;   // too small input size
+
+    // headerId early outs
     headerId = ip[0] & 3;
     if (ip[0]==0)   // Raw (uncompressed) data
     {
