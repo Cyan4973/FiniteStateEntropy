@@ -285,7 +285,7 @@ int main (int argc, char** argv)
     int argNb;
 
     programName = argv[0];
-    DISPLAYLEVEL (0, "FSE automated test\n");
+    DISPLAYLEVEL (0, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];
@@ -355,7 +355,10 @@ int main (int argc, char** argv)
     FUZ_tests (seed, startTestNb);
 
     DISPLAY ("\rAll tests passed               \n");
-    DISPLAY ("Press enter to exit \n");
-    getchar();
+    if (!seedset)
+    {
+        DISPLAY ("Press enter to exit \n");
+        getchar();
+    }
     return 0;
 }
