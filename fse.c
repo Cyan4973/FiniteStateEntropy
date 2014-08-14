@@ -111,8 +111,9 @@ typedef size_t scale_t;
 #define FSE_VIRTUAL_LOG   ((sizeof(scale_t)*8)-2)
 #define FSE_VIRTUAL_RANGE ((scale_t)1<<FSE_VIRTUAL_LOG)
 
-#if FSE_MAX_TABLELOG>15
-#error "FSE_MAX_TABLELOG>15 isn't supported"
+#define FSE_TABLELOG_ABSOLUTE_MAX 15
+#if FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX
+#error "FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX isn't supported"
 #endif
 
 
@@ -278,6 +279,7 @@ int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLo
     bitStream = * (U32*) ip;
     bitStream >>= 2;
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read tableLog
+    if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return -1;
     bitStream >>= 4;
     *tableLog = nbBits;
     remaining = (1<<nbBits)+1;
