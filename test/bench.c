@@ -1038,6 +1038,8 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
         }
         milliTime = BMK_GetMilliSpan(milliTime);
 
+        if (cSize == (size_t)-1) { DISPLAY("!!! Error compressing file %s !!!!    \n", inFileName); break; }
+
         if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
         ratio = (double)cSize/(double)benchedSize*100.;
 
@@ -1057,6 +1059,8 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
+
+        if (cSize == (size_t)-1) { DISPLAY("\n!!! Error decompressing file %s !!!!    \n", inFileName); break; }
 
         if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);

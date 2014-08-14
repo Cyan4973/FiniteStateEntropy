@@ -76,7 +76,7 @@ FSE_decompress():
 
 
 #define FSE_MAX_HEADERSIZE 512
-#define FSE_COMPRESSBOUND(size) (size + FSE_MAX_HEADERSIZE)
+#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)
 static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
 /*
 FSE_compressBound():
