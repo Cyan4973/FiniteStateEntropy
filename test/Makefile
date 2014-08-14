@@ -50,12 +50,15 @@ fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
 fuzzer: fuzzer.c xxhash.c ../fse.c
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+
+fuzzer32: fuzzer.c xxhash.c ../fse.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
