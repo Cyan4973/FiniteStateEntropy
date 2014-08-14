@@ -1,7 +1,7 @@
 /*
 ProbaGenerator.c
 Demo program creating sample file with controlled probabilies
-Copyright (C) Yann Collet 2012-2013
+Copyright (C) Yann Collet 2012-2014
 GPL v2 License
 
 This program is free software; you can redistribute it and/or modify
@@ -41,6 +41,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
 #define PROBATABLESIZE 4096
+#define PRIME1   2654435761U
+#define PRIME2   2246822519U
 
 
 //**************************************
@@ -60,7 +62,13 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 //******************************
 // local functions
 //******************************
-static int usage()
+static unsigned int GEN_rand (unsigned int* src)
+{
+    *src =  ( (*src) * PRIME1) + PRIME2;
+    return (*src) >> 11;
+}
+
+static int usage(void)
 {
     DISPLAY("Usage :\n");
     DISPLAY("%s P%%\n", programName);
@@ -69,7 +77,7 @@ static int usage()
     return 0;
 }
 
-static int badusage()
+static int badusage(void)
 {
     DISPLAYLEVEL(1, "Incorrect parameters\n");
     if (displayLevel >= 1) usage();
@@ -78,22 +86,37 @@ static int badusage()
     exit(1);
 }
 
+
+static void generateNoise(void* buffer, size_t buffSize)
+{
+    char* op = (char*) buffer;
+    char* oend = op + buffSize;
+    unsigned int seed = 1;
+
+    // Fill buffer
+    while (op<oend) *op++ = (char)GEN_rand(&seed);
+}
+
+
 static void generate(void* buffer, size_t buffSize, double p)
 {
     char table[PROBATABLESIZE];
     int remaining = PROBATABLESIZE;
     int pos = 0;
-    int s = 0;
+    unsigned s = 0;
     char* op = (char*) buffer;
     char* oend = op + buffSize;
+    unsigned int seed = 1;
 
     DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
+
+    if (p==0.0) return generateNoise(buffer, buffSize);
 
     // Build Table
     while (remaining)
     {
-        int n = (int)(remaining * p);
-        int end;
+        unsigned n = (unsigned)(remaining * p);
+        unsigned end;
         if (!n) n=1;
         end = pos + n;
         while (pos<end) table[pos++]=(char)s;
@@ -104,7 +127,7 @@ static void generate(void* buffer, size_t buffSize, double p)
     // Fill buffer
     while (op<oend)
     {
-        const int r = rand() & (PROBATABLESIZE-1);
+        const unsigned r = GEN_rand(&seed) & (PROBATABLESIZE-1);
         *op++ = table[r];
     }
 }
@@ -121,14 +144,14 @@ void createSampleFile(char* filename, double p)
 }
 
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
     char* n;
     double proba = 0.;
     char  filename[] = "proba.bin";
 
     programName = argv[0];
-    printf("Binary file generator\n");
+    DISPLAY("Binary file generator\n");
     if (argc<2) badusage();
 
     n = argv[1];
