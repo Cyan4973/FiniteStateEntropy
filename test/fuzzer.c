@@ -65,7 +65,7 @@ typedef unsigned long long  U64;
 #define BUFFERSIZE ((1 MB) - 1)
 #define FUZ_NB_TESTS  65536
 #define PROBATABLESIZE 4096
-#define FUZ_UPDATERATE  250
+#define FUZ_UPDATERATE  200
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
 
@@ -87,7 +87,7 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 //******************************
 // local functions
 //******************************
-static int FUZ_GetMilliStart()
+static int FUZ_GetMilliStart(void)
 {
     struct timeb tb;
     int nCount;

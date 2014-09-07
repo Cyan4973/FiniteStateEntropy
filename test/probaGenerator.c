@@ -102,11 +102,11 @@ static void generate(void* buffer, size_t buffSize, double p)
 {
     char table[PROBATABLESIZE];
     int remaining = PROBATABLESIZE;
-    int pos = 0;
+    unsigned pos = 0;
     unsigned s = 0;
     char* op = (char*) buffer;
     char* oend = op + buffSize;
-    unsigned int seed = 1;
+    unsigned seed = 1;
 
     DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
 

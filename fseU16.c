@@ -177,7 +177,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 }
 
 
-int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, int nbSymbols, int tableLog)
+int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog)
 {
     const U16* const istart = source;
     const U16* ip = istart;
@@ -200,7 +200,7 @@ int FSE_compressU16 (void* dest, const unsigned short* source, int sourceSize, i
     if (nbSymbols==1) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, nbSymbols);
+    tableLog = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
     if (tableLog==0) return FSE_writeSingleU16(ostart, *istart);
 
     op += FSE_writeHeader (op, norm, nbSymbols, tableLog);
@@ -342,9 +342,9 @@ int FSE_decompressU16_generic(
 }
 
 
-int FSE_decompressU16 (unsigned short* dest, int originalSize, const void* compressed)
+int FSE_decompressU16 (unsigned short* dest, unsigned originalSize, const void* compressed)
 { return FSE_decompressU16_generic(dest, originalSize, compressed, 0, 0); }
 
-int FSE_decompressU16_safe (unsigned short* dest, int originalSize, const void* compressed, int maxCompressedSize)
+int FSE_decompressU16_safe (unsigned short* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize)
 { return FSE_decompressU16_generic(dest, originalSize, compressed, maxCompressedSize, 1); }
 

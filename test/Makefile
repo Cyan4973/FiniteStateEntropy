@@ -28,7 +28,7 @@ RELEASE=v0.1.1
 DESTDIR?=
 CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow
+CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes
 CF32    = -m32 -march=pentiumpro
 
 # Define *.exe as extension for Windows systems

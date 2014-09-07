@@ -576,10 +576,10 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 //{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
 
 
-int BMK_ZLIBH_compress(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
+int BMK_ZLIBH_compress(void* dest, const unsigned char* src, unsigned srcSize, unsigned nbSymbols, unsigned tableLog)
 { (void)nbSymbols; (void)tableLog; return ZLIBH_compress(dest, (const char*)src, srcSize); }
 
-int BMK_ZLIBH_decompress(unsigned char* dest, int originalSize, const void* compressed)
+int BMK_ZLIBH_decompress(unsigned char* dest, unsigned originalSize, const void* compressed)
 { (void)originalSize; return ZLIBH_decompress((char*)dest, compressed); }
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
@@ -592,8 +592,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     double ratio=0.;
     U32 crcCheck=0;
     U32 crcOrig;
-    int (*compressor)(void*, const unsigned char*, int, int, int);
-    int (*decompressor)(unsigned char*, int, const void*);
+    int (*compressor)(void*, const unsigned char*, unsigned, unsigned, unsigned);
+    int (*decompressor)(unsigned char*, unsigned, const void*);
 
     // Init
     if (nbSymbols==0) { BMK_benchMemU16 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
@@ -994,7 +994,7 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
 **********************************************************************/
 
 static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
-                              int nbSymbols, int tableLog, char* inFileName,
+                              int nbSymbols, unsigned tableLog, char* inFileName,
                               U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
 {
     int loopNb;
@@ -1011,7 +1011,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
     // Init
     crcOrig = XXH32(src, benchedSize,0);
     nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
-    tableLog  = FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
+    tableLog  = FSE_normalizeCount(norm, &tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
     FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );

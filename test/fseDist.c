@@ -204,7 +204,7 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
 
 
 #define FSED_U16_MAXMEMLOG 10
-int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int tableLog)
+int FSED_compressU16 (void* dest, const U16* source, unsigned sourceSize, unsigned tableLog)
 {
     const U16* const istart = (const U16*) source;
     const U16* ip = istart;
@@ -226,7 +226,7 @@ int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int tableLo
     nbSymbols = FSED_countU16 (counting, ip, sourceSize);
 
     // Normalize
-    tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, nbSymbols);
+    tableLog = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
     if (tableLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, norm, nbSymbols, tableLog);
@@ -236,7 +236,7 @@ int FSED_compressU16 (void* dest, const U16* source, int sourceSize, int tableLo
     op += FSED_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
-    if ( (op-ostart) >= (sourceSize*2-1) )
+    if ( (size_t)(op-ostart) >= (size_t)(sourceSize*2-1) )
         return FSED_noCompressU16 (ostart, istart, sourceSize);
 
     return (int) (op-ostart);
@@ -409,7 +409,7 @@ int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceS
 
 
 #define FSED_U16LOG2_MAXMEMLOG 11
-int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int memLog)
+int FSED_compressU16Log2 (void* dest, const U16* source, unsigned sourceSize, unsigned memLog)
 {
     const U16* const istart = (const U16*) source;
     const U16* ip = istart;
@@ -431,7 +431,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int mem
     nbSymbols = FSED_countU16Log2 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
+    memLog = FSE_normalizeCount (norm, &memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, norm, nbSymbols, memLog);
@@ -441,7 +441,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, int sourceSize, int mem
     op += FSED_compressU16Log2_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
-    if ( (op-ostart) >= (sourceSize*2-1) )
+    if ( (size_t)(op-ostart) >= (size_t)(sourceSize*2-1) )
         return FSED_noCompressU16 (ostart, istart, sourceSize);
 
     return (int) (op-ostart);
@@ -494,49 +494,19 @@ int FSED_noCompressU32(void* dest, const U32* source, int sourceSize)
 }
 
 
-static unsigned ECounter = 0;
-
-
-int FSED_writeSingleU32(void* dest, const U32* source, int sourceSize)
+int FSED_writeSingleU32(void* dest, U32 val)
 {
     BYTE* header = (BYTE*) dest;
-    U32 val = *source;
-    const unsigned nb_bits = FSED_highbit(val);
-    size_t container = 1 + (nb_bits<<2);   // header 1 (2 bits) : singleU32
-    unsigned pos=7;
-    const unsigned mask = (1<<(nb_bits))-1;
-    const unsigned max = (sizeof(size_t)*8) - nb_bits;
-    int i=0;
-
-    while (i<sourceSize)
-    {
-        val = *source++;
-        container += (size_t)(val & mask) << pos;
-        pos += nb_bits;
-        if (pos >= max)   // Note : avoid filling container entirely, because container >> 64 == container (!= 0)
-        {
-            const unsigned nb_bytes = pos >> 3;
-            *(size_t*)header = container;
-            container >>= (nb_bytes*8);
-            pos -= (nb_bytes*8);
-            header += nb_bytes;
-        }
-        i++;
-    }
-
-    {
-        const unsigned nb_bytes = (pos+7) >> 3;
-        *(size_t*)header = container;
-        header += nb_bytes;
-    }
-
-    return (int)(header-(BYTE*)dest);
+    U32* value = (U32*)(header+1);
+    *header=1;
+    *value = val;
+    return 5;
 }
 
 
 void FSED_encodeU32(ptrdiff_t* state, bitStream_forward_t* bitC, void** op, U32 value, const void* symbolTT, const void* stateTable)
 {
-    BYTE nbBits = (BYTE)FSED_highbit(value);
+    BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
     if (sizeof(size_t)==4) FSE_flushBits(op, bitC);   // static test
     FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
@@ -574,7 +544,7 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 
 
 #define FSED_U32_MAXMEMLOG 11
-int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
+int FSED_compressU32 (void* dest, const U32* source, unsigned sourceSize, unsigned memLog)
 {
     const U32* const istart = (const U32*) source;
     const U32* ip = istart;
@@ -596,8 +566,8 @@ int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
     nbSymbols = FSED_countU32 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
-    if (memLog==0) return FSED_writeSingleU32 (ostart, source, sourceSize);
+    memLog = FSE_normalizeCount (norm, &memLog, counting, sourceSize, nbSymbols);
+    if (memLog==0) return FSED_writeSingleU32 (ostart, *source);
 
     op += FSE_writeHeader (op, norm, nbSymbols, memLog);
 
@@ -606,7 +576,7 @@ int FSED_compressU32 (void* dest, const U32* source, int sourceSize, int memLog)
     op += FSED_compressU32_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
-    if ( (op-ostart) >= (sourceSize*4-1) )
+    if ( (size_t)(op-ostart) >= (size_t)(sourceSize*4-1) )
         return FSED_noCompressU32 (ostart, istart, sourceSize);
 
     return (int) (op-ostart);
@@ -622,44 +592,11 @@ int FSED_decompressRawU32 (U32* out, int osize, const BYTE* in)
     return osize*4+1;
 }
 
-
-int FSED_decompressSingleU32 (U32* out, int osize, const BYTE* istart)
+int FSED_decompressSingleU32 (U32* out, int osize, U32 value)
 {
-    const BYTE* header = istart;
-    size_t container = (*(size_t*)header) >> 2;   // assumption : *istart&3==1;
-    const unsigned nb_bits = container & 31;
-    unsigned pos=7;
-    const unsigned prefix = 1<<nb_bits;
-    const unsigned mask = prefix-1;
-    const unsigned max = (sizeof(size_t)*8) - nb_bits;
-    int i=0;
-
-    container >>= 5;
-
-    while (i<osize)
-    {
-        U32 val = container & mask;
-        pos += nb_bits;
-        val += prefix;
-        container >>= nb_bits;
-        *out++ = val;
-        if (pos > max)
-        {
-            const unsigned nb_bytes = pos >> 3;
-            header += nb_bytes;
-            pos &= 7;
-            container = *(size_t*)header;
-            container >>= pos;
-        }
-        i++;
-    }
-
-    {
-        const unsigned nb_bytes = (pos+7) >> 3;
-        header += nb_bytes;
-    }
-
-    return (int)(header-istart);
+    int i;
+    for (i=0; i<osize; i++) *out++ = value;
+    return 5;
 }
 
 
@@ -709,7 +646,7 @@ int FSED_decompressU32 (U32* dest, int originalSize,
     // headerId early outs
     headerId = ip[0] & 3;
     if (headerId==0) return FSED_decompressRawU32 (dest, originalSize, istart);
-    if (headerId==1) return FSED_decompressSingleU32 (dest, originalSize, istart);
+    if (headerId==1) return FSED_decompressSingleU32 (dest, originalSize, (U32)(*(U32*)(istart+1)));
 
     // normal FSE decoding mode
     ip += FSE_readHeader (norm, &nbSymbols, &tableLog, istart);

@@ -55,8 +55,8 @@ extern "C" {
    FSE simple functions
 ******************************************/
 int FSE_compress   (void* dest,
-                    const unsigned char* source, int sourceSize);
-int FSE_decompress (unsigned char* dest, int originalSize,
+                    const unsigned char* source, unsigned sourceSize);
+int FSE_decompress (unsigned char* dest, unsigned originalSize,
                     const void* compressed);
 /*
 FSE_compress():
@@ -77,7 +77,7 @@ FSE_decompress():
 
 #define FSE_MAX_HEADERSIZE 512
 #define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)
-static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
+static inline unsigned FSE_compressBound(unsigned size) { return FSE_COMPRESSBOUND(size); }
 /*
 FSE_compressBound():
     Gives the maximum (worst case) size that can be reached by function FSE_compress.
@@ -97,7 +97,7 @@ FSE_compress2():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog);
+int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog);
 
 
 /*
@@ -108,7 +108,7 @@ FSE_decompress_safe():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* compressed, int maxCompressedSize);
+int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize);
 
 
 /******************************************
@@ -132,35 +132,32 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
+int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned maxNbSymbols);
 
-int FSE_normalizeCount(short* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
+int FSE_normalizeCount(short* normalizedCounter, unsigned* tableLogPtr, unsigned* count, unsigned total, unsigned nbSymbols);
 
-static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
-int FSE_writeHeader (void* header, const short* normalizedCounter, int nbSymbols, int tableLog);
+static inline unsigned FSE_headerBound(unsigned nbSymbols, unsigned tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
+int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_sizeof_CTable(int nbSymbols, int tableLog);
-int FSE_buildCTable(void* CTable, const short* normalizedCounter, int nbSymbols, int tableLog);
+int FSE_sizeof_CTable(unsigned nbSymbols, unsigned tableLog);
+int FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourceSize, const void* CTable);
+int FSE_compress_usingCTable (void* dest, const unsigned char* source, unsigned sourceSize, const void* CTable);
 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
 Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
-'source' is assumed to be a table of char of size 'sourceSize' if 'maxNbSymbols' <= 256.
-All values within 'source' MUST be < maxNbSymbols.
-FSE_count() will return the highest symbol value detected into 'source' (necessarily <= 'maxNbSymbols', can be 0 if only 0 is present).
+'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < maxNbSymbols.
+FSE_count() will return the highest symbol value (the "real" 'maxNbSymbols-1') detected into 'source'
 If there is an error, the function will return -1.
 
-The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^tableLog.
+The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2 ^ tableLog.
 This is performed by function FSE_normalizeCount()
-Alternatively, function FSE_normalizeCountHC() do the same, but is slower and provides the best achievable normalization.
-The result will be saved into a structure, called 'normalizedCounter', which is a table of unsigned int.
+You can use input 'tableLog'==0 to mean "default value".
+The result will be saved into a structure, called 'normalizedCounter', which is a table of short.
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
 FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
-FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
-You can use input 'tableLog'==0 to mean "default value".
-The return value is the adjusted tableLog. It is necessary to retrieve it for next steps.
+The return value is the adjusted tableLog, which can be <= to the one provided.
 A result of '0' means that there is only a single symbol present.
 If there is an error, the function will return -1.
 

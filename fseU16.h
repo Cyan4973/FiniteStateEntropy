@@ -47,8 +47,8 @@ extern "C" {
    All symbol values within input table must be < 'nbSymbols'.
    Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
 int FSE_compressU16  (void* dest,
-                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
-int FSE_decompressU16(unsigned short* dest, int originalSize,
+                      const unsigned short* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog);
+int FSE_decompressU16(unsigned short* dest, unsigned originalSize,
                       const void* compressed);
 
 
@@ -63,8 +63,8 @@ FSE_decompressU16_safe():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_decompressU16_safe (unsigned short* dest, int originalSize,
-                            const void* compressed, int maxCompressedSize);
+int FSE_decompressU16_safe (unsigned short* dest, unsigned originalSize,
+                            const void* compressed, unsigned maxCompressedSize);
 
 
 #if defined (__cplusplus)
