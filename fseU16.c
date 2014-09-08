@@ -311,8 +311,8 @@ int FSE_decompressU16_generic(
     short   counting[FSE_MAX_NB_SYMBOLS];
     FSE_decode_tU16 DTable[FSE_MAX_TABLESIZE];
     BYTE  headerId;
-    int nbSymbols;
-    int tableLog;
+    unsigned nbSymbols;
+    unsigned tableLog;
     int errorCode;
 
     if ((safe) && (maxCompressedSize<3)) return -1;   // too small input size

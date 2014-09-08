@@ -181,17 +181,17 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLog, const void* header);
+int FSE_readHeader (short* const normalizedCounter, unsigned* nbSymbolsPtr, unsigned* tableLogPtr, const void* header);
 
-int FSE_sizeof_DTable(int tableLog);
-int FSE_buildDTable (void* DTable, const short* const normalizedCounter, int nbSymbols, int tableLog);
+int FSE_sizeof_DTable(unsigned tableLog);
+int FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_decompress_usingDTable(unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
+int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
 
 /*
 The first step is to get the normalized frequency of symbols.
 This can be performed by reading a header with FSE_readHeader().
-'normalizedCounter' must be already allocated, and have at least 'nbSymbols' cells.
+'normalizedCounter' must be already allocated, and have at least '*nbSymbols' cells.
 In practice, that means it's necessary to know 'nbSymbols' beforehand,
 or size it to handle worst case situations (typically 256).
 FSE_readHeader will provide 'tableLog' and 'nbSymbols' stored into the header.
@@ -204,9 +204,12 @@ If there is an error, the function will return -1.
 The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
 The space required by 'DTable' must be already allocated. Its size is provided by FSE_sizeof_DTable().
+The function will return 1 if table is compatible with fastMode, 0 otherwise.
+If there is an error, the function will return -1.
 
 'DTable' can then be used to decompress 'compressed', with FSE_decompress_usingDTable().
 FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, as a table of unsigned char.
+Only use fastMode if it was authorized by result of FSE_buildDTable(), otherwise decompression will fail.
 The function returns the size of compressed data (without header), or -1 if failed.
 */
 
@@ -284,10 +287,10 @@ typedef struct
     int bitsConsumed;
 } bitStream_backward_t;
 
-const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, int* optionalId);
-const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, int* optionalId, int maxCompressedSize);
-unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, const void* DTable);
-unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned int nbBits);
+const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, unsigned* optionalId);
+const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, unsigned* optionalId, unsigned maxCompressedSize);
+unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, const void* DTable, unsigned fast);
+unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned nbBits);
 void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
 

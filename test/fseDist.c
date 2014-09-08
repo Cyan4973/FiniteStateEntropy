@@ -260,14 +260,14 @@ int FSED_decompressSingleU16 (U16* out, int osize, U16 value)
 }
 
 
-int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
+int FSED_decompressU16_usingDTable (unsigned short* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
 {
     const void* ip = (const BYTE*) compressed;
     const void* iend;
     unsigned short* op = dest;
     unsigned short* const oend = op + originalSize;
     bitStream_backward_t bitC;
-    int nbStates;
+    unsigned nbStates;
     U32 state;
 
     // Init
@@ -277,7 +277,7 @@ int FSED_decompressU16_usingDTable (unsigned short* dest, const int originalSize
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable);
+        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
         unsigned short value = (U16)FSE_readBits(&bitC, nbBits);
         value += 1<<nbBits;
         *op++ = value;
@@ -296,8 +296,8 @@ int FSED_decompressU16 (U16* dest, int originalSize,
     short norm[16];
     U32  DTable[1<<FSED_U16_MAXMEMLOG];
     BYTE headerId;
-    int  nbSymbols;
-    int  tableLog;
+    unsigned  nbSymbols;
+    unsigned  tableLog;
 
     // headerId early outs
     headerId = ip[0] & 3;
@@ -600,14 +600,14 @@ int FSED_decompressSingleU32 (U32* out, int osize, U32 value)
 }
 
 
-int FSED_decompressU32_usingDTable (unsigned int* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog)
+int FSED_decompressU32_usingDTable (unsigned* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
 {
     const void* ip = compressed;
     const void* iend;
     unsigned int* op = dest;
     unsigned int* const oend = op + originalSize;
     bitStream_backward_t bitC;
-    int nbStates;
+    U32 nbStates;
     U32 state;
 
     // Init
@@ -618,7 +618,7 @@ int FSED_decompressU32_usingDTable (unsigned int* dest, const int originalSize, 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable);
+        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
         U32 value;
         FSE_updateBitStream(&bitC, &ip);
         value = FSE_readBits(&bitC, nbBits);
@@ -640,8 +640,8 @@ int FSED_decompressU32 (U32* dest, int originalSize,
     short norm[FSED_MAXBITS_U32];
     U32  DTable[1<<FSED_U32_MAXMEMLOG];
     BYTE headerId;
-    int  nbSymbols;
-    int  tableLog;
+    unsigned  nbSymbols;
+    unsigned  tableLog;
 
     // headerId early outs
     headerId = ip[0] & 3;

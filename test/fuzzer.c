@@ -171,7 +171,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
     BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
-    int testNb, nbSymbols, tableLog;
+    unsigned testNb, nbSymbols, tableLog;
     U32 time = FUZ_GetMilliStart();
     const U32 nbRandPerLoop = 4;
 
