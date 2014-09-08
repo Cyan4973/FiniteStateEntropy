@@ -19,7 +19,7 @@ This makes FSE faster, on par with Huffman speed, and even suitable for low-powe
 Benchmarks
 -------------------------
 
-Benchmarks are run on an Intel Core i5-3340M (oc'ed to 2.9GHz), with Window Seven 64-bits.
+Benchmarks are run on an Intel Core i5-3340M (oc'ed to 3.0GHz), with Window Seven 64-bits.
 Source code is compiled using MSVC 2012, 64-bits mode.
 Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usingDTable() )
 
@@ -28,13 +28,13 @@ Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usi
     <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
   </tr>
   <tr>
-    <th>book1</th><th>FSE</th><th>1.766</th><th>430 MS/s</th><th>520 MS/s</th>
+    <th>book1</th><th>FSE</th><th>1.766</th><th>430 MS/s</th><th>540 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
   </tr>
   <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.688</th><th>430 MS/s</th><th>520 MS/s</th>
+    <th>win98-lz4-run</th><th>FSE</th><th>2.688</th><th>430 MS/s</th><th>540 MS/s</th>
   </tr>
   <tr>
     <th></th><th></th><th></th><th></th><th></th>
