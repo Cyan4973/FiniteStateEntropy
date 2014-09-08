@@ -132,7 +132,7 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned maxNbSymbols);
+int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
 
 int FSE_normalizeCount(short* normalizedCounter, unsigned* tableLogPtr, unsigned* count, unsigned total, unsigned nbSymbols);
 
@@ -147,18 +147,19 @@ int FSE_compress_usingCTable (void* dest, const unsigned char* source, unsigned 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
 Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
-'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < maxNbSymbols.
-FSE_count() will return the highest symbol value (the "real" 'maxNbSymbols-1') detected into 'source'
+'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < *maxNbSymbolsPtr
+maxNbSymbolsPtr will be updated, with its real value (necessarily <= original value)
+FSE_count() will return the number of occurrence of the most frequent symbol.
 If there is an error, the function will return -1.
 
-The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2 ^ tableLog.
-This is performed by function FSE_normalizeCount()
-You can use input 'tableLog'==0 to mean "default value".
+The next step is to normalize the frequencies.
+FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'*tableLogPtr'.
+It also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
+You can use input '*tableLogPtr'==0 to mean "use default tableLog value".
 The result will be saved into a structure, called 'normalizedCounter', which is a table of short.
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
-FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
-The return value is the adjusted tableLog, which can be <= to the one provided.
-A result of '0' means that there is only a single symbol present.
+*tableLogPtr will also be updated, with the final tableLog selected.
+The return value is 0 if there is a single symbol in distribution, 1 otherwise.
 If there is an error, the function will return -1.
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().

@@ -71,7 +71,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "xxhash.h"
 #include "lz4hce.h"
 #include "fseDist.h"
-#include "renorm.h"     // FSE_normalizeCountHC
 
 
 //**************************************
@@ -994,7 +993,7 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
 **********************************************************************/
 
 static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
-                              int nbSymbols, unsigned tableLog, char* inFileName,
+                              unsigned nbSymbols, unsigned tableLog, char* inFileName,
                               U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
 {
     int loopNb;
@@ -1010,8 +1009,8 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
 
     // Init
     crcOrig = XXH32(src, benchedSize,0);
-    nbSymbols = FSE_count(count, (BYTE*)src, benchedSize, nbSymbols);
-    tableLog  = FSE_normalizeCount(norm, &tableLog, count, benchedSize, nbSymbols);
+    FSE_count(count, (BYTE*)src, benchedSize, &nbSymbols);
+    FSE_normalizeCount(norm, &tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
     FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );

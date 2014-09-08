@@ -189,6 +189,8 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     S16   norm[FSE_MAX_NB_SYMBOLS];
     CTable_max_t CTable;
 
+    int   errorCode;
+
 
     // early out
     if (sourceSize <= 1) return FSE_noCompressionU16 (ostart, istart, sourceSize);
@@ -196,11 +198,11 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     // Scan for stats
-    nbSymbols = FSE_countU16 (counting, ip, sourceSize, nbSymbols);
-    if (nbSymbols==1) return FSE_writeSingleU16(ostart, *istart);
+    errorCode = FSE_countU16 (counting, ip, sourceSize, &nbSymbols);
+    if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    tableLog = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
+    FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
     if (tableLog==0) return FSE_writeSingleU16(ostart, *istart);
 
     op += FSE_writeHeader (op, norm, nbSymbols, tableLog);

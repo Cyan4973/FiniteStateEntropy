@@ -359,7 +359,7 @@ typedef struct
 } FSE_decode_t;
 
 
-// Emergency distribution strategy (fallback of fallback); compression will be seriously hurt ; consider increasing table size
+// Emergency distribution strategy (fallback); compression will suffer a lot ; consider increasing table size
 static void FSE_emergencyDistrib(short* normalizedCounter, int nbSymbols, short points)
 {
     int s=0;
@@ -374,7 +374,7 @@ static void FSE_emergencyDistrib(short* normalizedCounter, int nbSymbols, short 
     }
 }
 
-// fallback distribution (corner case); compression will be hurt ; consider increasing table size
+// fallback distribution (corner case); compression will suffer a bit ; consider increasing table size
 static void FSE_distribNpts(short* normalizedCounter, int nbSymbols, short points)
 {
     int s;
@@ -418,10 +418,11 @@ static void FSE_distribNpts(short* normalizedCounter, int nbSymbols, short point
     }
 }
 
-// New faster version
+
 int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigned* count, unsigned total, unsigned nbSymbols)
 {
     unsigned tableLog = *tableLogPtr;
+    unsigned largest=0;
 
     // Check
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
@@ -429,21 +430,22 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigne
     if ((FSE_highbit(nbSymbols)+1) > tableLog) tableLog = FSE_highbit(nbSymbols)+1;   // Need a minimum to represent all symbol values
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
+    *tableLogPtr = tableLog;
 
     {
         U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
         U64 const scale = 62 - tableLog;
-        U64 const step = ((U64)1<<62) / total;   // <== (lone) division detected...
+        U64 const step = ((U64)1<<62) / total;   // <== here, one division !
         U64 const vStep = 1ULL<<(scale-20);
         int stillToDistribute = 1<<tableLog;
         unsigned s;
-        short largest=0, largestP=0;
+        short largestP=0;
         U32 lowThreshold = total >> tableLog;
 
         for (s=0; s<nbSymbols; s++)
         {
-            if (count[s] == (U32) total) return 0;   // There is only one symbol
-            if (count[s]==0) { normalizedCounter[s]=0; continue; }
+            if (count[s] == total) return 0;
+            if (count[s] == 0) { normalizedCounter[s]=0; continue; }
             if (count[s] <= lowThreshold)
             {
                 normalizedCounter[s] = -1;
@@ -463,7 +465,7 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigne
                 stillToDistribute -= proba;
             }
         }
-        if ((int)normalizedCounter[largest] <= -stillToDistribute+8)   // largest cant accomodate that amount
+        if ((int)normalizedCounter[largest] <= -stillToDistribute+8)   // largest cant accommodate that amount
             FSE_distribNpts(normalizedCounter, nbSymbols, (short)(-stillToDistribute));   // Fallback
         else normalizedCounter[largest] += (short)stillToDistribute;
     }
@@ -477,8 +479,7 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigne
     }
     */
 
-    *tableLogPtr = tableLog;
-    return tableLog;
+    return 1;
 }
 
 
@@ -621,7 +622,7 @@ int FSE_writeSingleChar (BYTE *out, BYTE symbol)
     return 2;
 }
 
-int FSE_noCompression (BYTE* out, const BYTE* in, int isize)
+int FSE_noCompression (BYTE* out, const BYTE* in, unsigned isize)
 {
     *out++=0;     // Header means ==> uncompressed
     memcpy (out, in, isize);
@@ -648,19 +649,17 @@ int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize,
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     // Scan input and build symbol stats
-    errorCode = FSE_count (count, ip, sourceSize, nbSymbols);
-    if (errorCode==-1) return -1;
-    if (errorCode==1) return FSE_writeSingleChar (ostart, *istart);   // Only 0 is present
-    nbSymbols = errorCode;
+    errorCode = FSE_count (count, ip, sourceSize, &nbSymbols);
+    if (errorCode == -1) return -1;
+    if (errorCode == (int)sourceSize) return FSE_writeSingleChar (ostart, *istart);
+    if (errorCode < (int)((sourceSize * 7) >> 10)) return FSE_noCompression (ostart, istart, sourceSize);   // Heuristic : not compressible enough
 
     errorCode = FSE_normalizeCount (norm, &tableLog, count, sourceSize, nbSymbols);
-    if (errorCode==-1) return -1;
-    if (errorCode==0) return FSE_writeSingleChar (ostart, *istart);
-    tableLog = errorCode;
+    if (errorCode == -1) return -1;
 
     // Write table description header
     errorCode = FSE_writeHeader (op, norm, nbSymbols, tableLog);
-    if (errorCode==-1) return -1;
+    if (errorCode == -1) return -1;
     op += errorCode;
 
     // Compress
@@ -912,16 +911,17 @@ int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void*
 
 
 // Functions
-int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned maxNbSymbols)
+int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr)
 {
-    const FSE_FUNCTION_TYPE* ip = (const FSE_FUNCTION_TYPE*) source;
+    const FSE_FUNCTION_TYPE* ip = source;
     const FSE_FUNCTION_TYPE* const iend = ip+sourceSize;
-    unsigned i;
+    unsigned maxNbSymbols = *maxNbSymbolsPtr;
+    unsigned s, max=0;
 
-    U32   Counting1[FSE_MAX_NB_SYMBOLS] = {0};
-    U32   Counting2[FSE_MAX_NB_SYMBOLS] = {0};
-    U32   Counting3[FSE_MAX_NB_SYMBOLS] = {0};
-    U32   Counting4[FSE_MAX_NB_SYMBOLS] = {0};
+    U32 Counting1[FSE_MAX_NB_SYMBOLS] = {0};
+    U32 Counting2[FSE_MAX_NB_SYMBOLS] = {0};
+    U32 Counting3[FSE_MAX_NB_SYMBOLS] = {0};
+    U32 Counting4[FSE_MAX_NB_SYMBOLS] = {0};
 
     // Init checks
     if (maxNbSymbols > FSE_MAX_NB_SYMBOLS) return -1;        // maxNbSymbols too large : unsupported
@@ -937,10 +937,15 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
     }
     while (ip<iend) Counting1[*ip++]++;
 
-    for (i=0; i<maxNbSymbols; i++) count[i] = Counting1[i] + Counting2[i] + Counting3[i] + Counting4[i];
+    for (s=0; s<maxNbSymbols; s++)
+    {
+        count[s] = Counting1[s] + Counting2[s] + Counting3[s] + Counting4[s];
+        if (count[s] > max) max = count[s];
+    }
 
     while (!count[maxNbSymbols-1]) maxNbSymbols--;
-    return maxNbSymbols;
+    *maxNbSymbolsPtr = maxNbSymbols;
+    return (int)max;
 }
 
 
