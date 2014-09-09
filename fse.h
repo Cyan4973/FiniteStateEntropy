@@ -55,8 +55,8 @@ extern "C" {
    FSE simple functions
 ******************************************/
 int FSE_compress   (void* dest,
-                    const unsigned char* source, int sourceSize);
-int FSE_decompress (unsigned char* dest, int originalSize,
+                    const unsigned char* source, unsigned sourceSize);
+int FSE_decompress (unsigned char* dest, unsigned originalSize,
                     const void* compressed);
 /*
 FSE_compress():
@@ -77,7 +77,7 @@ FSE_decompress():
 
 #define FSE_MAX_HEADERSIZE 512
 #define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)
-static inline int FSE_compressBound(int size) { return FSE_COMPRESSBOUND(size); }
+static inline unsigned FSE_compressBound(unsigned size) { return FSE_COMPRESSBOUND(size); }
 /*
 FSE_compressBound():
     Gives the maximum (worst case) size that can be reached by function FSE_compress.
@@ -97,7 +97,7 @@ FSE_compress2():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_compress2 (void* dest, const unsigned char* source, int sourceSize, int nbSymbols, int tableLog);
+int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog);
 
 
 /*
@@ -108,7 +108,7 @@ FSE_decompress_safe():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_decompress_safe (unsigned char* dest, int originalSize, const void* compressed, int maxCompressedSize);
+int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize);
 
 
 /******************************************
@@ -132,36 +132,34 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-int FSE_count(unsigned int* count, const unsigned char* source, int sourceSize, int maxNbSymbols);
+int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
 
-int FSE_normalizeCount(short* normalizedCounter, int maxTableLog, unsigned int* count, int total, int nbSymbols);
+int FSE_normalizeCount(short* normalizedCounter, unsigned* tableLogPtr, unsigned* count, unsigned total, unsigned nbSymbols);
 
-static inline int FSE_headerBound(int nbSymbols, int tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
-int FSE_writeHeader (void* header, const short* normalizedCounter, int nbSymbols, int tableLog);
+static inline unsigned FSE_headerBound(unsigned nbSymbols, unsigned tableLog) { (void)tableLog; return nbSymbols ? (nbSymbols*2)+1 : 512; }
+int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_sizeof_CTable(int nbSymbols, int tableLog);
-int FSE_buildCTable(void* CTable, const short* normalizedCounter, int nbSymbols, int tableLog);
+int FSE_sizeof_CTable(unsigned nbSymbols, unsigned tableLog);
+int FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_compress_usingCTable (void* dest, const unsigned char* source, int sourceSize, const void* CTable);
+int FSE_compress_usingCTable (void* dest, const unsigned char* source, unsigned sourceSize, const void* CTable);
 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
 Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
-'source' is assumed to be a table of char of size 'sourceSize' if 'maxNbSymbols' <= 256.
-All values within 'source' MUST be < maxNbSymbols.
-FSE_count() will return the highest symbol value detected into 'source' (necessarily <= 'maxNbSymbols', can be 0 if only 0 is present).
+'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < *maxNbSymbolsPtr
+maxNbSymbolsPtr will be updated, with its real value (necessarily <= original value)
+FSE_count() will return the number of occurrence of the most frequent symbol.
 If there is an error, the function will return -1.
 
-The next step is to normalize the frequencies, so that Sum_of_Frequencies == 2^tableLog.
-This is performed by function FSE_normalizeCount()
-Alternatively, function FSE_normalizeCountHC() do the same, but is slower and provides the best achievable normalization.
-The result will be saved into a structure, called 'normalizedCounter', which is a table of unsigned int.
+The next step is to normalize the frequencies.
+FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'*tableLogPtr'.
+It also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
+You can use input '*tableLogPtr'==0 to mean "use default tableLog value".
+The result will be saved into a structure, called 'normalizedCounter', which is a table of short.
 'normalizedCounter' must be already allocated, and have 'nbSymbols' cells.
-FSE_normalizeCount() will ensure that sum of 'nbSymbols' frequencies is == 2 ^'tableLog', it also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
-FSE_normalizeCount() can work "in place" to preserve memory, using 'count' as both source and destination area.
-You can use input 'tableLog'==0 to mean "default value".
-The return value is the adjusted tableLog. It is necessary to retrieve it for next steps.
-A result of '0' means that there is only a single symbol present.
+*tableLogPtr will also be updated, with the final tableLog selected.
+The return value is 0 if there is a single symbol in distribution, 1 otherwise.
 If there is an error, the function will return -1.
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
@@ -183,17 +181,17 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (short* const normalizedCounter, int* nbSymbols, int* tableLog, const void* header);
+int FSE_readHeader (short* const normalizedCounter, unsigned* nbSymbolsPtr, unsigned* tableLogPtr, const void* header);
 
-int FSE_sizeof_DTable(int tableLog);
-int FSE_buildDTable (void* DTable, const short* const normalizedCounter, int nbSymbols, int tableLog);
+int FSE_sizeof_DTable(unsigned tableLog);
+int FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned nbSymbols, unsigned tableLog);
 
-int FSE_decompress_usingDTable(unsigned char* dest, const int originalSize, const void* compressed, const void* DTable, const int tableLog);
+int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
 
 /*
 The first step is to get the normalized frequency of symbols.
 This can be performed by reading a header with FSE_readHeader().
-'normalizedCounter' must be already allocated, and have at least 'nbSymbols' cells.
+'normalizedCounter' must be already allocated, and have at least '*nbSymbols' cells.
 In practice, that means it's necessary to know 'nbSymbols' beforehand,
 or size it to handle worst case situations (typically 256).
 FSE_readHeader will provide 'tableLog' and 'nbSymbols' stored into the header.
@@ -206,9 +204,12 @@ If there is an error, the function will return -1.
 The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
 The space required by 'DTable' must be already allocated. Its size is provided by FSE_sizeof_DTable().
+The function will return 1 if table is compatible with fastMode, 0 otherwise.
+If there is an error, the function will return -1.
 
 'DTable' can then be used to decompress 'compressed', with FSE_decompress_usingDTable().
 FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, as a table of unsigned char.
+Only use fastMode if it was authorized by result of FSE_buildDTable(), otherwise decompression will fail.
 The function returns the size of compressed data (without header), or -1 if failed.
 */
 
@@ -286,10 +287,10 @@ typedef struct
     int bitsConsumed;
 } bitStream_backward_t;
 
-const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, int* optionalId);
-const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, int* optionalId, int maxCompressedSize);
-unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, const void* DTable);
-unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned int nbBits);
+const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, unsigned* optionalId);
+const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, unsigned* optionalId, unsigned maxCompressedSize);
+unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, const void* DTable, unsigned fast);
+unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned nbBits);
 void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
 

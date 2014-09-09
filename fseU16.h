@@ -43,13 +43,29 @@ extern "C" {
 
 /* same as FSE normal functions,
    but data is presented as a table of unsigned short (2 bytes per symbol).
-   Useful if alphabet size > 256.
+   Useful for alphabet size > 256.
    All symbol values within input table must be < 'nbSymbols'.
    Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
 int FSE_compressU16  (void* dest,
-                      const unsigned short* source, int sourceSize, int nbSymbols, int tableLog);
-int FSE_decompressU16(unsigned short* dest, int originalSize,
+                      const unsigned short* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog);
+int FSE_decompressU16(unsigned short* dest, unsigned originalSize,
                       const void* compressed);
+
+
+/******************************************
+   FSE U16 advanced functions
+******************************************/
+/*
+FSE_decompressU16_safe():
+    Same as FSE_decompressU16(), but ensures that the decoder never reads beyond compressed + maxCompressedSize.
+    note : you don't have to provide the exact compressed size. If you provide more, it's fine too.
+    This function is safe against malicious data.
+    return : size of compressed data
+             or -1 if there is an error
+*/
+int FSE_decompressU16_safe (unsigned short* dest, unsigned originalSize,
+                            const void* compressed, unsigned maxCompressedSize);
+
 
 #if defined (__cplusplus)
 }

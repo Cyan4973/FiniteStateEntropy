@@ -21,8 +21,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 
 
-int FSED_compressU16 (void* dest, const unsigned short* source, int sourceSize, int memLog);
-int FSED_decompressU16 (unsigned short* dest, int originalSize, const void* compressed);
+int FSED_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned memLog);
+int FSED_decompressU16 (unsigned short* dest, unsigned originalSize, const void* compressed);
 
 
 int FSED_compressU16Log2 (void* dest, const unsigned short* source, int sourceSize, int memLog);

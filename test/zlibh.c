@@ -61,6 +61,10 @@ You can contact the author at :
 #  pragma warning(disable : 4131)        // disable: C4131: obsolete declarator
 #endif
 
+#ifdef __GNUC__    // GCC
+#  pragma GCC diagnostic ignored "-Wstrict-prototypes"
+#endif
+
 /*
 * Maximums for allocations and loops.  It is not useful to change these --
 * they are fixed by the deflate format.
@@ -306,7 +310,7 @@ static long long nbDBlocks = 0;    // debug
 #  define FORCE_INLINE static __forceinline
 #  include <intrin.h>                    // For Visual 2005
 #  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
-#else 
+#else
 #  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  ifdef __GNUC__
 #    define FORCE_INLINE static inline __attribute__((always_inline))
@@ -486,7 +490,7 @@ static void feed_bltree(ltree_desc, bltree_desc)
 tree_desc *bltree_desc;     /* the tree descriptor */
 {
     ct_data *ltree  = ltree_desc->dyn_tree;
-    ct_data *bltree = bltree_desc->dyn_tree;    
+    ct_data *bltree = bltree_desc->dyn_tree;
     int lmax_code   = ltree_desc->max_code;
     int n = 0;                  /* iterates over all tree elements */
     int prevlen = -1;           /* last emitted length */

@@ -267,7 +267,7 @@ STREAMCRC
 */
 int compress_file(char* output_filename, char* input_filename)
 {
-    int (*compressionFunction)(void*, const unsigned char*, int) = DEFAULT_COMPRESSOR;
+    int (*compressionFunction)(void*, const unsigned char*, unsigned) = DEFAULT_COMPRESSOR;
     U64 filesize = 0;
     U64 compressedfilesize = 0;
     char* in_buff;
@@ -423,7 +423,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
         if ((readSize != toReadSize) && ferror(finput)) EXM_THROW(34, "Read error");
 
         // Decode while enough data
-        while (iend-ip > FSE_compressBound(blockSize))
+        while ((size_t)(iend-ip) > (size_t)FSE_compressBound(blockSize))
         {
             size_t writeSizeCheck;
             int errorCode;
