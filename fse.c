@@ -181,7 +181,10 @@ FORCE_INLINE unsigned FSE_highbit (register U32 val)
 
 #ifndef FSE_DONTINCLUDECORE
 
-static short FSE_abs(short a) { return a<0? -a : a; }
+static short FSE_abs(short a)
+{
+    return a<0? -a : a;
+}
 
 /****************************************************************
    Header bitstream management
@@ -220,9 +223,22 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned nbSy
         {
             unsigned start = charnum;
             while (!normalizedCounter[charnum]) charnum++;
-            while (charnum >= start+24) { start+=24; bitStream += 0xFFFF<<bitCount; *(U16*)out=(U16)bitStream; out+=2; bitStream>>=16; }
-            while (charnum >= start+3) { start+=3; bitStream += 3 << bitCount; bitCount += 2; }
-            bitStream += (charnum-start) << bitCount; bitCount += 2;
+            while (charnum >= start+24)
+            {
+                start+=24;
+                bitStream += 0xFFFF<<bitCount;
+                *(U16*)out=(U16)bitStream;
+                out+=2;
+                bitStream>>=16;
+            }
+            while (charnum >= start+3)
+            {
+                start+=3;
+                bitStream += 3 << bitCount;
+                bitCount += 2;
+            }
+            bitStream += (charnum-start) << bitCount;
+            bitCount += 2;
             if (bitCount>16)
             {
                 *(U16*)out = (U16)bitStream;
@@ -235,13 +251,14 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned nbSy
             short count = normalizedCounter[charnum++];
             const short max = (short)((2*threshold-1)-remaining);
             remaining -= FSE_abs(count);
+            if (remaining<0) return -1;
             count++;   // +1 for extra accuracy
             if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
             bitStream += count << bitCount;
             bitCount  += nbBits;
             bitCount  -= (count<max);
             previous0 = (count==1);
-            while (remaining<threshold) { nbBits--; threshold>>=1; }
+            while (remaining<threshold) nbBits--, threshold>>=1;
         }
         if (bitCount>16)
         {
@@ -251,8 +268,6 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned nbSy
             bitCount -= 16;
         }
     }
-
-    if (remaining<0) return -1;
 
     * (U16*) out = (U16) bitStream;
     out+= (bitCount+7) /8;
@@ -291,11 +306,24 @@ int FSE_readHeader (short* const normalizedCounter, unsigned* nbSymbolsPtr, unsi
         if (previous0)
         {
             unsigned n0 = charnum;
-            while ((bitStream & 0xFFFF) == 0xFFFF) { n0+=24; ip+=2; bitStream = (*(U32*)ip) >> bitCount; }
-            while ((bitStream & 3) == 3) { n0+=3; bitStream>>=2; bitCount+=2; }
-            n0 += bitStream & 3; bitCount += 2;
+            while ((bitStream & 0xFFFF) == 0xFFFF)
+            {
+                n0+=24;
+                ip+=2;
+                bitStream = (*(U32*)ip) >> bitCount;
+            }
+            while ((bitStream & 3) == 3)
+            {
+                n0+=3;
+                bitStream>>=2;
+                bitCount+=2;
+            }
+            n0 += bitStream & 3;
+            bitCount += 2;
             while (charnum < n0) normalizedCounter[charnum++] = 0;
-            ip += bitCount>>3; bitCount &= 7; bitStream = (*(U32*)ip) >> bitCount;
+            ip += bitCount>>3;
+            bitCount &= 7;
+            bitStream = (*(U32*)ip) >> bitCount;
         }
         {
             const short max = (short)((2*threshold-1)-remaining);
@@ -317,9 +345,15 @@ int FSE_readHeader (short* const normalizedCounter, unsigned* nbSymbolsPtr, unsi
             remaining -= FSE_abs(count);
             normalizedCounter[charnum++] = count;
             previous0 = !count;
-            while (remaining < threshold) { nbBits--; threshold >>= 1; }
+            while (remaining < threshold)
+            {
+                nbBits--;
+                threshold >>= 1;
+            }
 
-            ip += bitCount>>3; bitCount &= 7; bitStream = (*(U32*)ip) >> bitCount;
+            ip += bitCount>>3;
+            bitCount &= 7;
+            bitStream = (*(U32*)ip) >> bitCount;
         }
     }
     *nbSymbolsPtr = charnum;
@@ -406,7 +440,11 @@ static void FSE_distribNpts(short* normalizedCounter, int nbSymbols, short point
         if (s==3)
         {
             short reduction = points>>2;
-            if (fallback) { FSE_emergencyDistrib(normalizedCounter, nbSymbols, points); return; }   // Fallback mode
+            if (fallback)
+            {
+                FSE_emergencyDistrib(normalizedCounter, nbSymbols, points);    // Fallback mode
+                return;
+            }
             if (reduction < 1) reduction=1;
             if (reduction >= normalizedCounter[rank[3]]) reduction=normalizedCounter[rank[3]]-1;
             fallback = (reduction==0);
@@ -444,7 +482,11 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigne
         for (s=0; s<nbSymbols; s++)
         {
             if (count[s] == total) return 0;
-            if (count[s] == 0) { normalizedCounter[s]=0; continue; }
+            if (count[s] == 0)
+            {
+                normalizedCounter[s]=0;
+                continue;
+            }
             if (count[s] <= lowThreshold)
             {
                 normalizedCounter[s] = -1;
@@ -459,7 +501,11 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr, unsigne
                     restToBeat = vStep * rtbTable[proba];
                     proba += (count[s]*step) - ((U64)proba<<scale) > restToBeat;
                 }
-                if (proba > largestP) { largestP=proba; largest=s; }
+                if (proba > largestP)
+                {
+                    largestP=proba;
+                    largest=s;
+                }
                 normalizedCounter[s] = proba;
                 stillToDistribute -= proba;
             }
@@ -517,8 +563,10 @@ int FSE_closeCompressionStream(void* outPtr, bitStream_forward_t* bitC, void* co
 
     FSE_flushBits(&outPtr, bitC);
 
-    p = (BYTE*)outPtr; p += bitC->bitPos > 0;
-    bitC->bitPos = 8 - bitC->bitPos; if (bitC->bitPos==8) bitC->bitPos=0;
+    p = (BYTE*)outPtr;
+    p += bitC->bitPos > 0;
+    bitC->bitPos = 8 - bitC->bitPos;
+    if (bitC->bitPos==8) bitC->bitPos=0;
 
     descriptor = (U32)(p - (BYTE*)compressionStreamDescriptor) << 3;
     descriptor += bitC->bitPos;
@@ -536,8 +584,13 @@ int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC,
 
     if ((nbStates > 2) || (nbStates < 1)) return -1;
 
-    if (nbStates==2) { FSE_addBits(bitC, state2, tableLog); FSE_flushBits(outPtr, bitC); }
-    FSE_addBits(bitC, state1, tableLog); FSE_flushBits(outPtr, bitC);
+    if (nbStates==2)
+    {
+        FSE_addBits(bitC, state2, tableLog);
+        FSE_flushBits(outPtr, bitC);
+    }
+    FSE_addBits(bitC, state1, tableLog);
+    FSE_flushBits(outPtr, bitC);
 
     return 0;
 }
@@ -727,10 +780,14 @@ FORCE_INLINE const void* FSE_initDecompressionStream_generic(
 }
 
 const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, unsigned* optionalId)
-{ return FSE_initDecompressionStream_generic(p, bitC, optionalId, 0, 0); }
+{
+    return FSE_initDecompressionStream_generic(p, bitC, optionalId, 0, 0);
+}
 
 const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, unsigned* optionalId, unsigned maxCompressedSize)
-{ return FSE_initDecompressionStream_generic(p, bitC, optionalId, maxCompressedSize, 1); }
+{
+    return FSE_initDecompressionStream_generic(p, bitC, optionalId, maxCompressedSize, 1);
+}
 
 
 void FSE_initDStates(
@@ -738,8 +795,13 @@ void FSE_initDStates(
     const void** p, bitStream_backward_t* bitC,
     const int tableLog)
 {
-    *state1 = FSE_readBits(bitC, tableLog); FSE_updateBitStream(bitC, p);
-    if (nbStates>=2) { *state2 = FSE_readBits(bitC, tableLog); FSE_updateBitStream(bitC, p); }
+    *state1 = FSE_readBits(bitC, tableLog);
+    FSE_updateBitStream(bitC, p);
+    if (nbStates>=2)
+    {
+        *state2 = FSE_readBits(bitC, tableLog);
+        FSE_updateBitStream(bitC, p);
+    }
 }
 
 
@@ -774,7 +836,9 @@ BYTE FSE_decodeSymbol(U32* state, bitStream_backward_t* bitC, const void* DTable
 
 
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input)
-{ return (int)((BYTE*)decompressionStreamDescriptor - (BYTE*)input); }
+{
+    return (int)((BYTE*)decompressionStreamDescriptor - (BYTE*)input);
+}
 
 
 FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
@@ -798,7 +862,7 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
 
     // 2 symbols per loop
     while( ((safe) && ((op<olimit) && (ip>=compressed)))
-        || ((!safe) && (op<olimit)) )
+            || ((!safe) && (op<olimit)) )
     {
         if (nbStates==2) *op++ = FSE_decodeSymbol(&state2, &bitC, DTable, fast);
         else *op++ = FSE_decodeSymbol(&state1, &bitC, DTable, fast);
@@ -809,7 +873,7 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
 
     // last symbol
     if ( ((safe) && ((op<oend) && (ip>=compressed)))
-        || ((!safe) && (op<oend)) )
+            || ((!safe) && (op<oend)) )
     {
         *op++ = FSE_decodeSymbol(&state1, &bitC, DTable, fast);
         FSE_updateBitStream(&bitC, &ip);
@@ -847,10 +911,14 @@ FORCE_INLINE int FSE_decompress_usingDTable_fastModeSelector(
 }
 
 int FSE_decompress_usingDTable (unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fast)
-{ return FSE_decompress_usingDTable_fastModeSelector(dest, originalSize, compressed, 0, DTable, tableLog, 0, fast); }
+{
+    return FSE_decompress_usingDTable_fastModeSelector(dest, originalSize, compressed, 0, DTable, tableLog, 0, fast);
+}
 
 int FSE_decompress_usingDTable_safe (unsigned char* dest, const unsigned originalSize, const void* compressed, unsigned maxCompressedSize, const void* DTable, const unsigned tableLog, unsigned fast)
-{ return FSE_decompress_usingDTable_fastModeSelector(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, 1, fast); }
+{
+    return FSE_decompress_usingDTable_fastModeSelector(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, 1, fast);
+}
 
 
 FORCE_INLINE int FSE_decompress_generic (
@@ -895,10 +963,14 @@ FORCE_INLINE int FSE_decompress_generic (
 }
 
 int FSE_decompress (unsigned char* dest, unsigned originalSize, const void* compressed)
-{ return FSE_decompress_generic(dest, originalSize, compressed, 0, 0); }
+{
+    return FSE_decompress_generic(dest, originalSize, compressed, 0, 0);
+}
 
 int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize)
-{ return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1); }
+{
+    return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1);
+}
 
 
 #endif   // FSE_DONTINCLUDECORE
@@ -997,7 +1069,7 @@ int FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
             tableSymbol[highThreshold--] = (FSE_FUNCTION_TYPE)(i-1);
         }
         else
-        cumul[i] = cumul[i-1] + normalizedCounter[i-1];
+            cumul[i] = cumul[i-1] + normalizedCounter[i-1];
     }
     cumul[nbSymbols] = tableSize+1;
 
