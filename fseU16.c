@@ -199,16 +199,22 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
 
     // Scan for stats
     errorCode = FSE_countU16 (counting, ip, sourceSize, &nbSymbols);
+    if (errorCode == -1) return -1;
     if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
-    if (tableLog==0) return FSE_writeSingleU16(ostart, *istart);
+    errorCode = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
+    if (errorCode == -1) return -1;
+    if (errorCode ==  0) return FSE_writeSingleU16(ostart, *istart);
 
-    op += FSE_writeHeader (op, norm, nbSymbols, tableLog);
+    // Write table description header
+    errorCode = FSE_writeHeader (op, norm, nbSymbols, tableLog);
+    if (errorCode == -1) return -1;
+    op += errorCode;
 
     // Compress
-    FSE_buildCTableU16 (&CTable, norm, nbSymbols, tableLog);
+    errorCode = FSE_buildCTableU16 (&CTable, norm, nbSymbols, tableLog);
+    if (errorCode==-1) return -1;
     op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility

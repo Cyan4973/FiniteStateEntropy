@@ -720,7 +720,8 @@ int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize,
     op += FSE_compress_usingCTable (op, ip, sourceSize, &CTable);
 
     // check compressibility
-    if ( (size_t)(op-ostart) >= (size_t)(sourceSize-1) ) return FSE_noCompression (ostart, istart, sourceSize);
+    if ( (size_t)(op-ostart) >= (size_t)(sourceSize-1) )
+        return FSE_noCompression (ostart, istart, sourceSize);
 
     return (int) (op-ostart);
 }
@@ -1004,10 +1005,10 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
     unsigned maxNbSymbols = *maxNbSymbolsPtr;
     unsigned s, max=0;
 
-    U32 Counting1[FSE_MAX_NB_SYMBOLS] = {0};
-    U32 Counting2[FSE_MAX_NB_SYMBOLS] = {0};
-    U32 Counting3[FSE_MAX_NB_SYMBOLS] = {0};
-    U32 Counting4[FSE_MAX_NB_SYMBOLS] = {0};
+    U32 Counting1[FSE_MAX_NB_SYMBOLS] = { 0 };
+    U32 Counting2[FSE_MAX_NB_SYMBOLS] = { 0 };
+    U32 Counting3[FSE_MAX_NB_SYMBOLS] = { 0 };
+    U32 Counting4[FSE_MAX_NB_SYMBOLS] = { 0 };
 
     // Init checks
     if (maxNbSymbols > FSE_MAX_NB_SYMBOLS) return -1;        // maxNbSymbols too large : unsupported
