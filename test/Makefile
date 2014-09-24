@@ -49,10 +49,10 @@ fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
-fuzzer: fuzzer.c xxhash.c ../fse.c
+fuzzer: fuzzer.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
-fuzzer32: fuzzer.c xxhash.c ../fse.c
+fuzzer32: fuzzer.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
@@ -71,8 +71,8 @@ clean:
 test: fullbench fullbench32 fuzzer fuzzer32
 	./fullbench -i1
 	./fullbench32 -i1
-	./fuzzer   -s0
-	./fuzzer32 -s0
+	./fuzzer
+	./fuzzer32
 	@echo test completed
 
 memtest: fuzzer

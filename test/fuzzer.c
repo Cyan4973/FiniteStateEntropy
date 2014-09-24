@@ -34,6 +34,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <string.h>    // memset
 #include <sys/timeb.h> // timeb
 #include "fse.h"
+#include "fseU16.h"
 #include "xxhash.h"
 
 
@@ -61,10 +62,11 @@ typedef unsigned long long  U64;
 //******************************
 // Constants
 //******************************
+#define KB *(1<<10)
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
-#define FUZ_NB_TESTS  65536
-#define PROBATABLESIZE 4096
+#define FUZ_NB_TESTS  (128 KB)
+#define PROBATABLESIZE (4 KB)
 #define FUZ_UPDATERATE  200
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
@@ -106,7 +108,7 @@ static int FUZ_GetMilliSpan ( int nTimeStart )
 }
 
 
-static unsigned int FUZ_rand (unsigned int* src)
+static unsigned FUZ_rand (unsigned* src)
 {
     *src =  ( (*src) * PRIME1) + PRIME2;
     return (*src) >> 11;
@@ -152,13 +154,13 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
 }
 
 
-static int FUZ_checkCount (short* normalizedCount, int tableLog, int nbSymbols)
+static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
 {
     int total = 1<<tableLog;
     int count = 0;
     int i;
     if (tableLog > 31) return -1;
-    for (i=0; i<nbSymbols; i++)
+    for (i=0; i<=maxSV; i++)
         count += abs(normalizedCount[i]);
     if (count != total) return -1;
     return 0;
@@ -171,7 +173,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
     BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
-    unsigned testNb, nbSymbols, tableLog;
+    unsigned testNb, maxSV, tableLog;
     U32 time = FUZ_GetMilliStart();
     const U32 nbRandPerLoop = 4;
 
@@ -241,10 +243,10 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
             short count[256];
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
-            result = FSE_readHeader (count, &nbSymbols, &tableLog, bufferTest);
+            result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest);
             if (result != -1)
             {
-                result = FUZ_checkCount (count, tableLog, nbSymbols);
+                result = FUZ_checkCount (count, tableLog, maxSV);
                 if (result==-1)
                     DISPLAY ("symbol distribution corrupted !\n");
             }
@@ -275,16 +277,73 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
 
 
 /*****************************************************************
+   Unitary tests
+*****************************************************************/
+extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
+
+#define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
+#define TBSIZE (16 KB)
+static void unitTest(void)
+{
+    BYTE testBuff[TBSIZE];
+    U32 i;
+    int errorCode;
+    U32 seed=0, testNb=0;
+
+    // FSE_count
+    {
+        U32 table[256];
+        U32 max;
+        for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
+        max = 128;
+        errorCode = FSE_count(table, testBuff, TBSIZE, &max);
+        CHECK(errorCode<0, "Error : FSE_count() should have worked");
+        max = 124;
+        errorCode = FSE_count(table, testBuff, TBSIZE, &max);
+        CHECK(errorCode>=0, "Error : FSE_count() should have failed : value > max");
+    }
+
+    // FSE_countU16
+    {
+        U32 table[FSE_MAX_SYMBOL_VALUE+2];
+        U32 max;
+        U16* tbu16 = (U16*)testBuff;
+        unsigned tbu16Size = TBSIZE / 2;
+
+        max = 124;
+        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
+        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : value too large");
+
+        for (i=0; i< tbu16Size; i++) tbu16[i] = i % (FSE_MAX_SYMBOL_VALUE+1);
+
+        max = FSE_MAX_SYMBOL_VALUE;
+        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
+        CHECK(errorCode<0, "Error : FSE_countU16() should have worked");
+
+        max = FSE_MAX_SYMBOL_VALUE+1;
+        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
+        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : max too large");
+
+        max = FSE_MAX_SYMBOL_VALUE-1;
+        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
+        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : max too low");
+    }
+
+    DISPLAY("Unit tests completed\n");
+}
+
+
+/*****************************************************************
    Command line
 *****************************************************************/
 int main (int argc, char** argv)
 {
-    char userInput[80] = {0};
-    U32 seed=0, seedset=0, startTestNb=0;
-    U32 timestamp=FUZ_GetMilliStart();
+    U32 seed, startTestNb=0, pause=0;
     int argNb;
 
     programName = argv[0];
+    seed = FUZ_GetMilliStart() % 10000;
     DISPLAYLEVEL (0, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
@@ -299,7 +358,7 @@ int main (int argc, char** argv)
                 // seed setting
                 case 's':
                     argument++;
-                    seed=0; seedset=1;
+                    seed=0;
                     while ((*argument>='0') && (*argument<='9'))
                     {
                         seed *= 10;
@@ -324,6 +383,12 @@ int main (int argc, char** argv)
                 case 'v':
                     displayLevel=4;
                     break;
+
+                // pause (hidden)
+                case 'p':
+                    pause=1;
+                    break;
+
                 default:
                     ;
                 }
@@ -331,33 +396,15 @@ int main (int argc, char** argv)
         }
     }
 
-    if (!seedset)
-    {
-        DISPLAY ("Select an Initialisation number (default : random) : ");
-        fflush (stdout);
-        if ( fgets (userInput, sizeof (userInput), stdin) )
-        {
-            if ( sscanf (userInput, "%d", &seed) == 1 )
-            {
-                DISPLAY ("Select start test nb (default : 0) : ");
-                fflush (stdout);
-                if ( fgets (userInput, sizeof (userInput), stdin) )
-                {
-                    if ( sscanf (userInput, "%d", &startTestNb) == 1 ) {}
-                    else startTestNb=0;
-                }
-            }
-            else seed = FUZ_GetMilliSpan (timestamp);
-        }
-        printf ("Seed = %u\n", seed);
-    }
+    unitTest();
 
+    DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, startTestNb);
 
     DISPLAY ("\rAll tests passed               \n");
-    if (!seedset)
+    if (pause)
     {
-        DISPLAY ("Press enter to exit \n");
+        DISPLAY("press enter ...\n");
         getchar();
     }
     return 0;

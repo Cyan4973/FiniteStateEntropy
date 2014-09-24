@@ -176,14 +176,6 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
   Benchmark function
 *********************************************************/
 
-int local_FSE_count256(void* dst, size_t dstSize, const void* src, size_t srcSize)
-{
-    U32 count[256];
-    U32 max = 256;
-    (void)dst; (void)dstSize;
-    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
-}
-
 int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[256];
@@ -192,14 +184,28 @@ int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSiz
     return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
 }
 
-extern int FSE_countFast(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
-
-int local_FSE_countFast255(void* dst, size_t dstSize, const void* src, size_t srcSize)
+int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[256];
-    U32 max = 255;
+    U32 max = 254;
+    (void)dst; (void)dstSize;
+    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+}
+
+extern int FSE_countFast(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
+
+int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    U32 count[256];
+    U32 max = 254;
     (void)dst; (void)dstSize;
     return FSE_countFast(count, (BYTE*)src, (U32)srcSize, &max);
+}
+
+int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dstSize;
+    return FSE_compress(dst, src, srcSize);
 }
 
 
@@ -226,18 +232,23 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     switch (algNb)
     {
     case 1:
-        funcName = "FSE_count(256)";
-        func = local_FSE_count256;
-        break;
-
-    case 2:
         funcName = "FSE_count(255)";
         func = local_FSE_count255;
         break;
 
+    case 2:
+        funcName = "FSE_count(254)";
+        func = local_FSE_count254;
+        break;
+
     case 3:
-        funcName = "FSE_countFast(255)";
-        func = local_FSE_countFast255;
+        funcName = "FSE_countFast(254)";
+        func = local_FSE_countFast254;
+        break;
+
+    case 4:
+        funcName = "FSE_compress";
+        func = local_FSE_compress;
         break;
 
     default:
@@ -382,7 +393,7 @@ int main(int argc, char** argv)
 
     if (algNb==0)
     {
-        for (i=1; i<=3; i++)
+        for (i=1; i<=4; i++)
             result = fullSpeedBench((double)proba / 100, nbLoops, i);
     }
     else
