@@ -62,10 +62,10 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 //******************************
 // local functions
 //******************************
-static unsigned int GEN_rand (unsigned int* src)
+static unsigned int GEN_rand (unsigned int* seed)
 {
-    *src =  ( (*src) * PRIME1) + PRIME2;
-    return (*src) >> 11;
+    *seed =  ((*seed) * PRIME1) + PRIME2;
+    return (*seed) >> 11;
 }
 
 static int usage(void)

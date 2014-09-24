@@ -1015,6 +1015,16 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
     if (!maxNbSymbols) maxNbSymbols = FSE_MAX_NB_SYMBOLS;    // 0: default
     if (!sourceSize) return -1;                              // Error : no input
 
+#if 0
+    while (ip < iend-3)
+    {
+        if (*ip>=maxNbSymbols) return -1; Counting1[*ip++]++;
+        if (*ip>=maxNbSymbols) return -1; Counting2[*ip++]++;
+        if (*ip>=maxNbSymbols) return -1; Counting3[*ip++]++;
+        if (*ip>=maxNbSymbols) return -1; Counting4[*ip++]++;
+    }
+    while (ip<iend) { if (*ip>=maxNbSymbols) return -1; Counting1[*ip++]++; }
+#else
     while (ip < iend-3)
     {
         Counting1[*ip++]++;
@@ -1023,6 +1033,7 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
         Counting4[*ip++]++;
     }
     while (ip<iend) Counting1[*ip++]++;
+#endif
 
     for (s=0; s<maxNbSymbols; s++)
     {

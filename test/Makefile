@@ -55,11 +55,17 @@ fuzzer: fuzzer.c xxhash.c ../fse.c
 fuzzer32: fuzzer.c xxhash.c ../fse.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
+fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+
+fullbench32: fullbench.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+
 probagen: probaGenerator.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
 test: fuzzer fuzzer32
