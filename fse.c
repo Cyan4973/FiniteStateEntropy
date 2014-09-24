@@ -998,7 +998,7 @@ int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void*
 
 
 // Functions
-int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr)
+int FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr, unsigned safe)
 {
     const FSE_FUNCTION_TYPE* ip = source;
     const FSE_FUNCTION_TYPE* const iend = ip+sourceSize;
@@ -1015,25 +1015,14 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
     if (!maxNbSymbols) maxNbSymbols = FSE_MAX_NB_SYMBOLS;    // 0: default
     if (!sourceSize) return -1;                              // Error : no input
 
-#if 0
     while (ip < iend-3)
     {
-        if (*ip>=maxNbSymbols) return -1; Counting1[*ip++]++;
-        if (*ip>=maxNbSymbols) return -1; Counting2[*ip++]++;
-        if (*ip>=maxNbSymbols) return -1; Counting3[*ip++]++;
-        if (*ip>=maxNbSymbols) return -1; Counting4[*ip++]++;
+        if ((safe) && (*ip>=maxNbSymbols)) return -1; Counting1[*ip++]++;
+        if ((safe) && (*ip>=maxNbSymbols)) return -1; Counting2[*ip++]++;
+        if ((safe) && (*ip>=maxNbSymbols)) return -1; Counting3[*ip++]++;
+        if ((safe) && (*ip>=maxNbSymbols)) return -1; Counting4[*ip++]++;
     }
-    while (ip<iend) { if (*ip>=maxNbSymbols) return -1; Counting1[*ip++]++; }
-#else
-    while (ip < iend-3)
-    {
-        Counting1[*ip++]++;
-        Counting2[*ip++]++;
-        Counting3[*ip++]++;
-        Counting4[*ip++]++;
-    }
-    while (ip<iend) Counting1[*ip++]++;
-#endif
+    while (ip<iend) { if ((safe) && (*ip>=maxNbSymbols)) return -1; Counting1[*ip++]++; }
 
     for (s=0; s<maxNbSymbols; s++)
     {
@@ -1044,6 +1033,19 @@ int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const
     while (!count[maxNbSymbols-1]) maxNbSymbols--;
     *maxNbSymbolsPtr = maxNbSymbols;
     return (int)max;
+}
+
+/* hidden fast variant (unsafe) */
+int FSE_FUNCTION_NAME(FSE_countFast, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr)
+{
+    return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, source, sourceSize, maxNbSymbolsPtr, 0);
+}
+
+int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr)
+{
+    if ((sizeof(FSE_FUNCTION_TYPE)==1) && (*maxNbSymbolsPtr >= 256))
+        return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, source, sourceSize, maxNbSymbolsPtr, 0);
+    return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, source, sourceSize, maxNbSymbolsPtr, 1);
 }
 
 

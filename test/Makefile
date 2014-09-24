@@ -68,7 +68,9 @@ clean:
 	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
-test: fuzzer fuzzer32
+test: fullbench fullbench32 fuzzer fuzzer32
+	./fullbench -i1
+	./fullbench32 -i1
 	./fuzzer   -s0
 	./fuzzer32 -s0
 	@echo test completed

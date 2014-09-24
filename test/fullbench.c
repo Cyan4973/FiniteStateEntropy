@@ -141,10 +141,15 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
     char* op = (char*) buffer;
     char* oend = op + buffSize;
     unsigned seed = 1;
+    static unsigned done = 0;
 
     if (p<=0.01) p = 0.005;
     if (p>1.) p = 1.;
-    DISPLAY("\nGenerating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
+    if (!done)
+    {
+        done = 1;
+        DISPLAY("\nGenerating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
+    }
 
     // Build Table
     while (remaining)
@@ -171,26 +176,78 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
   Benchmark function
 *********************************************************/
 
-int fullSpeedBench(double proba, U32 nbBenchs)
+int local_FSE_count256(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    void* origBuffer;
-    void* compressedBuffer;
-    void* decodedBuffer;
+    U32 count[256];
+    U32 max = 256;
+    (void)dst; (void)dstSize;
+    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+}
+
+int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    U32 count[256];
+    U32 max = 255;
+    (void)dst; (void)dstSize;
+    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+}
+
+extern int FSE_countFast(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
+
+int local_FSE_countFast255(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    U32 count[256];
+    U32 max = 255;
+    (void)dst; (void)dstSize;
+    return FSE_countFast(count, (BYTE*)src, (U32)srcSize, &max);
+}
+
+
+int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
+{
+    void* oBuffer;
+    void* cBuffer;
+    void* dBuffer;
     size_t benchedSize = DEFAULT_BLOCKSIZE;
+    size_t cBuffSize = FSE_compressBound((unsigned)benchedSize);
+    char* funcName;
+    int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
     U32 benchNb;
 
     // Allocations
-    origBuffer = malloc(benchedSize);
-    compressedBuffer = malloc(FSE_compressBound((unsigned)benchedSize));
-    decodedBuffer = malloc(benchedSize);
+    oBuffer = malloc(benchedSize);
+    cBuffer = malloc(cBuffSize);
+    dBuffer = malloc(benchedSize);
 
     // Init
-    BMK_genData(origBuffer, benchedSize, proba);
+    BMK_genData(oBuffer, benchedSize, proba);
+
+    // Bench selection
+    switch (algNb)
+    {
+    case 1:
+        funcName = "FSE_count(256)";
+        func = local_FSE_count256;
+        break;
+
+    case 2:
+        funcName = "FSE_count(255)";
+        func = local_FSE_count255;
+        break;
+
+    case 3:
+        funcName = "FSE_countFast(255)";
+        func = local_FSE_countFast255;
+        break;
+
+    default:
+        DISPLAY("Unknown algorithm number\n");
+        exit(-1);
+    }
 
     // Bench
     DISPLAY("\r%79s\r", "");
     {
-        char* benchedFunctionName = "FSE_count";
         double bestTime = 999.;
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
@@ -203,23 +260,21 @@ int fullSpeedBench(double proba, U32 nbBenchs)
             milliTime = BMK_GetMilliStart();
             while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
             {
-                unsigned nbSymbols = 256;
-                unsigned count[256];
-                int errorCode = FSE_count(count, origBuffer, benchedSize, &nbSymbols);
+                int errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
                 if (errorCode < 0) exit(-1);
                 loopNb++;
             }
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%1i-%-18.18s : %8.1f MB/s\r", benchNb, benchedFunctionName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%1i-%-18.18s : %8.1f MB/s\r", benchNb, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%-20.20s : %8.1f MB/s   \n", benchedFunctionName, (double)benchedSize / bestTime / 1000.);
+        DISPLAY("%-20.20s : %8.1f MB/s   \n", funcName, (double)benchedSize / bestTime / 1000.);
     }
 
-    free(origBuffer);
-    free(compressedBuffer);
-    free(decodedBuffer);
+    free(oBuffer);
+    free(cBuffer);
+    free(dBuffer);
 
     return 0;
 }
@@ -230,6 +285,7 @@ int usage(char* exename)
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [arg] \n", exename);
     DISPLAY( "Arguments :\n");
+    DISPLAY( " -b#    : select function to benchmark (default : 0 ==  all)\n");
     DISPLAY( " -H/-h  : Help (this text + advanced options)\n");
     return 0;
 }
@@ -238,8 +294,8 @@ int usage_advanced(char* exename)
 {
     usage(exename);
     DISPLAY( "\nAdvanced options :\n");
-    DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
-    DISPLAY( " -P#    : probability curve, in %%(default : %i%%)\n", DEFAULT_PROBA);
+    DISPLAY( " -i#    : iteration loops [1-9] (default : %i)\n", NBLOOPS);
+    DISPLAY( " -P#    : probability curve, in %% (default : %i%%)\n", DEFAULT_PROBA);
     return 0;
 }
 
@@ -256,6 +312,7 @@ int main(int argc, char** argv)
     U32 proba = DEFAULT_PROBA;
     U32 nbLoops = NBLOOPS;
     U32 pause = 0;
+    U32 algNb = 0;
     int i;
     int result;
 
@@ -287,10 +344,18 @@ int main(int argc, char** argv)
                 case 'h' :
                 case 'H': return usage_advanced(exename);
 
+                    // Select Algo nb
+                case 'b':
+                    argument++;
+                    algNb=0;
+                    while ((*argument >='0') && (*argument <='9')) algNb*=10, algNb += *argument++ - '0';
+                    break;
+
                     // Modify Nb loops
                 case 'i':
-                    if ((*argument >='1') && (*argument <='9')) nbLoops = *argument++ - '0';
                     argument++;
+                    nbLoops=0;
+                    while ((*argument >='0') && (*argument <='9')) nbLoops*=10, nbLoops += *argument++ - '0';
                     break;
 
                     // Modify data probability
@@ -315,8 +380,16 @@ int main(int argc, char** argv)
 
     }
 
-    result = fullSpeedBench((double)proba / 100, nbLoops);
+    if (algNb==0)
+    {
+        for (i=1; i<=3; i++)
+            result = fullSpeedBench((double)proba / 100, nbLoops, i);
+    }
+    else
+        result = fullSpeedBench((double)proba / 100, nbLoops, algNb);
+
     if (pause) { DISPLAY("press enter...\n"); getchar(); }
+
     return result;
 }
 
