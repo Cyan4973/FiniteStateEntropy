@@ -462,7 +462,6 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr,
                         unsigned maxSymbolValue)
 {
     unsigned tableLog = *tableLogPtr;
-    unsigned largest=0;
 
     // Check
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
@@ -479,6 +478,7 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr,
         U64 const vStep = 1ULL<<(scale-20);
         int stillToDistribute = 1<<tableLog;
         unsigned s;
+        unsigned largest=0;
         short largestP=0;
         U32 lowThreshold = total >> tableLog;
 
@@ -498,9 +498,9 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr,
             else
             {
                 short proba = (short)((count[s]*step) >> scale);
-                U64 restToBeat;
                 if (proba<8)
                 {
+                    U64 restToBeat;
                     restToBeat = vStep * rtbTable[proba];
                     proba += (count[s]*step) - ((U64)proba<<scale) > restToBeat;
                 }

@@ -131,7 +131,7 @@ typedef unsigned long long  U64;
 //**************************************
 // Benchmark Parameters
 //**************************************
-static int chunkSize = DEFAULT_CHUNKSIZE;
+static U32 chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 static int BMK_byteCompressor = 1;
@@ -139,7 +139,7 @@ static int BMK_tableLog = 0;
 
 void BMK_SetByteCompressor(int id) { BMK_byteCompressor = id; }
 
-void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
+void BMK_SetBlocksize(U32 bsize) { chunkSize = bsize; }
 
 void BMK_SetTableLog(int tableLog) { BMK_tableLog = 5 + tableLog; }
 
@@ -532,10 +532,8 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            int total = 0;
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                total += chunkP[chunkNb].origSize;
                 chunkP[chunkNb].compressedSize = FSE_decompressU16((unsigned short*)chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
             }
             nbLoops++;
@@ -793,7 +791,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             {
                 chunkP[i].id = i;
                 chunkP[i].origBuffer = in; in += chunkSize;
-                if ((int)remaining > chunkSize) { chunkP[i].origSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+                if (remaining > chunkSize) { chunkP[i].origSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
                 chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
                 chunkP[i].compressedSize = 0;
                 chunkP[i].destBuffer = dst; dst += chunkSize;
@@ -1086,7 +1084,6 @@ static void BMK_benchCore_Mem(char* dst, char* src, int benchedSize,
 int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
 {
     int fileIdx=0;
-    char* orig_buff;
 
     U64 totals = 0;
     U64 totalz = 0;
@@ -1106,6 +1103,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         int nbChunks;
         size_t maxCompressedChunkSize;
         size_t readSize;
+        char* orig_buff;
         char* compressedBuffer; size_t compressedBuffSize;
 
         // Check file existence

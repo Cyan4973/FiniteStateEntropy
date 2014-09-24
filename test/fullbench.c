@@ -211,19 +211,13 @@ int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSiz
 
 int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 {
-    void* oBuffer;
-    void* cBuffer;
-    void* dBuffer;
     size_t benchedSize = DEFAULT_BLOCKSIZE;
     size_t cBuffSize = FSE_compressBound((unsigned)benchedSize);
+    void* oBuffer = malloc(benchedSize);
+    void* cBuffer = malloc(cBuffSize);
     char* funcName;
     int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
-    U32 benchNb;
 
-    // Allocations
-    oBuffer = malloc(benchedSize);
-    cBuffer = malloc(cBuffSize);
-    dBuffer = malloc(benchedSize);
 
     // Init
     BMK_genData(oBuffer, benchedSize, proba);
@@ -260,6 +254,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     DISPLAY("\r%79s\r", "");
     {
         double bestTime = 999.;
+        U32 benchNb;
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -278,14 +273,13 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%1i-%-18.18s : %8.1f MB/s\r", benchNb, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%1u-%-18.18s : %8.1f MB/s\r", benchNb, funcName, (double)benchedSize / bestTime / 1000.);
         }
         DISPLAY("%-20.20s : %8.1f MB/s   \n", funcName, (double)benchedSize / bestTime / 1000.);
     }
 
     free(oBuffer);
     free(cBuffer);
-    free(dBuffer);
 
     return 0;
 }

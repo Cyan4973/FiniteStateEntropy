@@ -76,5 +76,5 @@ test: fullbench fullbench32 fuzzer fuzzer32
 	@echo test completed
 
 memtest: fuzzer
-	valgrind ./fuzzer -s0 -i100
+	valgrind ./fuzzer -i200
 

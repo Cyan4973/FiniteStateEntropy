@@ -34,7 +34,7 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb);
 
 
 // Parameters
-void BMK_SetBlocksize(int bsize);
+void BMK_SetBlocksize(unsigned bsize);
 void BMK_SetNbIterations(int nbLoops);
 void BMK_SetByteCompressor(int id);
 void BMK_SetTableLog(int tableLog);

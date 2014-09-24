@@ -167,7 +167,7 @@ static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
 }
 
 
-static void FUZ_tests (U32 seed, U32 startTestNb)
+static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 {
     BYTE* bufferNoise = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
@@ -187,13 +187,13 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
             FUZ_rand (&seed);
     }
 
-    for (testNb=startTestNb; testNb<FUZ_NB_TESTS; testNb++)
+    for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
         int tag=0;
-        DISPLAYLEVEL (4, "\r test %5i  ", testNb);
+        DISPLAYLEVEL (4, "\r test %5u  ", testNb);
         if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
         {
-            DISPLAY ("\r test %5i  ", testNb);
+            DISPLAY ("\r test %5u  ", testNb);
             time = FUZ_GetMilliStart();
         }
 
@@ -223,7 +223,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
                 DISPLAY ("Compression failed ! \n");
             else
             {
-                BYTE saved = bufferVerif[sizeOrig];
+                BYTE saved = (bufferVerif[sizeOrig] = 254);
                 int result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
                     DISPLAY ("Output buffer (bufferVerif) overrun (write beyond specified end) !\n");
@@ -257,7 +257,7 @@ static void FUZ_tests (U32 seed, U32 startTestNb)
             int sizeOrig = FUZ_rand (&seed) & 0x1FFFF;
             int sizeCompressed = FUZ_rand (&seed) & 0x1FFFF;
             BYTE* bufferTest = bufferSrc + testNb;
-            BYTE saved = bufferDst[sizeOrig];
+            BYTE saved = (bufferDst[sizeOrig] = 253);
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             result = FSE_decompress_safe (bufferDst, sizeOrig, bufferTest, sizeCompressed);
@@ -339,7 +339,7 @@ static void unitTest(void)
 *****************************************************************/
 int main (int argc, char** argv)
 {
-    U32 seed, startTestNb=0, pause=0;
+    U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
     int argNb;
 
     programName = argv[0];
@@ -363,6 +363,18 @@ int main (int argc, char** argv)
                     {
                         seed *= 10;
                         seed += *argument - '0';
+                        argument++;
+                    }
+                    break;
+
+                // total tests
+                case 'i':
+                    argument++;
+                    totalTest=0;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        totalTest *= 10;
+                        totalTest += *argument - '0';
                         argument++;
                     }
                     break;
@@ -399,7 +411,7 @@ int main (int argc, char** argv)
     unitTest();
 
     DISPLAY("Fuzzer seed : %u \n", seed);
-    FUZ_tests (seed, startTestNb);
+    FUZ_tests (seed, totalTest, startTestNb);
 
     DISPLAY ("\rAll tests passed               \n");
     if (pause)

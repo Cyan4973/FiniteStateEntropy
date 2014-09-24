@@ -305,7 +305,7 @@ int compress_file(char* output_filename, char* input_filename)
         // Fill input Buffer
         int outSize;
         size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBufferSize, finput);
-        if ((inSize<=0) && (lastBlockDone)) break;
+        if ((inSize==0) && (lastBlockDone)) break;
         filesize += inSize;
         XXH32_update(hashCtx, in_buff, (int)inSize);
         DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
