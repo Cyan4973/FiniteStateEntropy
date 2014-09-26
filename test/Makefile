@@ -73,8 +73,11 @@ test: fullbench fullbench32 fuzzer fuzzer32
 	./fullbench32 -i1
 	./fuzzer
 	./fuzzer32
-	@echo test completed
 
-memtest: fuzzer
+memtest: fuzzer fullbench
 	valgrind ./fuzzer -i200
+	valgrind ./fullbench -i1
+
+test-all: test memtest
+	@echo test completed
 

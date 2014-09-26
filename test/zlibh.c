@@ -358,19 +358,17 @@ unsigned int ip_len;    /* number of symbols in input buffer */
     unsigned int lx = 0;    /* running index in l_buf */
     unsigned int value;     /* value to send */
     unsigned short length;  /* number of bits to send */
-    unsigned int t_index;
-    unsigned int n;
 
     if  (ltree != static_ltree) {  /* write dynamic Huffman header first */
         /* send_tree is merged here */
         int prevlen = -1;            /* last emitted length */
-        int curlen;                  /* length of current code */
         int nextlen = ltree[0].Len;  /* length of next code */
         int count = 0;               /* repeat count of the current code */
         int max_count = 7;           /* max repeat count */
         int min_count = 4;           /* min repeat count */
         unsigned int max_code = 256;
         unsigned int blcodes;
+        unsigned int n;
 
         bi_valid = 5;
         blcodes = op[0];
@@ -384,6 +382,7 @@ unsigned int ip_len;    /* number of symbols in input buffer */
         if (nextlen == 0) max_count = 138, min_count = 3;
 
         for (n = 0; n <= max_code; n++) {
+            int curlen;                  /* length of current code */
             curlen = nextlen; nextlen = ltree[n+1].Len;
             if (++count < max_count && curlen == nextlen) {
                 continue;
@@ -444,6 +443,7 @@ unsigned int ip_len;    /* number of symbols in input buffer */
     }
     lx = 1;
     do {
+        unsigned int t_index;
         t_index = *ip++;
         value = (unsigned int)ltree[t_index].Code;
         length = ltree[t_index].Len;
@@ -494,7 +494,6 @@ tree_desc *bltree_desc;     /* the tree descriptor */
     int lmax_code   = ltree_desc->max_code;
     int n = 0;                  /* iterates over all tree elements */
     int prevlen = -1;           /* last emitted length */
-    int curlen;                 /* length of current code */
     int nextlen = ltree[0].Len; /* length of next code */
     int count = 0;              /* repeat count of the current code */
     int max_count = 7;          /* max repeat count */
@@ -509,6 +508,7 @@ tree_desc *bltree_desc;     /* the tree descriptor */
     } while (n < 19);
 
     for (n = 0; n <= lmax_code; n++) {
+        int curlen;                 /* length of current code */
         curlen = nextlen; nextlen = ltree[n+1].Len;
         if (++count < max_count && curlen == nextlen) {
             continue;
@@ -693,13 +693,10 @@ static void build_tree(desc)
     const ct_data *stree  = desc->stat_desc->static_tree;
     int elems             = desc->max_code;
     unsigned long *csize  = desc->comp_size;
-    int n, m;                           /* iterate over heap elements */
+    int n;                              /* iterate over heap elements */
     int max_code = -1;                  /* largest code with non zero frequency */
-    int node;                           /* new node being created */
     int huf_heap[2*ZLIBH_L_CODES+1];    /* heap used to build the Huffman trees */
     int heap_max;                       /* element of largest frequency */
-    unsigned short bl_count[ZLIBH_MAX_BITS+1];
-    /* number of codes at each bit length for an optimal tree */
     unsigned char depth[2*ZLIBH_L_CODES+1];
     /* Depth of each subtree used as tie breaker for trees of equal frequency */
 
@@ -729,6 +726,10 @@ static void build_tree(desc)
     */
 
     if (huf_heap[0] > 1) {                /* at least two codes (non trivial tree) */
+        int node;                           /* new node being created */
+        unsigned short bl_count[ZLIBH_MAX_BITS+1];
+        /* number of codes at each bit length for an optimal tree */
+
         desc->max_code = max_code;
 
         /* The elements huf_heap[huf_heap[0]/2+1 .. huf_heap[0]] are leaves of the tree,
@@ -741,6 +742,7 @@ static void build_tree(desc)
         */
         node = elems;                          /* next internal node of the tree */
         do {
+            int m;
             pqremove(tree, huf_heap, depth, n);  /* n = node of least frequency */
             m = huf_heap[SMALLEST];              /* m = node of next least frequency */
 
@@ -1169,7 +1171,6 @@ unsigned short *work;
     unsigned used;              /* code entries in table used */
     unsigned huff;              /* Huffman code */
     unsigned incr;              /* for incrementing code, index */
-    unsigned fill;              /* index for replicating entries */
     unsigned low;               /* low bits for current root entry */
     unsigned mask;              /* mask for low root bits */
     code here;                  /* table entry for duplication */
@@ -1336,6 +1337,8 @@ unsigned short *work;
 
     /* process all codes and make table entries */
     for (;;) {
+        unsigned fill;              /* index for replicating entries */
+
         /* create table entry */
         here.bits = (unsigned char)(len - drop);
         if ((int)(work[sym]) < end) {

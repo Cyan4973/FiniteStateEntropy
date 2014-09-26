@@ -270,8 +270,9 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     }
 
     // exit
-    free (bufferDst);
+    free (bufferNoise);
     free (bufferSrc);
+    free (bufferDst);
     free (bufferVerif);
 }
 

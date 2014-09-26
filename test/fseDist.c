@@ -226,7 +226,7 @@ int FSED_compressU16 (void* dest, const U16* source, unsigned sourceSize, unsign
     nbSymbols = FSED_countU16 (counting, ip, sourceSize);
 
     // Normalize
-    FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
+    tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, nbSymbols);
     if (tableLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, norm, nbSymbols, tableLog);
@@ -431,7 +431,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, unsigned sourceSize, un
     nbSymbols = FSED_countU16Log2 (counting, ip, sourceSize);
 
     // Normalize
-    FSE_normalizeCount (norm, &memLog, counting, sourceSize, nbSymbols);
+    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, norm, nbSymbols, memLog);
@@ -593,7 +593,7 @@ int FSED_compressU32 (void* dest, const U32* source, unsigned sourceSize, unsign
     nbSymbols = FSED_countU32 (counting, ip, sourceSize);
 
     // Normalize
-    FSE_normalizeCount (norm, &memLog, counting, sourceSize, nbSymbols);
+    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU32 (ostart, source, sourceSize);
 
     op += FSE_writeHeader (op, norm, nbSymbols, memLog);
