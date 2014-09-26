@@ -322,7 +322,7 @@ void BMK_benchMemU32(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 }
 
 
-void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
+static void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
                   int memLog)
 {
@@ -330,11 +330,11 @@ void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
     size_t cSize=0;
     double fastestC = 100000000., fastestD = 100000000.;
     double ratio=0.;
-    U32 crcCheck=0;
-    U32 crcOrig;
+    U64 crcCheck=0;
+    U64 crcOrig;
 
     // Init
-    crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
+    crcOrig = XXH64(chunkP[0].origBuffer, benchedSize,0);
 
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -384,7 +384,7 @@ void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         // CRC Checking
-        crcCheck = XXH32(chunkP[0].origBuffer, benchedSize,0);
+        crcCheck = XXH64(chunkP[0].origBuffer, benchedSize,0);
         if (crcOrig!=crcCheck) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOrig, (unsigned)crcCheck); break; }
     }
 
@@ -578,6 +578,7 @@ int BMK_ZLIBH_compress(void* dest, const unsigned char* src, unsigned srcSize, u
 
 int BMK_ZLIBH_decompress(unsigned char* dest, unsigned originalSize, const void* compressed)
 { (void)originalSize; return ZLIBH_decompress((char*)dest, compressed); }
+
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
