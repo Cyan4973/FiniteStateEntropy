@@ -41,11 +41,6 @@
 #define FSE_MAX_MEMORY_USAGE 14
 #define FSE_DEFAULT_MEMORY_USAGE 13
 
-// FSE_MAX_NB_SYMBOLS :
-// Maximum nb of symbol values authorized.
-// Required for proper stack allocation
-#define FSE_MAX_NB_SYMBOLS 286   // Suitable for zlib for example
-
 // FSE_ILP :
 // Determine if the algorithm tries to explicitly exploit ILP
 // (Instruction Level Parallelism)
@@ -177,7 +172,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 }
 
 
-int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog)
+int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog)
 {
     const U16* const istart = source;
     const U16* ip = istart;
@@ -185,8 +180,8 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     BYTE* const ostart = (BYTE*) dest;
     BYTE* op = ostart;
 
-    U32   counting[FSE_MAX_NB_SYMBOLS];
-    S16   norm[FSE_MAX_NB_SYMBOLS];
+    U32   counting[FSE_MAX_SYMBOL_VALUE+1];
+    S16   norm[FSE_MAX_SYMBOL_VALUE+1];
     CTable_max_t CTable;
 
     int   errorCode;
@@ -194,26 +189,26 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
 
     // early out
     if (sourceSize <= 1) return FSE_noCompressionU16 (ostart, istart, sourceSize);
-    if (!nbSymbols) nbSymbols = FSE_MAX_NB_SYMBOLS;
+    if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     // Scan for stats
-    errorCode = FSE_countU16 (counting, ip, sourceSize, &nbSymbols);
+    errorCode = FSE_countU16 (counting, ip, sourceSize, &maxSymbolValue);
     if (errorCode == -1) return -1;
     if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    errorCode = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, nbSymbols);
+    errorCode = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, maxSymbolValue);
     if (errorCode == -1) return -1;
     if (errorCode ==  0) return FSE_writeSingleU16(ostart, *istart);
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, norm, nbSymbols, tableLog);
+    errorCode = FSE_writeHeader (op, norm, maxSymbolValue, tableLog);
     if (errorCode == -1) return -1;
     op += errorCode;
 
     // Compress
-    errorCode = FSE_buildCTableU16 (&CTable, norm, nbSymbols, tableLog);
+    errorCode = FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
     if (errorCode==-1) return -1;
     op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 
@@ -314,10 +309,10 @@ int FSE_decompressU16_generic(
 {
     const BYTE* const istart = (const BYTE*) compressed;
     const BYTE* ip = istart;
-    short   counting[FSE_MAX_NB_SYMBOLS];
+    short   counting[FSE_MAX_SYMBOL_VALUE+1];
     FSE_decode_tU16 DTable[FSE_MAX_TABLESIZE];
     BYTE  headerId;
-    unsigned nbSymbols;
+    unsigned maxSymbolValue;
     unsigned tableLog;
     int errorCode;
 
@@ -334,11 +329,11 @@ int FSE_decompressU16_generic(
     if (headerId!=2) return -1;   // unused headerId
 
     // normal FSE decoding mode
-    errorCode = FSE_readHeader (counting, &nbSymbols, &tableLog, istart);
+    errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart);
     if (errorCode==-1) return -1;
     ip += errorCode;
 
-    errorCode = FSE_buildDTableU16 (DTable, counting, nbSymbols, tableLog);
+    errorCode = FSE_buildDTableU16 (DTable, counting, maxSymbolValue, tableLog);
     if (errorCode==-1) return -1;
 
     if (safe) errorCode = FSE_decompressU16_usingDTable (dest, originalSize, ip, maxCompressedSize, DTable, tableLog, 1);

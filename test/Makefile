@@ -49,24 +49,32 @@ fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c renorm.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
-fuzzer: fuzzer.c xxhash.c ../fse.c
+fuzzer: fuzzer.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
-fuzzer32: fuzzer.c xxhash.c ../fse.c
+fuzzer32: fuzzer.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+
+fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+
+fullbench32: fullbench.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
-test: fuzzer fuzzer32
-	./fuzzer   -s0
-	./fuzzer32 -s0
+test: fullbench fullbench32 fuzzer fuzzer32
+	./fullbench -i1
+	./fullbench32 -i1
+	./fuzzer
+	./fuzzer32
 	@echo test completed
 
 memtest: fuzzer
-	valgrind ./fuzzer -s0 -i100
+	valgrind ./fuzzer -i200
 

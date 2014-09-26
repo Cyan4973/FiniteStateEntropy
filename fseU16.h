@@ -38,16 +38,25 @@ extern "C" {
 
 
 /******************************************
+   Tuning parameters
+******************************************/
+// FSE_MAX_SYMBOL_VALUE :
+// Maximum nb of symbol values authorized.
+// Required for allocation purposes
+#define FSE_MAX_SYMBOL_VALUE 286   // This is just an example, typical value for zlib
+
+
+/******************************************
    FSE U16 functions
 ******************************************/
 
 /* same as FSE normal functions,
    but data is presented as a table of unsigned short (2 bytes per symbol).
    Useful for alphabet size > 256.
-   All symbol values within input table must be < 'nbSymbols'.
-   Maximum allowed 'nbSymbols' value is controlled by constant FSE_MAX_NB_SYMBOLS inside fse.c */
+   All symbol values within input table must be <= 'maxSymbolValue'.
+   Maximum allowed 'maxSymbolValue' value is controlled by constant FSE_MAX_SYMBOL_VALUE */
 int FSE_compressU16  (void* dest,
-                      const unsigned short* source, unsigned sourceSize, unsigned nbSymbols, unsigned tableLog);
+                      const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog);
 int FSE_decompressU16(unsigned short* dest, unsigned originalSize,
                       const void* compressed);
 

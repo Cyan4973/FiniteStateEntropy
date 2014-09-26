@@ -62,10 +62,10 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 //******************************
 // local functions
 //******************************
-static unsigned int GEN_rand (unsigned int* src)
+static unsigned int GEN_rand (unsigned int* seed)
 {
-    *src =  ( (*src) * PRIME1) + PRIME2;
-    return (*src) >> 11;
+    *seed =  ((*seed) * PRIME1) + PRIME2;
+    return (*seed) >> 11;
 }
 
 static int usage(void)
@@ -87,17 +87,6 @@ static int badusage(void)
 }
 
 
-static void generateNoise(void* buffer, size_t buffSize)
-{
-    char* op = (char*) buffer;
-    char* oend = op + buffSize;
-    unsigned int seed = 1;
-
-    // Fill buffer
-    while (op<oend) *op++ = (char)GEN_rand(&seed);
-}
-
-
 static void generate(void* buffer, size_t buffSize, double p)
 {
     char table[PROBATABLESIZE];
@@ -108,9 +97,8 @@ static void generate(void* buffer, size_t buffSize, double p)
     char* oend = op + buffSize;
     unsigned seed = 1;
 
+    if (p==0.0) p=0.005;
     DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
-
-    if (p==0.0) return generateNoise(buffer, buffSize);
 
     // Build Table
     while (remaining)

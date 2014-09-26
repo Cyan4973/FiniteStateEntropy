@@ -1,6 +1,6 @@
 language: c
 compiler: gcc
-script: cd test && make test
+script: cd test && make test && make memtest
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq gcc-multilib
