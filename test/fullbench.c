@@ -143,7 +143,7 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
     unsigned seed = 1;
     static unsigned done = 0;
 
-    if (p<=0.01) p = 0.005;
+    if (p<0.01) p = 0.005;
     if (p>1.) p = 1.;
     if (!done)
     {
@@ -175,6 +175,17 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
 /*********************************************************
   Benchmark function
 *********************************************************/
+static U32 g_count[256] = {0};
+static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    const BYTE* ip = (BYTE*)src;
+    const BYTE* const end = ip + srcSize;
+    (void)dst; (void)dstSize;
+    memset(g_count, 0, sizeof(g_count));
+    while (ip<end) g_count[*ip++]++;
+    return 0;
+}
+
 static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[256];
@@ -315,6 +326,12 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 8:
         funcName = "FSE_compress";
         func = local_FSE_compress;
+        break;
+
+    /* Specific test functions */
+    case 100:
+        funcName = "trivialCount";
+        func = local_trivialCount;
         break;
 
     default:
