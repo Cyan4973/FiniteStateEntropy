@@ -198,9 +198,10 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    errorCode = FSE_normalizeCount (norm, &tableLog, counting, sourceSize, maxSymbolValue);
+    errorCode = FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
     if (errorCode == -1) return -1;
     if (errorCode ==  0) return FSE_writeSingleU16(ostart, *istart);
+    tableLog = errorCode;
 
     // Write table description header
     errorCode = FSE_writeHeader (op, norm, maxSymbolValue, tableLog);

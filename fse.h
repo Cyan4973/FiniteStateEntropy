@@ -132,7 +132,8 @@ The following API allows to target specific sub-functions.
 
 int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
-int FSE_normalizeCount(short* normalizedCounter, unsigned* tableLogPtr, unsigned* count, unsigned total, unsigned maxSymbolValue);
+unsigned FSE_optimalTableLog(unsigned tableLog, unsigned sourceSize, unsigned maxSymbolValue);
+int FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, unsigned* count, unsigned total, unsigned maxSymbolValue);
 
 static inline unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog) { (void)tableLog; return maxSymbolValue ? (maxSymbolValue*2)+1 : 512; }
 int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
@@ -151,14 +152,18 @@ FSE_count() will return the number of occurrence of the most frequent symbol.
 If there is an error, the function will return -1.
 
 The next step is to normalize the frequencies.
-FSE_normalizeCount() will ensure that sum of frequencies is == 2 ^'*tableLogPtr'.
+FSE_normalizeCount() will ensure that sum of frequencies is == 2 ^'tableLog'.
 It also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
-You can use input '*tableLogPtr'==0 to mean "use default tableLog value".
-The result will be saved into a structure, called 'normalizedCounter', which is a table of short.
-'normalizedCounter' must be already allocated, and have 'maxSymbolValue+1' cells.
-*tableLogPtr will also be updated, with the final tableLog selected.
-The return value is 0 if there is a single symbol in distribution, 1 otherwise.
-If there is an error, the function will return -1.
+You can use input 'tableLog'==0 to mean "use default tableLog value".
+For a more optimal tableLog, you can optionally use FSE_optimalTableLog(),
+which will provide the optimal valid tableLog given sourceSize, maxSymbolValue, and a user-defined maximum.
+
+The result of FSE_normalizeCount() will be saved into a structure,
+called 'normalizedCounter', which is a table of short.
+'normalizedCounter' must be already allocated, and have at least 'maxSymbolValue+1' cells.
+The return value is tableLog if everything proceeded as expected.
+It is 0 if there is a single symbol within distribution.
+If there is an error (typically, invalid tableLog value), the function will return -1.
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
 The target memory area must be pointed by 'header'.
@@ -187,7 +192,7 @@ int FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigne
 int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
 
 /*
-The first step is to get the normalized frequency of symbols.
+The first step is to obtain the normalized frequencies of symbols.
 This can be performed by reading a header with FSE_readHeader().
 'normalizedCounter' must be already allocated, and have at least '*maxSymbolValuePtr+1' cells.
 In practice, that means it's necessary to know 'maxSymbolValue' beforehand,

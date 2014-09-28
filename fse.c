@@ -457,19 +457,26 @@ static void FSE_distribNpts(short* normalizedCounter, int maxSymbolValue, short 
 }
 
 
-int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr,
+unsigned FSE_optimalTableLog(unsigned maxTableLog, unsigned sourceSize, unsigned maxSymbolValue)
+{
+    U32 tableLog = maxTableLog;
+    if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
+    if ((FSE_highbit(sourceSize-1)-2) < tableLog) tableLog = FSE_highbit(sourceSize-1)-2;   // Useless accuracy
+    if ((FSE_highbit(maxSymbolValue)+1) > tableLog) tableLog = FSE_highbit(maxSymbolValue)+1;   // Need a minimum to represent all symbol values
+    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
+    if (tableLog > FSE_MAX_TABLELOG) tableLog = FSE_MAX_TABLELOG;
+    return tableLog;
+}
+
+
+int FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
                         unsigned* count, unsigned total,
                         unsigned maxSymbolValue)
 {
-    unsigned tableLog = *tableLogPtr;
-
     // Check
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
-    if ((FSE_highbit(total-1)-2) < tableLog) tableLog = FSE_highbit(total-1)-2;   // Useless accuracy
-    if ((FSE_highbit(maxSymbolValue)+1) > tableLog) tableLog = FSE_highbit(maxSymbolValue)+1;   // Need a minimum to represent all symbol values
-    if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
+    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported size
     if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported size
-    *tableLogPtr = tableLog;
 
     {
         U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
@@ -527,7 +534,7 @@ int FSE_normalizeCount (short* normalizedCounter, unsigned* tableLogPtr,
     }
     */
 
-    return 1;
+    return tableLog;
 }
 
 
@@ -709,7 +716,8 @@ int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize,
     if (errorCode == (int)sourceSize) return FSE_writeSingleChar (ostart, *istart);
     if (errorCode < (int)((sourceSize * 7) >> 10)) return FSE_noCompression (ostart, istart, sourceSize);   // Heuristic : not compressible enough
 
-    errorCode = FSE_normalizeCount (norm, &tableLog, count, sourceSize, maxSymbolValue);
+    tableLog = FSE_optimalTableLog(tableLog, sourceSize, maxSymbolValue);
+    errorCode = FSE_normalizeCount (norm, tableLog, count, sourceSize, maxSymbolValue);
     if (errorCode == -1) return -1;
 
     // Write table description header
