@@ -230,7 +230,7 @@ int FSED_compressU16 (void* dest, const U16* source, unsigned sourceSize, unsign
     tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
     if (tableLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
-    op += FSE_writeHeader (op, norm, maxSymbolValue, tableLog);
+    op += FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
 
     // Compress
     FSE_buildCTable (&CTable, norm, maxSymbolValue, tableLog);
@@ -435,7 +435,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, unsigned sourceSize, un
     memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
-    op += FSE_writeHeader (op, norm, nbSymbols, memLog);
+    op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, memLog), norm, nbSymbols, memLog);
 
     // Compress
     FSE_buildCTable (&CTable, norm, nbSymbols, memLog);
@@ -597,7 +597,7 @@ int FSED_compressU32 (void* dest, const U32* source, unsigned sourceSize, unsign
     memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU32 (ostart, source, sourceSize);
 
-    op += FSE_writeHeader (op, norm, nbSymbols, memLog);
+    op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, memLog), norm, nbSymbols, memLog);
 
     // Compress
     FSE_buildCTable (&CTable, norm, nbSymbols, memLog);

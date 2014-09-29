@@ -175,15 +175,42 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
 /*********************************************************
   Benchmark function
 *********************************************************/
-static U32 g_count[256] = {0};
 static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
+
+    U32 count[256] = {0};
     const BYTE* ip = (BYTE*)src;
     const BYTE* const end = ip + srcSize;
+
     (void)dst; (void)dstSize;
-    memset(g_count, 0, sizeof(g_count));
-    while (ip<end) g_count[*ip++]++;
-    return 0;
+    while (ip<end) count[*ip++]++;
+    return (int)count[ip[-1]];
+
+/*
+    // Experiment : count 2 bytes at a time
+    U32 count16[65536] = {0};
+    U32 count[256] = {0};
+    const U16* ip = (U16*)src;
+    const U16* const end = ip+(srcSize/2);
+
+    (void)dst; (void)dstSize;
+    while (ip<end) count16[*ip++]++;
+    {
+        unsigned c;
+        for (c=0; c<256; c++)
+        {
+            U32 total = 0;
+            U32 i;
+            for (i=0; i<256; i++)
+            {
+                total += count16[c*256 + i];
+                total += count16[i*256 + c];
+            }
+            count[c] = total;
+        }
+    }
+    return (int)count[ip[-1]];
+*/
 }
 
 static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -231,8 +258,14 @@ static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, 
 
 static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
+    (void)src; (void)srcSize;
+    return FSE_writeHeader(dst, dstSize, g_normTable, 255, g_tableLog);
+}
+
+static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
     (void)src; (void)srcSize; (void)dstSize;
-    return FSE_writeHeader(dst, g_normTable, 255, g_tableLog);
+    return FSE_writeHeader(dst, 500, g_normTable, 255, g_tableLog);
 }
 
 static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -307,12 +340,23 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             FSE_count(g_countTable, oBuffer, benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            funcName = "FSE_writeHeader(small)";
+            func = local_FSE_writeHeader_small;
+            break;
+        }
+
+    case 7:
+        {
+            U32 max=255;
+            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_buildCTable";
             func = local_FSE_buildCTable;
             break;
         }
 
-    case 7:
+    case 8:
         {
             U32 max=255;
             FSE_count(g_countTable, oBuffer, benchedSize, &max);
@@ -323,7 +367,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
-    case 8:
+    case 9:
         funcName = "FSE_compress";
         func = local_FSE_compress;
         break;
@@ -345,7 +389,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         double bestTime = 999.;
         U32 benchNb=1;
         int errorCode = 0;
-        DISPLAY("%1u-%-22.22s : \r", benchNb, funcName);
+        DISPLAY("%1u-%-24.24s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -358,15 +402,15 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
             {
                 errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                if (errorCode < 0) exit(-1);
+                if (errorCode < 0) { DISPLAY("Error %s \n", funcName); exit(-1); }
                 loopNb++;
             }
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%1u-%-22.22s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%1u-%-24.24s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%-24.24s : %8.1f MB/s   (%i)\n", funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%1u#%-24.24s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
     free(oBuffer);
@@ -478,7 +522,7 @@ int main(int argc, char** argv)
 
     if (algNb==0)
     {
-        for (i=1; i<=8; i++)
+        for (i=1; i<=9; i++)
             result = fullSpeedBench((double)proba / 100, nbLoops, i);
     }
     else

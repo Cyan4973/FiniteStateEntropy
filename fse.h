@@ -135,8 +135,8 @@ int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize,
 unsigned FSE_optimalTableLog(unsigned tableLog, unsigned sourceSize, unsigned maxSymbolValue);
 int FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, unsigned* count, unsigned total, unsigned maxSymbolValue);
 
-static inline unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog) { (void)tableLog; return maxSymbolValue ? (maxSymbolValue*2)+1 : 512; }
-int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
+int FSE_writeHeader (void* headerBuffer, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 int FSE_sizeof_CTable(unsigned maxSymbolValue, unsigned tableLog);
 int FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
@@ -147,7 +147,7 @@ int FSE_compress_usingCTable (void* dest, const unsigned char* source, unsigned 
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
 Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
 'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < *maxNbSymbolsPtr
-maxNbSymbolsPtr will be updated, with its real value (necessarily <= original value)
+*maxNbSymbolsPtr will be updated, with its real value (necessarily <= original value)
 FSE_count() will return the number of occurrence of the most frequent symbol.
 If there is an error, the function will return -1.
 
@@ -158,18 +158,18 @@ You can use input 'tableLog'==0 to mean "use default tableLog value".
 For a more optimal tableLog, you can optionally use FSE_optimalTableLog(),
 which will provide the optimal valid tableLog given sourceSize, maxSymbolValue, and a user-defined maximum.
 
-The result of FSE_normalizeCount() will be saved into a structure,
-called 'normalizedCounter', which is a table of short.
+The result of FSE_normalizeCount() will be saved into a table,
+called 'normalizedCounter', which is a table of signed short.
 'normalizedCounter' must be already allocated, and have at least 'maxSymbolValue+1' cells.
 The return value is tableLog if everything proceeded as expected.
 It is 0 if there is a single symbol within distribution.
 If there is an error (typically, invalid tableLog value), the function will return -1.
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
-The target memory area must be pointed by 'header'.
-'header' buffer must be already allocated. Its size must be at least FSE_headerBound().
+'header' buffer must be already allocated.
+For guaranteed success, buffer size must be at least FSE_headerBound().
 The result of the function is the number of bytes written into 'header'.
-If there is an error, the function will return -1.
+If there is an error, the function will return -1 (for example, buffer size too small).
 
 'normalizedCounter' can then be used to create the compression tables 'CTable'.
 The space required by 'CTable' must be already allocated. Its size is provided by FSE_sizeof_CTable().
