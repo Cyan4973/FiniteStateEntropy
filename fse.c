@@ -191,100 +191,9 @@ static short FSE_abs(short a)
 ****************************************************************/
 unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
 {
-    (void)tableLog;
-    return maxSymbolValue ? (maxSymbolValue*2)+1 : 512;
+    U32 maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1;
+    return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
 }
-
-/*
-static int FSE_writeHeader (void* header, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
-{
-    BYTE* const ostart = (BYTE*) header;
-    BYTE* out = ostart;
-    int nbBits;
-    const int tableSize = 1 << tableLog;
-    int remaining;
-    int threshold;
-    U32 bitStream;
-    int bitCount;
-    unsigned charnum = 0;
-    int previous0 = 0;
-
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported
-    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported
-    if (headerBufferSize < FSE_headerBound(maxSymbolValue, tableLog)) return -1;  // buffer overflow  risk
-
-    // HeaderId (normal case)
-    bitStream = 2;
-    bitCount  = 2;
-    // Table Size
-    bitStream += (tableLog-FSE_MIN_TABLELOG) << bitCount;
-    bitCount  += 4;
-
-    // Init
-    remaining = tableSize+1;   // +1 for extra accuracy
-    threshold = tableSize;
-    nbBits = tableLog+1;
-
-    while (remaining>1)   // stops at 1
-    {
-        if (previous0)
-        {
-            unsigned start = charnum;
-            while (!normalizedCounter[charnum]) charnum++;
-            while (charnum >= start+24)
-            {
-                start+=24;
-                bitStream += 0xFFFF<<bitCount;
-                *(U16*)out=(U16)bitStream;
-                out+=2;
-                bitStream>>=16;
-            }
-            while (charnum >= start+3)
-            {
-                start+=3;
-                bitStream += 3 << bitCount;
-                bitCount += 2;
-            }
-            bitStream += (charnum-start) << bitCount;
-            bitCount += 2;
-            if (bitCount>16)
-            {
-                *(U16*)out = (U16)bitStream;
-                out += 2;
-                bitStream >>= 16;
-                bitCount -= 16;
-            }
-        }
-        {
-            short count = normalizedCounter[charnum++];
-            const short max = (short)((2*threshold-1)-remaining);
-            remaining -= FSE_abs(count);
-            if (remaining<0) return -1;
-            count++;   // +1 for extra accuracy
-            if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
-            bitStream += count << bitCount;
-            bitCount  += nbBits;
-            bitCount  -= (count<max);
-            previous0 = (count==1);
-            while (remaining<threshold) nbBits--, threshold>>=1;
-        }
-        if (bitCount>16)
-        {
-            *(U16*)out = (U16)bitStream;
-            out += 2;
-            bitStream >>= 16;
-            bitCount -= 16;
-        }
-    }
-
-    * (U16*) out = (U16) bitStream;
-    out+= (bitCount+7) /8;
-
-    if (charnum > maxSymbolValue+1) return -1;   // Too many symbols written
-
-    return (int) (out-ostart);
-}
-*/
 
 static int FSE_writeHeader_generic (void* header, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog, unsigned safeWrite)
 {
@@ -832,7 +741,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize,
     if (errorCode == -1) return -1;
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
     if (errorCode == -1) return -1;
     op += errorCode;
 
