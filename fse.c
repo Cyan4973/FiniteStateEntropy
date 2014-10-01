@@ -490,7 +490,7 @@ unsigned FSE_optimalTableLog(unsigned maxTableLog, unsigned sourceSize, unsigned
 
 
 int FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
-                        unsigned* count, unsigned total,
+                        const unsigned* count, unsigned total,
                         unsigned maxSymbolValue)
 {
     // Check
@@ -710,6 +710,8 @@ int FSE_noCompression (BYTE* out, const BYTE* in, unsigned isize)
     memcpy (out, in, isize);
     return (isize+1);
 }
+
+unsigned FSE_compressBound(unsigned size) { return FSE_COMPRESSBOUND(size); }
 
 
 int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog)

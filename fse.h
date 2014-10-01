@@ -62,7 +62,7 @@ int FSE_decompress (unsigned char* dest, unsigned originalSize,
 FSE_compress():
     Compress table of unsigned char 'source', of size 'sourceSize', into destination buffer 'dest'.
     'dest' buffer must be already allocated, and sized to handle worst case situations.
-    Use FSE_compressBound() to determine this size.
+    Worst case size evaluation is provided by FSE_compressBound().
     return : size of compressed data
              or -1 if there is an error.
 FSE_decompress():
@@ -76,8 +76,8 @@ FSE_decompress():
 
 
 #define FSE_MAX_HEADERSIZE 512
-#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)
-static inline unsigned FSE_compressBound(unsigned size) { return FSE_COMPRESSBOUND(size); }
+#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
+unsigned FSE_compressBound(unsigned size);
 /*
 FSE_compressBound():
     Gives the maximum (worst case) size that can be reached by function FSE_compress.
@@ -114,16 +114,16 @@ int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void*
 ******************************************/
 /*
 int FSE_compress(char* dest, const char* source, int inputSize) does the following:
-1. count symbol occurence from table source[] into table count[]
-2. normalize counters so that sum(counting[]) == Power_of_2 (== 2^tableLog)
-3. saves normalized counters to memory buffer using writeHeader()
-4. builds encoding tables from the normalized counters
-5. encodes the data stream using encoding tables
+1. count symbol occurrence from table source[] into table count[]
+2. normalize counters so that sum(count[]) == Power_of_2 (2^tableLog)
+3. save normalized counters to memory buffer using writeHeader()
+4. build encoding tables from normalized counters
+5. encode the data stream using encoding tables
 
 int FSE_decompress(char* dest, int originalSize, const char* compressed) performs:
-1. reads normalized counters with readHeader()
-2. builds decoding tables from the normalized counters
-3. decodes the data stream using these decoding tables
+1. read normalized counters with readHeader()
+2. build decoding tables from normalized counters
+3. decode the data stream using these decoding tables
 
 The following API allows to target specific sub-functions.
 */
@@ -133,7 +133,7 @@ The following API allows to target specific sub-functions.
 int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
 unsigned FSE_optimalTableLog(unsigned tableLog, unsigned sourceSize, unsigned maxSymbolValue);
-int FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, unsigned* count, unsigned total, unsigned maxSymbolValue);
+int FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, const unsigned* count, unsigned total, unsigned maxSymbolValue);
 
 unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
 int FSE_writeHeader (void* headerBuffer, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
@@ -155,8 +155,8 @@ The next step is to normalize the frequencies.
 FSE_normalizeCount() will ensure that sum of frequencies is == 2 ^'tableLog'.
 It also guarantees a minimum of 1 to any Symbol which frequency is >= 1.
 You can use input 'tableLog'==0 to mean "use default tableLog value".
-For a more optimal tableLog, you can optionally use FSE_optimalTableLog(),
-which will provide the optimal valid tableLog given sourceSize, maxSymbolValue, and a user-defined maximum.
+If you are unsure of which tableLog value to use, you can optionally call FSE_optimalTableLog(),
+which will provide the optimal valid tableLog given sourceSize, maxSymbolValue, and a user-defined maximum (0 means "default").
 
 The result of FSE_normalizeCount() will be saved into a table,
 called 'normalizedCounter', which is a table of signed short.
@@ -273,7 +273,7 @@ The nb of bits already written into bitStream is stored into bitPos.
 For information, FSE_encodeByte() never writes more than 'tableLog' bits at a time.
     FSE_flushBits(&op, &bitStream);
 
-Your last FSE encoding operation shall be to flush your state value.
+Your last FSE encoding operation shall be to flush your last state value.
     FSE_addBits(&bitStream, state, tableLog);
     FSE_flushBits(&op, &bitStream);
 

@@ -213,6 +213,86 @@ static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t
 */
 }
 
+static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+#define NBT 8
+    U32 count[NBT][256];
+    const BYTE* ip = (BYTE*)src;
+    const BYTE* const end = ip + srcSize - (NBT-1);
+
+    (void)dst; (void)dstSize;
+    memset(count, 0, sizeof(count));
+    while (ip<end)
+    {
+        unsigned idx;
+        for (idx=0; idx<NBT; idx++)
+            count[idx][*ip++]++;
+    }
+    {
+        unsigned idx, n;
+        for (n=0; n<256; n++)
+            for (idx=1; idx<NBT; idx++)
+                count[0][n] += count[idx][n];
+    }
+    return (int)count[0][ip[-1]];
+}
+
+
+#ifdef __SSE4_1__
+
+#include <emmintrin.h>
+#include <smmintrin.h>
+
+static int local_countVector(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    // SSE version, suggested by Miklos Maroti
+    unsigned int count[256];
+    struct data { unsigned int a, b, c, d; } temp[256];
+    int i;
+
+    (void)dst; (void)dstSize;
+
+    for (i = 0; i < 256; i += 8)
+    {
+        temp[i].a = 0;
+        temp[i].b = 0;
+        temp[i].c = 0;
+        temp[i].d = 0;
+    }
+
+    __m128i *ptr = (__m128i*) src;
+    __m128i *end = (__m128i*) ((BYTE*)src + srcSize);
+    while (ptr != end)
+    {
+        __m128i bs = _mm_load_si128(ptr++);
+
+        temp[_mm_extract_epi8(bs, 0)].a += 1;
+        temp[_mm_extract_epi8(bs, 1)].b += 1;
+        temp[_mm_extract_epi8(bs, 2)].c += 1;
+        temp[_mm_extract_epi8(bs, 3)].d += 1;
+        temp[_mm_extract_epi8(bs, 4)].a += 1;
+        temp[_mm_extract_epi8(bs, 5)].b += 1;
+        temp[_mm_extract_epi8(bs, 6)].c += 1;
+        temp[_mm_extract_epi8(bs, 7)].d += 1;
+        temp[_mm_extract_epi8(bs, 8)].a += 1;
+        temp[_mm_extract_epi8(bs, 9)].b += 1;
+        temp[_mm_extract_epi8(bs,10)].c += 1;
+        temp[_mm_extract_epi8(bs,11)].d += 1;
+        temp[_mm_extract_epi8(bs,12)].a += 1;
+        temp[_mm_extract_epi8(bs,13)].b += 1;
+        temp[_mm_extract_epi8(bs,14)].c += 1;
+        temp[_mm_extract_epi8(bs,15)].d += 1;
+    }
+
+    for (i = 0; i < 256; i++)
+        count[i] = temp[i].a + temp[i].b + temp[i].c + temp[i].d;
+
+    return count[0];
+}
+
+#endif
+
+
 static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[256];
@@ -377,6 +457,18 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         funcName = "trivialCount";
         func = local_trivialCount;
         break;
+
+    case 101:
+        funcName = "count8";
+        func = local_count8;
+        break;
+
+#ifdef __SSE4_1__
+    case 200:
+        funcName = "local_countVector";
+        func = local_countVector;
+        break;
+#endif
 
     default:
         DISPLAY("Unknown algorithm number\n");
