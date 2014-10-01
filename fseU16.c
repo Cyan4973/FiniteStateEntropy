@@ -204,7 +204,7 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     tableLog = errorCode;
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
     if (errorCode == -1) return -1;
     op += errorCode;
 

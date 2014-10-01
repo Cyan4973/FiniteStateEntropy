@@ -189,10 +189,17 @@ static short FSE_abs(short a)
 /****************************************************************
    Header bitstream management
 ****************************************************************/
-int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
+{
+    U32 maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1;
+    return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
+}
+
+static int FSE_writeHeader_generic (void* header, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog, unsigned safeWrite)
 {
     BYTE* const ostart = (BYTE*) header;
     BYTE* out = ostart;
+    BYTE* oend = ostart + headerBufferSize;
     int nbBits;
     const int tableSize = 1 << tableLog;
     int remaining;
@@ -201,9 +208,6 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxS
     int bitCount;
     unsigned charnum = 0;
     int previous0 = 0;
-
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported
-    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported
 
     // HeaderId (normal case)
     bitStream = 2;
@@ -227,6 +231,7 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxS
             {
                 start+=24;
                 bitStream += 0xFFFF<<bitCount;
+                if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
                 *(U16*)out=(U16)bitStream;
                 out+=2;
                 bitStream>>=16;
@@ -241,6 +246,7 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxS
             bitCount += 2;
             if (bitCount>16)
             {
+                if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
                 *(U16*)out = (U16)bitStream;
                 out += 2;
                 bitStream >>= 16;
@@ -262,6 +268,7 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxS
         }
         if (bitCount>16)
         {
+            if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
             *(U16*)out = (U16)bitStream;
             out += 2;
             bitStream >>= 16;
@@ -269,12 +276,25 @@ int FSE_writeHeader (void* header, const short* normalizedCounter, unsigned maxS
         }
     }
 
+    if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
     * (U16*) out = (U16) bitStream;
     out+= (bitCount+7) /8;
 
     if (charnum > maxSymbolValue+1) return -1;   // Too many symbols written
 
     return (int) (out-ostart);
+}
+
+
+int FSE_writeHeader (void* header, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+{
+    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported
+    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported
+
+    if (headerBufferSize < FSE_headerBound(maxSymbolValue, tableLog))
+        return FSE_writeHeader_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
+
+    return FSE_writeHeader_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 1);
 }
 
 
@@ -721,7 +741,7 @@ int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize,
     if (errorCode == -1) return -1;
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
     if (errorCode == -1) return -1;
     op += errorCode;
 
@@ -1055,7 +1075,10 @@ int FSE_FUNCTION_NAME(FSE_countFast, FSE_FUNCTION_EXTENSION) (unsigned* count, c
 int FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, const FSE_FUNCTION_TYPE* source, unsigned sourceSize, unsigned* maxSymbolValuePtr)
 {
     if ((sizeof(FSE_FUNCTION_TYPE)==1) && (*maxSymbolValuePtr >= 255))
+    {
+        *maxSymbolValuePtr = 255;
         return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, source, sourceSize, maxSymbolValuePtr, 0);
+    }
     return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, source, sourceSize, maxSymbolValuePtr, 1);
 }
 
