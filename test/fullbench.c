@@ -252,6 +252,55 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
     return count[0][0];
 }
 
+
+static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+//#define NU 8
+  #define NU 16
+  int i;
+  U32 count[256]={0};
+  U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
+  const BYTE* ip = (const BYTE*)src;
+  const BYTE* const iend = ip + (srcSize&(~(NU-1)));
+  U32 cp = *(U32 *)src;
+
+  (void)dst; (void)dstSize;
+
+  for(; ip != iend; )
+  {
+    U32 c = cp; ip += 4; cp = *(U32 *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+      #if NU == 16
+    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+             c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+      #endif
+  }
+  while(ip < (const BYTE*)src+srcSize) c0[*ip++]++;
+  for(i = 0; i < 256; i++)
+    count[i] = c0[i]+c1[i]+c2[i]+c3[i];
+
+  return count[0];
+}
+
 #ifdef __SSE4_1__
 
 #include <emmintrin.h>
@@ -647,6 +696,12 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         funcName = "count8v2";
         func = local_count8v2;
         break;
+
+    case 103:
+        funcName = "local_hist_4_32";
+        func = local_hist_4_32;
+        break;
+
 
 #ifdef __SSE4_1__
     case 200:
