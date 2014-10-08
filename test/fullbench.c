@@ -302,6 +302,8 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
   return count[0];
 }
 
+#ifdef __x86_64__
+
 // test function from Nathan Kurz, at https://github.com/nkurz/countbench
 #define ASM_SHIFT_RIGHT(reg, bitsToShift)                                \
     __asm volatile ("shr %1, %0":                                       \
@@ -388,6 +390,8 @@ static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t s
 
     return count[0][0];
 }
+
+#endif // __x86_64__
 
 
 #ifdef __SSE4_1__
@@ -791,10 +795,14 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         func = local_hist_4_32;
         break;
 
-    case 104:
+#ifdef __x86_64__
+
+    case 150:
         funcName = "local_count2x64";
         func = local_count2x64;
         break;
+
+#endif // __x86_64__
 
 
 #ifdef __SSE4_1__
