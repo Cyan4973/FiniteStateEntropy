@@ -253,6 +253,7 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
 }
 
 
+// hist_X_Y function from https://github.com/powturbo/turbohist
 static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
 //#define NU 8
@@ -300,6 +301,94 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
 
   return count[0];
 }
+
+// test function from Nathan Kurz, at https://github.com/nkurz/countbench
+#define ASM_SHIFT_RIGHT(reg, bitsToShift)                                \
+    __asm volatile ("shr %1, %0":                                       \
+                    "+r" (reg): /* read and written */                  \
+                    "i" (bitsToShift) /* constant */                    \
+                    )
+
+
+#define ASM_INC_TABLES(src0, src1, byte0, byte1, offset, size, base, scale) \
+    __asm volatile ("movzbl %b2, %k0\n"                /* byte0 = src0 & 0xFF */ \
+                    "movzbl %b3, %k1\n"                /* byte1 = src1 & 0xFF */ \
+                    "incl (%c4+0)*%c5(%6, %0, %c7)\n"  /* count[i+0][byte0]++ */ \
+                    "incl (%c4+1)*%c5(%6, %1, %c7)\n"  /* count[i+1][byte1]++ */ \
+                    "movzbl %h2, %k0\n"                /* byte0 = (src0 & 0xFF00) >> 8 */ \
+                    "movzbl %h3, %k1\n"                /* byte1 = (src1 & 0xFF00) >> 8 */ \
+                    "incl (%c4+2)*%c5(%6, %0, %c7)\n"  /* count[i+2][byte0]++ */ \
+                    "incl (%c4+3)*%c5(%6, %1, %c7)\n": /* count[i+3][byte1]++ */ \
+                    "=&R" (byte0),  /* write only (R == non REX) */     \
+                    "=&R" (byte1):  /* write only (R == non REX) */     \
+                    "Q" (src0),  /* read only (Q == must have rH) */    \
+                    "Q" (src1),  /* read only (Q == must have rH) */    \
+                    "i" (offset), /* constant array offset */           \
+                    "i" (size), /* constant array size     */           \
+                    "r" (base),  /* read only array address */          \
+                    "i" (scale):  /* constant [1,2,4,8] */              \
+                    "memory" /* clobbered (forces compiler to compute sum ) */ \
+                    )
+
+#define COUNT_SIZE (256+16)
+static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t srcSize)
+{
+    const BYTE* src = (const BYTE*)src0;
+    U64 remainder = srcSize;
+    if (srcSize < 32) goto handle_remainder;
+
+    U32 count[16][COUNT_SIZE];
+    memset(count, 0, sizeof(count));
+
+   (void)dst; (void)dstSize;
+
+    remainder = srcSize % 16;
+    srcSize -= remainder;
+    const BYTE *endSrc = src + srcSize;
+    U64 next0 = *(U64 *)(src + 0);
+    U64 next1 = *(U64 *)(src + 8);
+
+    while (src != endSrc)
+    {
+        U64 byte0, byte1;
+        U64 data0 = next0;
+        U64 data1 = next1;
+
+        src += 16;
+        next0 = *(U64 *)(src + 0);
+        next1 = *(U64 *)(src + 8);
+
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 0, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 4, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 8, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 12, COUNT_SIZE * 4, count, 4);
+    }
+
+
+ handle_remainder:
+    for (size_t i = 0; i < remainder; i++) {
+        uint64_t byte = src[i];
+        count[0][byte]++;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        for (int idx=1; idx < 16; idx++) {
+            count[0][i] += count[idx][i];
+        }
+    }
+
+    return count[0][0];
+}
+
 
 #ifdef __SSE4_1__
 
@@ -700,6 +789,11 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 103:
         funcName = "local_hist_4_32";
         func = local_hist_4_32;
+        break;
+
+    case 104:
+        funcName = "local_count2x64";
+        func = local_count2x64;
         break;
 
 
