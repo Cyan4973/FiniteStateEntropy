@@ -1065,22 +1065,22 @@ int FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (unsigned* coun
         while (ip < iend-15)
         {
             U32 c = cached; cached = *(U32 *)ip; ip += 4;
-            Counting1[(BYTE)c      ]++;
+            Counting1[(BYTE) c     ]++;
             Counting2[(BYTE)(c>>8) ]++;
             Counting3[(BYTE)(c>>16)]++;
             Counting4[       c>>24 ]++;
             c = cached; cached = *(U32 *)ip; ip += 4;
-            Counting1[(BYTE)c      ]++;
+            Counting1[(BYTE) c     ]++;
             Counting2[(BYTE)(c>>8) ]++;
             Counting3[(BYTE)(c>>16)]++;
             Counting4[       c>>24 ]++;
             c = cached; cached = *(U32 *)ip; ip += 4;
-            Counting1[(BYTE)c      ]++;
+            Counting1[(BYTE) c     ]++;
             Counting2[(BYTE)(c>>8) ]++;
             Counting3[(BYTE)(c>>16)]++;
             Counting4[       c>>24 ]++;
             c = cached; cached = *(U32 *)ip; ip += 4;
-            Counting1[(BYTE)c      ]++;
+            Counting1[(BYTE) c     ]++;
             Counting2[(BYTE)(c>>8) ]++;
             Counting3[(BYTE)(c>>16)]++;
             Counting4[       c>>24 ]++;

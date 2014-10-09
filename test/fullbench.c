@@ -302,6 +302,78 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
   return count[0];
 }
 
+
+// Modified version of count2x64 by Nathan Kurz, using C instead of assembler
+#define C_INC_TABLES(src0, src1, count, i) \
+        { \
+            U64 byte0 = src0 & 0xFF;\
+            U64 byte1 = src1 & 0xFF;\
+            U64 byte2 = (src0 & 0xFF00) >> 8; \
+            U64 byte3 = (src1 & 0xFF00) >> 8; \
+            count[i+0][byte0]++;\
+            count[i+1][byte1]++;\
+            count[i+2][byte2]++; \
+            count[i+3][byte3]++; \
+        }
+
+#define COUNT_SIZE (256+16)
+static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t srcSize)
+{
+    const BYTE* src = (const BYTE*)src0;
+    U64 remainder = srcSize;
+
+    U32 count[16][COUNT_SIZE];
+
+   (void)dst; (void)dstSize;
+    memset(count, 0, sizeof(count));
+    if (srcSize < 32) goto handle_remainder;
+
+    remainder = srcSize % 16;
+    srcSize -= remainder;
+    const BYTE *endSrc = src + srcSize;
+    U64 next0 = *(U64 *)(src + 0);
+    U64 next1 = *(U64 *)(src + 8);
+
+    while (src != endSrc)
+    {
+        U64 data0 = next0;
+        U64 data1 = next1;
+
+        src += 16;
+        next0 = *(U64 *)(src + 0);
+        next1 = *(U64 *)(src + 8);
+
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+    }
+
+
+ handle_remainder:
+    for (size_t i = 0; i < remainder; i++) {
+        U64 byte = src[i];
+        count[0][byte]++;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        for (int idx=1; idx < 16; idx++) {
+            count[0][i] += count[idx][i];
+        }
+    }
+
+    return count[0][0];
+}
+
 #ifdef __x86_64__
 
 // test function from Nathan Kurz, at https://github.com/nkurz/countbench
@@ -396,8 +468,9 @@ static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t s
 
 #ifdef __SSE4_1__
 
-#include <emmintrin.h>
-#include <smmintrin.h>
+//#include <emmintrin.h>
+//#include <smmintrin.h>
+#include <x86intrin.h>
 
 static int local_countVector(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -793,6 +866,11 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 103:
         funcName = "local_hist_4_32";
         func = local_hist_4_32;
+        break;
+
+    case 104:
+        funcName = "local_count2x64v2";
+        func = local_count2x64v2;
         break;
 
 #ifdef __x86_64__
