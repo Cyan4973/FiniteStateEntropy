@@ -213,17 +213,17 @@ static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSi
 }
 
 
+// U64 version
 static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    // U64 version
     U32 count[8][256+16];
+    U64* ptr = (U64*) src;
+    U64* end = (U64*) ((BYTE*)src + (srcSize & (~0x7)));
+    U64 next = *ptr++;
 
     (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
 
-    U64 *ptr = (U64*) src;
-    U64 *end = (U64*) ((BYTE*)src + (srcSize & (~0x7)));
-    U64 next = *ptr++;
     while (ptr != end)
     {
         register U64 bs = next;
@@ -321,18 +321,20 @@ static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t
 {
     const BYTE* src = (const BYTE*)src0;
     U64 remainder = srcSize;
+    U64 next0, next1;
 
     U32 count[16][COUNT_SIZE];
+    const BYTE *endSrc;
 
    (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
     if (srcSize < 32) goto handle_remainder;
 
     remainder = srcSize % 16;
-    srcSize -= remainder;
-    const BYTE *endSrc = src + srcSize;
-    U64 next0 = *(U64 *)(src + 0);
-    U64 next1 = *(U64 *)(src + 8);
+    srcSize -= (size_t)remainder;
+    endSrc = src + srcSize;
+    next0 = *(U64 *)(src + 0);
+    next1 = *(U64 *)(src + 8);
 
     while (src != endSrc)
     {
@@ -359,15 +361,22 @@ static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t
     }
 
 
- handle_remainder:
-    for (size_t i = 0; i < remainder; i++) {
-        U64 byte = src[i];
-        count[0][byte]++;
-    }
+handle_remainder:
+    {
+        size_t i;
+        for (i = 0; i < remainder; i++) 
+        {
+            U64 byte = src[i];
+            count[0][byte]++;
+        }
 
-    for (int i = 0; i < 256; i++) {
-        for (int idx=1; idx < 16; idx++) {
-            count[0][i] += count[idx][i];
+        for (i = 0; i < 256; i++) 
+        {
+            int idx;
+            for (idx=1; idx < 16; idx++)
+            {
+                count[0][i] += count[idx][i];
+            }
         }
     }
 
@@ -717,7 +726,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_compress(dst, src, srcSize);
+    return FSE_compress(dst, src, (U32)srcSize);
 }
 
 static short g_normTable[256];
@@ -734,7 +743,7 @@ static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, 
 static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return FSE_writeHeader(dst, dstSize, g_normTable, 255, g_tableLog);
+    return FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
 }
 
 static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -752,7 +761,7 @@ static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, siz
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_compress_usingCTable(dst, src, srcSize, g_CTable);
+    return FSE_compress_usingCTable(dst, src, (U32)srcSize, g_CTable);
 }
 
 
@@ -791,7 +800,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 4:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
@@ -801,7 +810,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 5:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_writeHeader";
@@ -812,7 +821,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 6:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_writeHeader(small)";
@@ -823,7 +832,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_buildCTable";
@@ -834,7 +843,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 8:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
