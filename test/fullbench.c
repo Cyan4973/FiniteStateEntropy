@@ -213,17 +213,17 @@ static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSi
 }
 
 
+// U64 version
 static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    // U64 version
     U32 count[8][256+16];
+    U64* ptr = (U64*) src;
+    U64* end = (U64*) ((BYTE*)src + (srcSize & (~0x7)));
+    U64 next = *ptr++;
 
     (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
 
-    U64 *ptr = (U64*) src;
-    U64 *end = (U64*) ((BYTE*)src + (srcSize & (~0x7)));
-    U64 next = *ptr++;
     while (ptr != end)
     {
         register U64 bs = next;
@@ -252,10 +252,234 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
     return count[0][0];
 }
 
+
+// hist_X_Y function from https://github.com/powturbo/turbohist
+static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+//#define NU 8
+  #define NU 16
+  int i;
+  U32 count[256]={0};
+  U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
+  const BYTE* ip = (const BYTE*)src;
+  const BYTE* const iend = ip + (srcSize&(~(NU-1)));
+  U32 cp = *(U32 *)src;
+
+  (void)dst; (void)dstSize;
+
+  for(; ip != iend; )
+  {
+    U32 c = cp; ip += 4; cp = *(U32 *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+      #if NU == 16
+    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+
+             c = cp; ip += 4; cp = *(unsigned *)ip;
+    c0[(unsigned char)c      ]++;
+    c1[(unsigned char)(c>>8) ]++;
+    c2[(unsigned char)(c>>16)]++;
+    c3[c>>24                 ]++;
+      #endif
+  }
+  while(ip < (const BYTE*)src+srcSize) c0[*ip++]++;
+  for(i = 0; i < 256; i++)
+    count[i] = c0[i]+c1[i]+c2[i]+c3[i];
+
+  return count[0];
+}
+
+
+// Modified version of count2x64 by Nathan Kurz, using C instead of assembler
+#define C_INC_TABLES(src0, src1, count, i) \
+        { \
+            U64 byte0 = src0 & 0xFF;\
+            U64 byte1 = src1 & 0xFF;\
+            U64 byte2 = (src0 & 0xFF00) >> 8; \
+            U64 byte3 = (src1 & 0xFF00) >> 8; \
+            count[i+0][byte0]++;\
+            count[i+1][byte1]++;\
+            count[i+2][byte2]++; \
+            count[i+3][byte3]++; \
+        }
+
+#define COUNT_SIZE (256+16)
+static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t srcSize)
+{
+    const BYTE* src = (const BYTE*)src0;
+    U64 remainder = srcSize;
+    U64 next0, next1;
+
+    U32 count[16][COUNT_SIZE];
+    const BYTE *endSrc;
+
+   (void)dst; (void)dstSize;
+    memset(count, 0, sizeof(count));
+    if (srcSize < 32) goto handle_remainder;
+
+    remainder = srcSize % 16;
+    srcSize -= (size_t)remainder;
+    endSrc = src + srcSize;
+    next0 = *(U64 *)(src + 0);
+    next1 = *(U64 *)(src + 8);
+
+    while (src != endSrc)
+    {
+        U64 data0 = next0;
+        U64 data1 = next1;
+
+        src += 16;
+        next0 = *(U64 *)(src + 0);
+        next1 = *(U64 *)(src + 8);
+
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+
+        data0 >>= 16;
+        data1 >>= 16;
+        C_INC_TABLES(data0, data1, count, 0);
+    }
+
+
+handle_remainder:
+    {
+        size_t i;
+        for (i = 0; i < remainder; i++) 
+        {
+            U64 byte = src[i];
+            count[0][byte]++;
+        }
+
+        for (i = 0; i < 256; i++) 
+        {
+            int idx;
+            for (idx=1; idx < 16; idx++)
+            {
+                count[0][i] += count[idx][i];
+            }
+        }
+    }
+
+    return count[0][0];
+}
+
+#ifdef __x86_64__
+
+// test function from Nathan Kurz, at https://github.com/nkurz/countbench
+#define ASM_SHIFT_RIGHT(reg, bitsToShift)                                \
+    __asm volatile ("shr %1, %0":                                       \
+                    "+r" (reg): /* read and written */                  \
+                    "i" (bitsToShift) /* constant */                    \
+                    )
+
+
+#define ASM_INC_TABLES(src0, src1, byte0, byte1, offset, size, base, scale) \
+    __asm volatile ("movzbl %b2, %k0\n"                /* byte0 = src0 & 0xFF */ \
+                    "movzbl %b3, %k1\n"                /* byte1 = src1 & 0xFF */ \
+                    "incl (%c4+0)*%c5(%6, %0, %c7)\n"  /* count[i+0][byte0]++ */ \
+                    "incl (%c4+1)*%c5(%6, %1, %c7)\n"  /* count[i+1][byte1]++ */ \
+                    "movzbl %h2, %k0\n"                /* byte0 = (src0 & 0xFF00) >> 8 */ \
+                    "movzbl %h3, %k1\n"                /* byte1 = (src1 & 0xFF00) >> 8 */ \
+                    "incl (%c4+2)*%c5(%6, %0, %c7)\n"  /* count[i+2][byte0]++ */ \
+                    "incl (%c4+3)*%c5(%6, %1, %c7)\n": /* count[i+3][byte1]++ */ \
+                    "=&R" (byte0),  /* write only (R == non REX) */     \
+                    "=&R" (byte1):  /* write only (R == non REX) */     \
+                    "Q" (src0),  /* read only (Q == must have rH) */    \
+                    "Q" (src1),  /* read only (Q == must have rH) */    \
+                    "i" (offset), /* constant array offset */           \
+                    "i" (size), /* constant array size     */           \
+                    "r" (base),  /* read only array address */          \
+                    "i" (scale):  /* constant [1,2,4,8] */              \
+                    "memory" /* clobbered (forces compiler to compute sum ) */ \
+                    )
+
+#define COUNT_SIZE (256+16)
+static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t srcSize)
+{
+    const BYTE* src = (const BYTE*)src0;
+    U64 remainder = srcSize;
+    if (srcSize < 32) goto handle_remainder;
+
+    U32 count[16][COUNT_SIZE];
+    memset(count, 0, sizeof(count));
+
+   (void)dst; (void)dstSize;
+
+    remainder = srcSize % 16;
+    srcSize -= remainder;
+    const BYTE *endSrc = src + srcSize;
+    U64 next0 = *(U64 *)(src + 0);
+    U64 next1 = *(U64 *)(src + 8);
+
+    while (src != endSrc)
+    {
+        U64 byte0, byte1;
+        U64 data0 = next0;
+        U64 data1 = next1;
+
+        src += 16;
+        next0 = *(U64 *)(src + 0);
+        next1 = *(U64 *)(src + 8);
+
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 0, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 4, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 8, COUNT_SIZE * 4, count, 4);
+
+        ASM_SHIFT_RIGHT(data0, 16);
+        ASM_SHIFT_RIGHT(data1, 16);
+        ASM_INC_TABLES(data0, data1, byte0, byte1, 12, COUNT_SIZE * 4, count, 4);
+    }
+
+
+ handle_remainder:
+    for (size_t i = 0; i < remainder; i++) {
+        uint64_t byte = src[i];
+        count[0][byte]++;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        for (int idx=1; idx < 16; idx++) {
+            count[0][i] += count[idx][i];
+        }
+    }
+
+    return count[0][0];
+}
+
+#endif // __x86_64__
+
+
 #ifdef __SSE4_1__
 
-#include <emmintrin.h>
-#include <smmintrin.h>
+//#include <emmintrin.h>
+//#include <smmintrin.h>
+#include <x86intrin.h>
 
 static int local_countVector(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -502,7 +726,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_compress(dst, src, srcSize);
+    return FSE_compress(dst, src, (U32)srcSize);
 }
 
 static short g_normTable[256];
@@ -519,7 +743,7 @@ static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, 
 static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return FSE_writeHeader(dst, dstSize, g_normTable, 255, g_tableLog);
+    return FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
 }
 
 static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -537,7 +761,7 @@ static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, siz
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_compress_usingCTable(dst, src, srcSize, g_CTable);
+    return FSE_compress_usingCTable(dst, src, (U32)srcSize, g_CTable);
 }
 
 
@@ -576,7 +800,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 4:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
@@ -586,7 +810,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 5:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_writeHeader";
@@ -597,7 +821,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 6:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_writeHeader(small)";
@@ -608,7 +832,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_buildCTable";
@@ -619,7 +843,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 8:
         {
             U32 max=255;
-            FSE_count(g_countTable, oBuffer, benchedSize, &max);
+            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
             g_tableLog = FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
@@ -647,6 +871,26 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         funcName = "count8v2";
         func = local_count8v2;
         break;
+
+    case 103:
+        funcName = "local_hist_4_32";
+        func = local_hist_4_32;
+        break;
+
+    case 104:
+        funcName = "local_count2x64v2";
+        func = local_count2x64v2;
+        break;
+
+#ifdef __x86_64__
+
+    case 150:
+        funcName = "local_count2x64";
+        func = local_count2x64;
+        break;
+
+#endif // __x86_64__
+
 
 #ifdef __SSE4_1__
     case 200:

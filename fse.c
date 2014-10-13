@@ -1048,12 +1048,44 @@ int FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (unsigned* coun
     if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return -1;        // maxSymbolValue too large : unsupported
     if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;  // 0: default
 
-    while (ip < iend-3)
+    //safe=1;
+    if (safe)
     {
-        if ((safe) && (*ip>maxSymbolValue)) return -1; Counting1[*ip++]++;
-        if ((safe) && (*ip>maxSymbolValue)) return -1; Counting2[*ip++]++;
-        if ((safe) && (*ip>maxSymbolValue)) return -1; Counting3[*ip++]++;
-        if ((safe) && (*ip>maxSymbolValue)) return -1; Counting4[*ip++]++;
+        while (ip < iend-3)
+        {
+            if (*ip>maxSymbolValue) return -1; Counting1[*ip++]++;
+            if (*ip>maxSymbolValue) return -1; Counting2[*ip++]++;
+            if (*ip>maxSymbolValue) return -1; Counting3[*ip++]++;
+            if (*ip>maxSymbolValue) return -1; Counting4[*ip++]++;
+        }
+    }
+    else
+    {
+        U32 cached = *(U32 *)ip; ip += 4;
+        while (ip < iend-15)
+        {
+            U32 c = cached; cached = *(U32 *)ip; ip += 4;
+            Counting1[(BYTE) c     ]++;
+            Counting2[(BYTE)(c>>8) ]++;
+            Counting3[(BYTE)(c>>16)]++;
+            Counting4[       c>>24 ]++;
+            c = cached; cached = *(U32 *)ip; ip += 4;
+            Counting1[(BYTE) c     ]++;
+            Counting2[(BYTE)(c>>8) ]++;
+            Counting3[(BYTE)(c>>16)]++;
+            Counting4[       c>>24 ]++;
+            c = cached; cached = *(U32 *)ip; ip += 4;
+            Counting1[(BYTE) c     ]++;
+            Counting2[(BYTE)(c>>8) ]++;
+            Counting3[(BYTE)(c>>16)]++;
+            Counting4[       c>>24 ]++;
+            c = cached; cached = *(U32 *)ip; ip += 4;
+            Counting1[(BYTE) c     ]++;
+            Counting2[(BYTE)(c>>8) ]++;
+            Counting3[(BYTE)(c>>16)]++;
+            Counting4[       c>>24 ]++;
+        }
+        ip-=4;
     }
     while (ip<iend) { if ((safe) && (*ip>maxSymbolValue)) return -1; Counting1[*ip++]++; }
 
