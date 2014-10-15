@@ -308,7 +308,7 @@ static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t 
   U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
   const BYTE* ip = (BYTE*)src;
   const BYTE* const iend = (const BYTE*)src + srcSize;
-  U32   cp = *(U32*)src;
+  U32 cp = *(U32*)src;
   int i;
 
 
@@ -338,9 +338,50 @@ static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t 
   }
   while(ip < iend) c0[*ip++]++;
 
-  for(i = 0; i < 256; i++)
-    c0[i] += c1[i]+c2[i]+c3[i];
+  for(i = 0; i < 256; i++) c0[i] += c1[i]+c2[i]+c3[i];
+
   return c0[0];
+}
+
+
+#define PAD 8
+
+static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    U32 c0[256+PAD]={0},c1[256+PAD]={0},c2[256+PAD]={0},c3[256+PAD]={0},c4[256+PAD]={0},c5[256+PAD]={0},c6[256+PAD]={0},c7[256+PAD]={0};
+    const BYTE* ip = (BYTE*)src;
+    const BYTE* const iend = (const BYTE*)src + srcSize;
+    U32 cp = *(U32*)src;
+    int i;
+
+    (void)dst; (void)dstSize;
+
+    while( ip <= iend-16 )
+    {
+        U32 c = cp,	d = *(U32 *)(ip+=4); cp = *(U32 *)(ip+=4);
+        c0[(unsigned char) c ]++;
+        c1[(unsigned char) d ]++;
+        c2[(unsigned char)(c>>8)]++; c>>=16;
+        c3[(unsigned char)(d>>8)]++; d>>=16;
+        c4[(unsigned char) c ]++;
+        c5[(unsigned char) d ]++;
+        c6[ c>>8 ]++;
+        c7[ d>>8 ]++;
+        c = cp;	d = *(unsigned *)(ip+=4); cp = *(unsigned *)(ip+=4);
+        c0[(unsigned char) c ]++;
+        c1[(unsigned char) d ]++;
+        c2[(unsigned char)(c>>8)]++; c>>=16;
+        c3[(unsigned char)(d>>8)]++; d>>=16;
+        c4[(unsigned char) c ]++;
+        c5[(unsigned char) d ]++;
+        c6[ c>>8 ]++;
+        c7[ d>>8 ]++;
+    }
+
+    while(ip < iend) c0[*ip++]++;
+    for(i = 0; i < 256; i++) c0[i] += c1[i]+c2[i]+c3[i]+c4[i]+c5[i]+c6[i]+c7[i];
+
+    return c0[0];
 }
 
 
@@ -924,6 +965,11 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         break;
 
     case 105:
+        funcName = "local_hist_8_32";
+        func = local_hist_8_32;
+        break;
+
+    case 106:
         funcName = "local_count2x64v2";
         func = local_count2x64v2;
         break;
