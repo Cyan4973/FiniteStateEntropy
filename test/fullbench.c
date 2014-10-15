@@ -303,6 +303,47 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
 }
 
 
+static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+  U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
+  const BYTE* ip = (BYTE*)src;
+  const BYTE* const iend = (const BYTE*)src + srcSize;
+  U32   cp = *(U32*)src;
+  int i;
+
+
+  (void)dst; (void)dstSize;
+
+  while (ip <= iend-16)
+  {
+    U32 c = cp,	d = *(U32*)(ip+=4); cp = *(U32*)(ip+=4);
+    c0[(BYTE) c    ]++;
+    c1[(BYTE) d    ]++;
+    c2[(BYTE)(c>>8)]++; c>>=16;
+    c3[(BYTE)(d>>8)]++; d>>=16;
+    c0[(BYTE) c    ]++;
+    c1[(BYTE) d    ]++;
+    c2[ 	  c>>8 ]++;
+    c3[ 	  d>>8 ]++;
+
+    c = cp;	d = *(U32*)(ip+=4); cp = *(U32*)(ip+=4);
+    c0[(BYTE) c    ]++;
+    c1[(BYTE) d    ]++;
+    c2[(BYTE)(c>>8)]++; c>>=16;
+    c3[(BYTE)(d>>8)]++; d>>=16;
+    c0[(BYTE) c    ]++;
+    c1[(BYTE) d    ]++;
+    c2[ 	  c>>8 ]++;
+    c3[ 	  d>>8 ]++;
+  }
+  while(ip < iend) c0[*ip++]++;
+
+  for(i = 0; i < 256; i++)
+    c0[i] += c1[i]+c2[i]+c3[i];
+  return c0[0];
+}
+
+
 // Modified version of count2x64 by Nathan Kurz, using C instead of assembler
 #define C_INC_TABLES(src0, src1, count, i) \
         { \
@@ -364,13 +405,13 @@ static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t
 handle_remainder:
     {
         size_t i;
-        for (i = 0; i < remainder; i++) 
+        for (i = 0; i < remainder; i++)
         {
             U64 byte = src[i];
             count[0][byte]++;
         }
 
-        for (i = 0; i < 256; i++) 
+        for (i = 0; i < 256; i++)
         {
             int idx;
             for (idx=1; idx < 16; idx++)
@@ -878,6 +919,11 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         break;
 
     case 104:
+        funcName = "local_hist_4_32v2";
+        func = local_hist_4_32v2;
+        break;
+
+    case 105:
         funcName = "local_count2x64v2";
         func = local_count2x64v2;
         break;
