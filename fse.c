@@ -258,7 +258,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, co
             {
                 start+=24;
                 bitStream += 0xFFFF<<bitCount;
-                if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
+                if ((!safeWrite) && (out > oend-2)) return (size_t)-FSE_ERROR_GENERIC;   // Buffer overflow
                 *(U16*)out=(U16)bitStream;
                 out+=2;
                 bitStream>>=16;
@@ -273,7 +273,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, co
             bitCount += 2;
             if (bitCount>16)
             {
-                if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
+                if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_GENERIC;   // Buffer overflow
                 *(U16*)out = (U16)bitStream;
                 out += 2;
                 bitStream >>= 16;
@@ -284,7 +284,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, co
             short count = normalizedCounter[charnum++];
             const short max = (short)((2*threshold-1)-remaining);
             remaining -= FSE_abs(count);
-            if (remaining<0) return -1;
+            if (remaining<0) return (size_t)-FSE_ERROR_GENERIC;
             count++;   // +1 for extra accuracy
             if (count>=threshold) count += max;   // [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[
             bitStream += count << bitCount;
@@ -295,7 +295,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, co
         }
         if (bitCount>16)
         {
-            if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
+            if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_GENERIC;   // Buffer overflow
             *(U16*)out = (U16)bitStream;
             out += 2;
             bitStream >>= 16;
@@ -303,20 +303,20 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, co
         }
     }
 
-    if ((!safeWrite) && (out > oend-2)) return -1;   // Buffer overflow
+    if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_GENERIC;   // Buffer overflow
     * (U16*) out = (U16) bitStream;
     out+= (bitCount+7) /8;
 
-    if (charnum > maxSymbolValue+1) return -1;   // Too many symbols written
+    if (charnum > maxSymbolValue + 1) return (size_t)-FSE_ERROR_GENERIC;   // Too many symbols written
 
-    return (int) (out-ostart);
+    return (out-ostart);
 }
 
 
 size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
-    if (tableLog > FSE_MAX_TABLELOG) return -1;   // Unsupported
-    if (tableLog < FSE_MIN_TABLELOG) return -1;   // Unsupported
+    if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   // Unsupported
+    if (tableLog < FSE_MIN_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   // Unsupported
 
     if (headerBufferSize < FSE_headerBound(maxSymbolValue, tableLog))
         return FSE_writeHeader_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
@@ -610,7 +610,7 @@ size_t FSE_initCStream(FSE_CState_t* statePtr, void* op, const void* CTable)
     const U32 tableLog = ( (U16*) CTable) [0];
     statePtr->value = (ptrdiff_t)1<<tableLog;
     statePtr->stateTable = ((const U16*) CTable) + 2;
-    statePtr->symbolTT = ((const U16*)(statePtr->stateTable)) + (1<<tableLog);
+    statePtr->symbolTT = ((const U16*)(statePtr->stateTable)) + ((size_t)1<<tableLog);
     statePtr->streamPtr = op;
     return 4;
 }
@@ -625,8 +625,9 @@ void FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned 
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
 }
 
-size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forward_t* bitC, int optionalId)
+size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* out, bitStream_forward_t* bitC, int optionalId)
 {
+    BYTE* op = out;
     BYTE* endPtr;
     U32 descriptor;
     U32 supplBits;
@@ -647,7 +648,7 @@ size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forwar
 }
 
 
-int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC,
+int FSE_flushStates(BYTE** outPtr, bitStream_forward_t* bitC,
                     int nbStates, ptrdiff_t state1, ptrdiff_t state2, const void* CTable)
 {
     const int tableLog = ( (U16*) CTable) [0];
@@ -723,7 +724,7 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
         op += FSE_flushBits(op, &bitC);
     }
 
-    FSE_flushStates((void**)&op, &bitC, nbStreams, CState1.value, CState2.value, CTable);
+    FSE_flushStates(&op, &bitC, nbStreams, CState1.value, CState2.value, CTable);
     return FSE_closeCStream(&CState1, op, &bitC, nbStreams);
 }
 
@@ -734,14 +735,14 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, siz
 }
 
 
-int FSE_writeSingleChar (BYTE *out, BYTE symbol)
+static size_t FSE_writeSingleChar (BYTE *out, BYTE symbol)
 {
     *out++=1;     // Header means ==> 1 symbol repeated across the whole sequence
     *out=symbol;
     return 2;
 }
 
-int FSE_noCompression (BYTE* out, const BYTE* in, unsigned isize)
+static size_t FSE_noCompression (BYTE* out, const BYTE* in, size_t isize)
 {
     *out++=0;     // Header means ==> uncompressed
     memcpy (out, in, isize);
@@ -763,7 +764,7 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     U32   count[FSE_MAX_SYMBOL_VALUE+1];
     S16   norm[FSE_MAX_SYMBOL_VALUE+1];
     CTable_max_t CTable;
-    int errorCode;
+    size_t errorCode;
 
     // early out
     if (dstSize < FSE_compressBound(srcSize)) return (size_t)-FSE_ERROR_dstSize_tooSmall;
@@ -774,22 +775,22 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     // Scan input and build symbol stats
     errorCode = (int)FSE_count (count, ip, srcSize, &maxSymbolValue);
     if (FSE_isError(errorCode)) return errorCode;
-    if (errorCode == (int)srcSize) return FSE_writeSingleChar (ostart, *istart);
-    if (errorCode < (int)((srcSize * 7) >> 10)) return FSE_noCompression (ostart, istart, srcSize);   // Heuristic : not compressible enough
+    if (errorCode == srcSize) return FSE_writeSingleChar (ostart, *istart);
+    if (errorCode < ((srcSize * 7) >> 10)) return FSE_noCompression (ostart, istart, srcSize);   // Heuristic : not compressible enough
 
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
     errorCode = (int)FSE_normalizeCount (norm, tableLog, count, srcSize, maxSymbolValue);
-    if (errorCode == -1) return -1;
+    if (FSE_isError(errorCode)) return errorCode;
 
     // Write table description header
     errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
-    if (errorCode == -1) return -1;
+    if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
     // Compress
     errorCode = FSE_buildCTable (&CTable, norm, maxSymbolValue, tableLog);
-    if (errorCode==-1) return -1;
-    op += FSE_compress_usingCTable (op, oend-op, ip, srcSize, &CTable);
+    if (FSE_isError(errorCode)) return errorCode;
+    op += FSE_compress_usingCTable(op, oend - op, ip, srcSize, &CTable);
 
     // check compressibility
     if ( (size_t)(op-ostart) >= srcSize-1 )
