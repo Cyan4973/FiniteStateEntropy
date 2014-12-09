@@ -75,8 +75,8 @@ test: fullbench fullbench32 fuzzer fuzzer32
 	./fuzzer32
 
 memtest: fuzzer fullbench
-	valgrind ./fuzzer -i200
-	valgrind ./fullbench -i1
+	valgrind --leak-check=yes ./fuzzer -i256
+	valgrind --leak-check=yes ./fullbench -i1
 
 test-all: test memtest
 	@echo test completed

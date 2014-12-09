@@ -833,11 +833,13 @@ static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, siz
     return FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
 }
 
+/*
 static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize; (void)dstSize;
     return FSE_writeHeader(dst, 500, g_normTable, 255, g_tableLog);
 }
+*/
 
 static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -904,6 +906,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
+/*
     case 6:
         {
             U32 max=255;
@@ -914,8 +917,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             func = local_FSE_writeHeader_small;
             break;
         }
+*/
 
-    case 7:
+    case 6:
         {
             U32 max=255;
             FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
@@ -926,7 +930,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
-    case 8:
+    case 7:
         {
             U32 max=255;
             FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
@@ -937,7 +941,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
-    case 9:
+    case 8:
         funcName = "FSE_compress";
         func = local_FSE_compress;
         break;
@@ -1006,8 +1010,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 #endif
 
     default:
-        DISPLAY("Unknown algorithm number\n");
-        exit(-1);
+        return 0;
+        //DISPLAY("Unknown algorithm number\n");
+        //exit(-1);
     }
 
     // Bench
@@ -1149,7 +1154,7 @@ int main(int argc, char** argv)
 
     if (algNb==0)
     {
-        for (i=1; i<=9; i++)
+        for (i=1; i<=99; i++)
             result = fullSpeedBench((double)proba / 100, nbLoops, i);
     }
     else
