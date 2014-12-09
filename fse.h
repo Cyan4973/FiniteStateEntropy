@@ -38,14 +38,6 @@ extern "C" {
 
 
 /******************************************
-   Compiler Options
-******************************************/
-#if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
-#  define inline __inline           // Visual C is not C99, but supports some kind of inline
-#endif
-
-
-/******************************************
    Includes
 ******************************************/
 #include <stddef.h>    // size_t, ptrdiff_t
@@ -238,42 +230,34 @@ typedef struct
 } FSE_CState_t;
 
 size_t FSE_initCStream(FSE_CState_t* statePtr, void* op, const void* CTable);
-void  FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned char symbol);
-static void FSE_addBits(bitStream_forward_t* bitC, size_t value, int nbBits);
-static void FSE_flushBits(void** op, bitStream_forward_t* bitC);
+void   FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned char symbol);
+void   FSE_addBits(bitStream_forward_t* bitC, size_t value, unsigned nbBits);
+size_t FSE_flushBits(void* op, bitStream_forward_t* bitC);
 size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forward_t* bitC, int optionalId);
 
-
 /*
-These function allow the creation of custom streams, mixing multiple tables and bit sources.
-They are used by FSE_compress_usingCTable().
+These functions are inner components of FSE_compress_usingCTable().
+They allow creation of custom streams, mixing multiple tables and bit sources.
 
 A key property to keep in mind is that encoding and decoding are done **in reverse direction**.
 So the first symbol you will encode is the last you will decode, like a lifo stack.
-This logic applies to any bitstream value inserted into the bitstream.
 
-You will need a few variables to track your bitStream. They are :
+You will need a few variables to track your CStream. They are :
 
 void* op;           // Your output buffer (must be already allocated)
-void* compressionStreamDescriptor;   // Required to init and close the bitStream
 void* CTable;       // Provided by FSE_buildCTable()
-ptrdiff_t state;    // Encode fractional bits
+FSE_CState_t state; // Tracking structure
 bitStream_forward_t bitStream={0,0}; // Store bitStream into register before writing it
-void* CTablePtr1;   // Encoding Table n°1. Provided by init. Required by encodeByte.
-void* CTablePtr2;   // Encoding Table n°2. Provided by init. Required by encodeByte.
 
 
-The first thing to do is to init the bitStream.
-    void* compressionStreamDescriptor = FSE_initCompressionStream(&op);
-
-And then init your state and Ptrs. Ptrs are required by the encoded function.
-    FSE_initStateAndPtrs(&state, &CTablePtr1, &CTablePtr2, CTable);
+The first thing to do is to init the CStream.
+    op += FSE_initCStream(&state, op, CTable);
 
 You can then encode your input data, byte after byte.
-You are free to choose the direction in which you encode, as long as you remember decoding will be done in reverse direction.
-    FSE_encodeByte(&state, &bitStream, symbol, CTablePtr1, CTablePtr2);
+Remember decoding will be done in reverse direction.
+    FSE_encodeByte(&state, &bitStream, symbol);
 
-At any time, you can add any other bit sequence.
+At any time, you can add any bit sequence.
 Note : maximum allowed nbBits is 25, to be compatible with 32-bits decoders
     FSE_addBits(&bitStream, bitField, nbBits);
 
@@ -281,19 +265,20 @@ Writing data to memory is performed by the flush method.
 It's possible to store several bitFields into bitStream before calling flush a single time.
 BitStream size is 64-bits on 64-bits systems, 32-bits on 32-bits systems (size_t).
 The nb of bits already written into bitStream is stored into bitPos.
-For information, FSE_encodeByte() never writes more than 'tableLog' bits at a time.
-    FSE_flushBits(&op, &bitStream);
+FSE_encodeByte() never writes more than 'tableLog' bits at a time.
+    op += FSE_flushBits(op, &bitStream);
 
-Your last FSE encoding operation shall be to flush your last state value.
-    FSE_addBits(&bitStream, state, tableLog);
-    FSE_flushBits(&op, &bitStream);
+Your last FSE encoding operation shall be to flush your last state value(s).
+    FSE_addBits(&bitStream, state.value, tableLog);
+    op += FSE_flushBits(op, &bitStream);
 
 When you are done with compression, you must close the bitStream.
 It's possible to embed an optionalId into the header, for later information, value must be between 1 and 4.
 The function returns the size in bytes of the compressed stream.
-If there is an error, it returns -1.
-    int size = FSE_closeCompressionStream(op, &bitStream, compressionStreamDescriptor, optionalId);
+If there is an error, it returns an errorCode (which can be tested using FSE_isError()).
+    size_t size = FSE_closeCStream(&state, op, &bitStream, optionalId);
 */
+
 
 typedef struct
 {
@@ -349,30 +334,6 @@ The function returns the size in bytes of the compressed stream.
 If there is an error, it returns -1.
     int size = FSE_closeDecompressionStream(decompressionStreamDescriptor, ip, bitsConsumed);
 */
-
-
-/***********************************************************************
-   *** inlined functions (for performance) ***
-   GCC is not as good as visual to inline code from other *.c files
-***********************************************************************/
-
-static inline void FSE_addBits(bitStream_forward_t* bitC, size_t value, int nbBits)
-{
-    static const unsigned int mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   // up to 25 bits
-    bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
-    bitC->bitPos += nbBits;
-}
-
-static inline void FSE_flushBits(void** outPtr, bitStream_forward_t* bitC)
-{
-    ** (size_t**) outPtr = bitC->bitContainer;
-    {
-        size_t nbBytes = bitC->bitPos >> 3;
-        bitC->bitPos &= 7;
-        *(char**)outPtr += nbBytes;
-        bitC->bitContainer >>= nbBytes*8;
-    }
-}
 
 
 #if defined (__cplusplus)

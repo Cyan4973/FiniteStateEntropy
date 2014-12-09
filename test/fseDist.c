@@ -191,12 +191,11 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
         FSED_encodeU16(&state, &bitC, *ip--);
         if (sizeof(size_t)>4)   // static test
             FSED_encodeU16(&state, &bitC, *ip--);
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
-    if (ip==istart) { FSED_encodeU16(&state, &bitC, *ip--); FSE_flushBits((void**)&op, &bitC); }
+    if (ip==istart) { FSED_encodeU16(&state, &bitC, *ip--); op += FSE_flushBits(op, &bitC); }
 
     FSE_addBits(&bitC, state.value, tableLog);
-    //return FSE_closeCompressionStream(op, &bitC, streamSize, 0);
     return FSE_closeCStream(&state, op, &bitC, 1);
 }
 
@@ -390,14 +389,14 @@ int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceS
         FSED_encodeU16Log2(&state, &bitC, *ip--);
         if (sizeof(size_t)>4)   // static test
             FSED_encodeU16Log2(&state, &bitC, *ip--);
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
-    if (ip==istart) { FSED_encodeU16Log2(&state, &bitC, *ip--); FSE_flushBits((void**)&op, &bitC); }
+    if (ip==istart) { FSED_encodeU16Log2(&state, &bitC, *ip--); op += FSE_flushBits(op, &bitC); }
 
     // Finalize block
     FSE_addBits(&bitC, state.value, memLog);
-    FSE_flushBits((void**)&op, &bitC);
-    //return FSE_closeCompressionStream(op, &bitC, streamSizePtr, 1);
+    op += FSE_flushBits(op, &bitC);
+
     return FSE_closeCStream(&state, op, &bitC, 1);
 }
 
@@ -530,7 +529,7 @@ void FSED_encodeU32(FSE_CState_t* statePtr, bitStream_forward_t* bitC, void** op
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
     if (sizeof(size_t)==4)   // static test
-        FSE_flushBits(op, bitC);
+        *op += FSE_flushBits(*op, bitC);
     FSE_encodeByte(statePtr, bitC, nbBits);
 }
 
@@ -553,10 +552,10 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
     while (ip>istart)
     {
         FSED_encodeU32(&state, &bitC, (void**)&op, *--ip);
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
 
-    FSE_addBits(&bitC, state.value, tableLog); FSE_flushBits((void**)&op, &bitC);
+    FSE_addBits(&bitC, state.value, tableLog); op += FSE_flushBits(op, &bitC);
     return FSE_closeCStream(&state, op, &bitC, 1);
 }
 

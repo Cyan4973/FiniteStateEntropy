@@ -588,6 +588,23 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
 }
 
 
+void FSE_addBits(bitStream_forward_t* bitC, size_t value, unsigned nbBits)
+{
+    static const unsigned mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   // up to 25 bits
+    bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
+    bitC->bitPos += nbBits;
+}
+
+size_t FSE_flushBits(void* op, bitStream_forward_t* bitC)
+{
+    size_t nbBytes = bitC->bitPos >> 3;
+    *(size_t*)op = bitC->bitContainer;
+    bitC->bitPos &= 7;
+    bitC->bitContainer >>= nbBytes*8;
+    return nbBytes;
+}
+
+
 size_t FSE_initCStream(FSE_CState_t* statePtr, void* op, const void* CTable)
 {
     const U32 tableLog = ( (U16*) CTable) [0];
@@ -597,7 +614,6 @@ size_t FSE_initCStream(FSE_CState_t* statePtr, void* op, const void* CTable)
     statePtr->streamPtr = op;
     return 4;
 }
-
 
 void FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned char symbol)
 {
@@ -609,14 +625,13 @@ void FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned 
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
 }
 
-
 size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forward_t* bitC, int optionalId)
 {
     BYTE* endPtr;
     U32 descriptor;
     U32 supplBits;
 
-    FSE_flushBits(&op, bitC);
+    op += FSE_flushBits(op, bitC);
 
     endPtr = (BYTE*)op;
     endPtr += bitC->bitPos > 0;
@@ -632,27 +647,6 @@ size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forwar
 }
 
 
-int FSE_closeCompressionStream(void* outPtr, bitStream_forward_t* bitC, void* CStreamDescriptor, int id)
-{
-    BYTE* p;
-    U32 descriptor;
-
-    FSE_flushBits(&outPtr, bitC);
-
-    p = (BYTE*)outPtr;
-    p += bitC->bitPos > 0;
-    bitC->bitPos = 8 - bitC->bitPos;
-    if (bitC->bitPos==8) bitC->bitPos=0;
-
-    descriptor = (U32)(p - (BYTE*)CStreamDescriptor) << 3;
-    descriptor += bitC->bitPos;
-    descriptor += (id-1)<<30;   // optional field [1-4]
-    *(U32*)CStreamDescriptor = descriptor;
-
-    return (int)(p-(BYTE*)CStreamDescriptor);
-}
-
-
 int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC,
                     int nbStates, ptrdiff_t state1, ptrdiff_t state2, const void* CTable)
 {
@@ -663,10 +657,10 @@ int FSE_flushStates(void** outPtr, bitStream_forward_t* bitC,
     if (nbStates==2)
     {
         FSE_addBits(bitC, state2, tableLog);
-        FSE_flushBits(outPtr, bitC);
+        *outPtr += FSE_flushBits(*outPtr, bitC);
     }
     FSE_addBits(bitC, state1, tableLog);
-    FSE_flushBits(outPtr, bitC);
+    *outPtr += FSE_flushBits(*outPtr, bitC);
 
     return 0;
 }
@@ -695,7 +689,7 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
     if (srcSize & 1)
     {
         FSE_encodeByte(&CState1, &bitC, *--ip);
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
 
     // join to mod 4 (if necessary)
@@ -704,7 +698,7 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
         FSE_encodeByte(&CState1, &bitC, *--ip);
         if (ilp) FSE_encodeByte(&CState2, &bitC, *--ip);
         else FSE_encodeByte(&CState1, &bitC, *--ip);
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
 
     // 2 or 4 per loop
@@ -713,7 +707,7 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
         FSE_encodeByte(&CState1, &bitC, *--ip);
 
         if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   // this test needs to be static
-            FSE_flushBits((void**)&op, &bitC);
+            op += FSE_flushBits(op, &bitC);
 
         if (ilp) FSE_encodeByte(&CState2, &bitC, *--ip);
         else FSE_encodeByte(&CState1, &bitC, *--ip);
@@ -726,7 +720,7 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
             else FSE_encodeByte(&CState1, &bitC, *--ip);
         }
 
-        FSE_flushBits((void**)&op, &bitC);
+        op += FSE_flushBits(op, &bitC);
     }
 
     FSE_flushStates((void**)&op, &bitC, nbStreams, CState1.value, CState2.value, CTable);
