@@ -540,16 +540,21 @@ static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t s
 
 
  handle_remainder:
-    for (size_t i = 0; i < remainder; i++) {
-        uint64_t byte = src[i];
-        count[0][byte]++;
+    {
+        size_t i;
+        int idx;
+
+        for (i = 0; i < remainder; i++)
+        {
+            U64 byte = src[i];
+            count[0][byte]++;
+        }
+
+        for (i = 0; i < 256; i++)
+            for (idx=1; idx < 16; idx++)
+                count[0][i] += count[idx][i];
     }
 
-    for (int i = 0; i < 256; i++) {
-        for (int idx=1; idx < 16; idx++) {
-            count[0][i] += count[idx][i];
-        }
-    }
 
     return count[0][0];
 }
@@ -808,7 +813,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_compress(dst, src, (U32)srcSize);
+    return (int)FSE_compress(dst, dstSize, src, srcSize);
 }
 
 static short g_normTable[256];
@@ -842,8 +847,7 @@ static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, siz
 
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    (void)dstSize;
-    return FSE_compress_usingCTable(dst, src, (U32)srcSize, g_CTable);
+    return FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
 

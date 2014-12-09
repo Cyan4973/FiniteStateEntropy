@@ -573,8 +573,8 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 //{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
 
 
-int BMK_ZLIBH_compress(void* dest, const unsigned char* src, unsigned srcSize, unsigned nbSymbols, unsigned tableLog)
-{ (void)nbSymbols; (void)tableLog; return ZLIBH_compress(dest, (const char*)src, srcSize); }
+size_t BMK_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned nbSymbols, unsigned tableLog)
+{ (void)nbSymbols; (void)tableLog; (void)dstSize; return ZLIBH_compress(dst, (const char*)src, (int)srcSize); }
 
 int BMK_ZLIBH_decompress(unsigned char* dest, unsigned originalSize, const void* compressed)
 { (void)originalSize; return ZLIBH_decompress((char*)dest, compressed); }
@@ -590,7 +590,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     double ratio=0.;
     U32 crcCheck=0;
     U32 crcOrig;
-    int (*compressor)(void*, const unsigned char*, unsigned, unsigned, unsigned);
+    size_t (*compressor)(void* dst, size_t, const void* src, size_t, unsigned, unsigned);
     int (*decompressor)(unsigned char*, unsigned, const void*);
 
     // Init
@@ -632,7 +632,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                int errorCode = compressor(chunkP[chunkNb].compressedBuffer, (unsigned char*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                int errorCode = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
                 if (errorCode==-1)
                 {
                     DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb);
@@ -1012,7 +1012,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, unsigned benchedSize,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            cSize = FSE_compress_usingCTable(dst, (BYTE*)src, benchedSize, CTable);
+            cSize = FSE_compress_usingCTable(dst, FSE_compressBound(benchedSize), src, benchedSize, CTable);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);

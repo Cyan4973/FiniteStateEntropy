@@ -267,11 +267,12 @@ STREAMCRC
 */
 int compress_file(char* output_filename, char* input_filename)
 {
-    int (*compressionFunction)(void*, const unsigned char*, unsigned) = DEFAULT_COMPRESSOR;
+    size_t (*compressionFunction)(void* dst, size_t dstSize, const void* src, size_t srcSize) = DEFAULT_COMPRESSOR;
     U64 filesize = 0;
     U64 compressedfilesize = 0;
     char* in_buff;
     char* out_buff;
+    size_t outBuffSize;
     FILE* finput;
     FILE* foutput;
     size_t sizeCheck;
@@ -279,17 +280,19 @@ int compress_file(char* output_filename, char* input_filename)
     size_t inputBufferSize = FIO_GetBufferSize_FromBufferId(bufferSizeId);
     int nbBlocksPerBuffer;
     int lastBlockDone=0;
-    void* hashCtx = XXH32_init(FSE_CHECKSUM_SEED);
+    XXH32_state_t xxhState;
 
 
     // Init
+    XXH32_reset (&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     // Allocate Memory
     if (inputBufferSize < inputBlockSize) inputBufferSize = inputBlockSize;
     nbBlocksPerBuffer = (int)((inputBufferSize + (inputBlockSize-1)) / inputBlockSize);
     in_buff  = (char*)malloc(inputBufferSize);
-    out_buff = (char*)malloc(nbBlocksPerBuffer * FSE_compressBound((int)inputBlockSize) + CACHELINE);
+    outBuffSize = nbBlocksPerBuffer * FSE_compressBound((int)inputBlockSize) + CACHELINE;
+    out_buff = (char*)malloc(outBuffSize);
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
 
     // Write Archive Header
@@ -303,11 +306,12 @@ int compress_file(char* output_filename, char* input_filename)
     while (1)
     {
         // Fill input Buffer
+        char* const oend = out_buff + outBuffSize;
         int outSize;
         size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBufferSize, finput);
         if ((inSize==0) && (lastBlockDone)) break;
         filesize += inSize;
-        XXH32_update(hashCtx, in_buff, (int)inSize);
+        XXH32_update(&xxhState, in_buff, (int)inSize);
         DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
 
         // Compress Blocks
@@ -319,7 +323,7 @@ int compress_file(char* output_filename, char* input_filename)
             *(BYTE*)out_buff = (BYTE)nbFullBlocks;
             for (i=0; i<nbFullBlocks; i++)
             {
-                int errorCode = compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
+                int errorCode = compressionFunction(op, oend-op, ip, inputBlockSize);
                 if (errorCode==-1) EXM_THROW(22, "Compression error");
                 op += errorCode;
                 ip += inputBlockSize;
@@ -331,7 +335,7 @@ int compress_file(char* output_filename, char* input_filename)
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
                 *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
-                errorCode = compressionFunction(op, (unsigned char*)ip, lastBlockSize);
+                errorCode = compressionFunction(op, oend-op, ip, lastBlockSize);
                 if (errorCode==-1) EXM_THROW(22, "Compression error, last block");
                 op += errorCode;
                 ip +=  lastBlockSize;
@@ -348,7 +352,7 @@ int compress_file(char* output_filename, char* input_filename)
     }
 
     // Checksum
-    *(U32*)out_buff = LITTLE_ENDIAN_32(XXH32_digest(hashCtx));
+    *(U32*)out_buff = LITTLE_ENDIAN_32(XXH32_digest(&xxhState));
     compressedfilesize += 4;
     sizeCheck = fwrite(out_buff, 1, 4, foutput);
     if (sizeCheck!=4) EXM_THROW(24, "Write error : cannot write checksum");
@@ -386,10 +390,11 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
     U32*  magicNumberP = (U32*) header;
     size_t inputBufferSize;
     int nbFullBlocks = 0;
-    void* hashCtx = XXH32_init(FSE_CHECKSUM_SEED);
+    XXH32_state_t xxhState;
 
 
     // Init
+    XXH32_reset(&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     // Read and then check header
@@ -440,7 +445,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
 
             writeSizeCheck = fwrite(out_buff, 1, blockSize, foutput);
             if (writeSizeCheck != blockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
-            XXH32_update(hashCtx, out_buff, blockSize);
+            XXH32_update(&xxhState, out_buff, blockSize);
         }
 
         // move remaining data to beginning of buffer
@@ -475,13 +480,13 @@ _lastBlock:
 
         sizeCheck = fwrite(out_buff, 1, lastBlockSize, foutput);
         if (sizeCheck != lastBlockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
-        XXH32_update(hashCtx, out_buff, lastBlockSize);
+        XXH32_update(&xxhState, out_buff, lastBlockSize);
     }
 
     // CRC verification
     {
         U32 CRCsaved = *(U32*)ip;
-        U32 CRCcalculated = XXH32_digest(hashCtx);
+        U32 CRCcalculated = XXH32_digest(&xxhState);
         if (CRCsaved != CRCcalculated) EXM_THROW(35, "CRC error : wrong checksum, corrupted data");
     }
 

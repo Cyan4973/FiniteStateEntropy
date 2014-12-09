@@ -54,17 +54,18 @@ extern "C" {
 /******************************************
    FSE simple functions
 ******************************************/
-int FSE_compress   (void* dest,
-                    const unsigned char* source, unsigned sourceSize);
-int FSE_decompress (unsigned char* dest, unsigned originalSize,
+size_t FSE_compress(void* dst, size_t dstSize,
+              const void* src, size_t srcSize);
+int FSE_decompress (unsigned char* dst, unsigned originalSize,
                     const void* compressed);
 /*
 FSE_compress():
-    Compress table of unsigned char 'source', of size 'sourceSize', into destination buffer 'dest'.
-    'dest' buffer must be already allocated, and sized to handle worst case situations.
+    Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
+    'dst' buffer must be already allocated, and sized to handle worst case situations.
     Worst case size evaluation is provided by FSE_compressBound().
     return : size of compressed data
-             or -1 if there is an error.
+             or an error value, which can be tested using FSE_isError()
+
 FSE_decompress():
     Decompress compressed data from buffer 'compressed',
     into destination table of unsigned char 'dest', of size 'originalSize'.
@@ -75,14 +76,15 @@ FSE_decompress():
 */
 
 
-#define FSE_MAX_HEADERSIZE 512
-#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
-unsigned FSE_compressBound(unsigned size);
-/*
-FSE_compressBound():
-    Gives the maximum (worst case) size that can be reached by function FSE_compress.
-    Used to know how much memory to allocate for destination buffer.
-*/
+/******************************************
+   Tool functions
+******************************************/
+size_t FSE_compressBound(size_t size);       /* maximum compressed size */
+
+/* Error Management */
+unsigned    FSE_isError(size_t code);        /* tells if a return value is an error code */
+const char* FSE_getErrorName(size_t code);   /* provides error code string (useful for debugging) */
+
 
 
 /******************************************
@@ -95,7 +97,7 @@ FSE_compress2():
     return : size of compressed data
              or -1 if there is an error
 */
-int FSE_compress2 (void* dest, const unsigned char* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog);
 
 
 /*
@@ -130,26 +132,26 @@ The following API allows to target specific sub-functions.
 
 /* *** COMPRESSION *** */
 
-int FSE_count(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
+size_t FSE_count(unsigned* count, const unsigned char* src, size_t srcSize, unsigned* maxSymbolValuePtr);
 
-unsigned FSE_optimalTableLog(unsigned tableLog, unsigned sourceSize, unsigned maxSymbolValue);
-int FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, const unsigned* count, unsigned total, unsigned maxSymbolValue);
+unsigned FSE_optimalTableLog(unsigned tableLog, size_t srcSize, unsigned maxSymbolValue);
+size_t FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, const unsigned* count, size_t total, unsigned maxSymbolValue);
 
-unsigned FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
-int FSE_writeHeader (void* headerBuffer, unsigned headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_writeHeader (void* headerBuffer, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-int FSE_sizeof_CTable(unsigned maxSymbolValue, unsigned tableLog);
-int FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_sizeof_CTable(unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-int FSE_compress_usingCTable (void* dest, const unsigned char* source, unsigned sourceSize, const void* CTable);
+size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const void* CTable);
 
 /*
 The first step is to count all symbols. FSE_count() provides one quick way to do this job.
-Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have 'maxNbSymbols' cells.
-'source' is a table of char of size 'sourceSize'. All values within 'source' MUST be < *maxNbSymbolsPtr
-*maxNbSymbolsPtr will be updated, with its real value (necessarily <= original value)
+Result will be saved into 'count', a table of unsigned int, which must be already allocated, and have '*maxSymbolValuePtr+1' cells.
+'source' is a table of char of size 'sourceSize'. All values within 'src' MUST be <= *maxSymbolValuePtr
+*maxSymbolValuePtr will be updated, with its real value (necessarily <= original value)
 FSE_count() will return the number of occurrence of the most frequent symbol.
-If there is an error, the function will return -1.
+If there is an error, the function will return an ErrorCode (which can be tested using FSE_isError()).
 
 The next step is to normalize the frequencies.
 FSE_normalizeCount() will ensure that sum of frequencies is == 2 ^'tableLog'.
@@ -163,18 +165,19 @@ called 'normalizedCounter', which is a table of signed short.
 'normalizedCounter' must be already allocated, and have at least 'maxSymbolValue+1' cells.
 The return value is tableLog if everything proceeded as expected.
 It is 0 if there is a single symbol within distribution.
-If there is an error (typically, invalid tableLog value), the function will return -1.
+If there is an error(typically, invalid tableLog value), the function will return an ErrorCode (which can be tested using FSE_isError()).
 
 'normalizedCounter' can be saved in a compact manner to a memory area using FSE_writeHeader().
 'header' buffer must be already allocated.
 For guaranteed success, buffer size must be at least FSE_headerBound().
 The result of the function is the number of bytes written into 'header'.
-If there is an error, the function will return -1 (for example, buffer size too small).
+If there is an error, the function will return an ErrorCode (which can be tested using FSE_isError()) (for example, buffer size too small).
 
 'normalizedCounter' can then be used to create the compression tables 'CTable'.
 The space required by 'CTable' must be already allocated. Its size is provided by FSE_sizeof_CTable().
+'CTable' must be aligned of 4 bytes boundaries.
 You can then use FSE_buildCTable() to fill 'CTable'.
-In both cases, if there is an error, the function will return -1.
+In both cases, if there is an error, the function will return an ErrorCode (which can be tested using FSE_isError()).
 
 'CTable' can then be used to compress 'source', with FSE_compress_usingCTable().
 Similar to FSE_count(), the convention is that 'source' is assumed to be a table of char of size 'sourceSize'
@@ -226,15 +229,23 @@ typedef struct
     int bitPos;
 } bitStream_forward_t;
 
-void* FSE_initCompressionStream(void** op);
-void FSE_initStateAndPtrs(ptrdiff_t* state, const void** CTablePtr1, const void** CTablePtr2, const void* CTable);
-void FSE_encodeByte(ptrdiff_t* state, bitStream_forward_t* bitC, unsigned char symbol, const void* CTablePtr1, const void* CTablePtr2);
+typedef struct
+{
+    ptrdiff_t   value;
+    const void* stateTable;
+    const void* symbolTT;
+    void* streamPtr;
+} FSE_CState_t;
+
+size_t FSE_initCStream(FSE_CState_t* statePtr, void* op, const void* CTable);
+void  FSE_encodeByte(FSE_CState_t* statePtr, bitStream_forward_t* bitC, unsigned char symbol);
 static void FSE_addBits(bitStream_forward_t* bitC, size_t value, int nbBits);
-static void FSE_flushBits(void** outPtr, bitStream_forward_t* bitC);
-int FSE_closeCompressionStream(void* outPtr, bitStream_forward_t* bitC, void* compressionStreamDescriptor, int optionalId);
+static void FSE_flushBits(void** op, bitStream_forward_t* bitC);
+size_t FSE_closeCStream(const FSE_CState_t* statePtr, void* op, bitStream_forward_t* bitC, int optionalId);
+
 
 /*
-These function allow the creation of custom streams, mixing mutiple tables and bit sources.
+These function allow the creation of custom streams, mixing multiple tables and bit sources.
 They are used by FSE_compress_usingCTable().
 
 A key property to keep in mind is that encoding and decoding are done **in reverse direction**.
