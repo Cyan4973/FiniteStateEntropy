@@ -173,6 +173,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
+    size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb, maxSV, tableLog;
     U32 time = FUZ_GetMilliStart();
     const U32 nbRandPerLoop = 4;
@@ -203,7 +204,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             int sizeCompressed;
             BYTE* bufferTest = bufferNoise + testNb;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
-            sizeCompressed = FSE_compress (bufferDst, bufferTest, sizeOrig);
+            sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
             if (sizeCompressed == -1)
                 DISPLAY ("Noise Compression failed ! \n");
             if (sizeCompressed > sizeOrig+1)
@@ -218,7 +219,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             BYTE* bufferTest = bufferSrc + testNb;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
-            sizeCompressed = FSE_compress (bufferDst, bufferTest, sizeOrig);
+            sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
             if (sizeCompressed == -1)
                 DISPLAY ("Compression failed ! \n");
             else
