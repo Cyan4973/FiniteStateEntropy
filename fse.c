@@ -94,9 +94,6 @@ typedef unsigned long long  U64;
 typedef   signed long long  S64;
 #endif
 
-typedef size_t bitContainer_t;
-typedef size_t scale_t;
-
 
 //****************************************************************
 //* Constants
@@ -107,12 +104,9 @@ typedef size_t scale_t;
 #define FSE_DEFAULT_TABLELOG (FSE_DEFAULT_MEMORY_USAGE-2)
 #define FSE_MIN_TABLELOG 5
 
-#define FSE_VIRTUAL_LOG   ((sizeof(scale_t)*8)-2)
-#define FSE_VIRTUAL_RANGE ((scale_t)1<<FSE_VIRTUAL_LOG)
-
 #define FSE_TABLELOG_ABSOLUTE_MAX 15
-#if FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX
-#error "FSE_MAX_TABLELOG>FSE_TABLELOG_ABSOLUTE_MAX isn't supported"
+#if FSE_MAX_TABLELOG > FSE_TABLELOG_ABSOLUTE_MAX
+#error "FSE_MAX_TABLELOG > FSE_TABLELOG_ABSOLUTE_MAX is not supported"
 #endif
 
 
@@ -196,6 +190,8 @@ FORCE_INLINE unsigned FSE_highbit (register U32 val)
 
 #ifndef FSE_DONTINCLUDECORE
 
+//static unsigned FSE_64bits(void) { return sizeof(void*)==8; }
+
 unsigned FSE_isError(size_t code) { return (code > (size_t)(-FSE_ERROR_maxCode)); }
 
 #define FSE_GENERATE_STRING(STRING) #STRING,
@@ -212,6 +208,7 @@ static short FSE_abs(short a)
 {
     return a<0? -a : a;
 }
+
 
 /****************************************************************
    Header bitstream management
@@ -424,7 +421,7 @@ CTable is a variable size structure which contains :
     FSE_symbolCompressionTransform symbolTT[maxSymbolValue+1];  // This size is variable
 Allocation is manual, since C standard does not support variable-size structures.
 */
-//#define FSE_SIZEOF_CTABLE_U32(s,t) (((((2 + (1<<t))*sizeof(U16)) + ((s+1)*sizeof(FSE_symbolCompressionTransform)))+(sizeof(U32)-1)) / sizeof(U32))
+
 size_t FSE_sizeof_CTable (unsigned maxSymbolValue, unsigned tableLog)
 {
     size_t size;
@@ -433,14 +430,6 @@ size_t FSE_sizeof_CTable (unsigned maxSymbolValue, unsigned tableLog)
     size = FSE_CTABLE_SIZE_U32 (tableLog, maxSymbolValue) * sizeof(U32);
     return size;
 }
-
-typedef struct
-{
-    U16  newState;
-    BYTE symbol;
-    BYTE nbBits;
-} FSE_decode_t;
-
 
 // Emergency distribution strategy (fallback); compression will suffer a lot ; consider increasing table size
 static void FSE_emergencyDistrib(short* normalizedCounter, int maxSymbolValue, short points)
@@ -604,7 +593,6 @@ void FSE_initState(FSE_CState_t* statePtr, const void* CTable)
     statePtr->symbolTT = ((const U16*)(statePtr->stateTable)) + ((size_t)1<<tableLog);
     statePtr->stateLog = tableLog;
 }
-
 
 
 void FSE_addBits(bitStream_forward_t* bitC, size_t value, unsigned nbBits)
@@ -806,6 +794,13 @@ size_t FSE_compress (void* dst, size_t dstSize, const void* src, size_t srcSize)
 /*********************************************************
    Decompression (Byte symbols)
 *********************************************************/
+typedef struct
+{
+    U16  newState;
+    BYTE symbol;
+    BYTE nbBits;
+} FSE_decode_t;
+
 int FSE_decompressRaw (void* out, int originalSize, const BYTE* in)
 {
     memcpy (out, in+1, originalSize);
@@ -1154,7 +1149,7 @@ size_t FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, co
 }
 
 
-#define FSE_TABLESTEP(tableSize) ((tableSize>>1) + (tableSize>>3) + 3)
+static U32 FSE_tableStep(U32 tableSize) { return (tableSize>>1) + (tableSize>>3) + 3; }
 
 size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 (void* CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
@@ -1163,7 +1158,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     const unsigned tableMask = tableSize - 1;
     U16* tableU16 = ( (U16*) CTable) + 2;
     FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) (tableU16 + tableSize);
-    const unsigned step = FSE_TABLESTEP(tableSize);
+    const unsigned step = FSE_tableStep(tableSize);
     unsigned cumul[FSE_MAX_SYMBOL_VALUE+2];
     U32 position = 0;
     FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE];
@@ -1261,7 +1256,7 @@ int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
     const U32 tableSize = 1 << tableLog;
     const S16 largeLimit= 1 << (tableLog-1);
     const U32 tableMask = tableSize-1;
-    const U32 step = FSE_TABLESTEP(tableSize);
+    const U32 step = FSE_tableStep(tableSize);
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
     U32 position = 0;
     U32 highThreshold = tableSize-1;
