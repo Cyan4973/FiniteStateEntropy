@@ -148,7 +148,7 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
     if (!done)
     {
         done = 1;
-        DISPLAY("\nGenerating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
+        DISPLAY("Generating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
     }
 
     // Build Table

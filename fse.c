@@ -582,7 +582,7 @@ void FSE_initCStream(bitStream_forward_t* bitC, void* start)
     bitC->bitContainer = 0;
     bitC->bitPos = 0;
     bitC->startPtr = start;
-    bitC->ptr = start + 4;
+    bitC->ptr = bitC->startPtr + 4;
 }
 
 void FSE_initState(FSE_CState_t* statePtr, const void* CTable)

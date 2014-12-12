@@ -377,7 +377,7 @@ int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceS
     const int memLog = ( (U16*) CTable) [0];
 
     FSE_CState_t state;
-    bitStream_forward_t bitC = {0,0};
+    bitStream_forward_t bitC;
 
     // init
     FSE_initCStream(&bitC, op);
@@ -524,7 +524,7 @@ int FSED_writeSingleU32(void* dest, const U32* source, unsigned sourceSize)
 }
 
 
-void FSED_encodeU32(FSE_CState_t* statePtr, bitStream_forward_t* bitC, void** op, U32 value)
+void FSED_encodeU32(bitStream_forward_t* bitC, FSE_CState_t* statePtr, U32 value)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
@@ -542,7 +542,7 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 
     BYTE* op = (BYTE*) dest;
     int tableLog = *(U16*)CTable;
-    bitStream_forward_t bitC = {0,0};
+    bitStream_forward_t bitC;
     FSE_CState_t state;
 
     // init
@@ -552,7 +552,7 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 
     while (ip>istart)
     {
-        FSED_encodeU32(&state, &bitC, (void**)&op, *--ip);
+        FSED_encodeU32(&bitC, &state, *--ip);
         FSE_flushBits(&bitC);
     }
 

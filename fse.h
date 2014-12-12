@@ -219,8 +219,8 @@ typedef struct
 {
     size_t bitContainer;
     int    bitPos;
-    void*  startPtr;
-    void*  ptr;
+    char*  startPtr;
+    char*  ptr;
 } bitStream_forward_t;
 
 typedef struct
