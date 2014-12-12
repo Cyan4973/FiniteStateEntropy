@@ -40,7 +40,7 @@
 #include <sys/timeb.h>   // timeb
 
 #include "fse.h"
-#include "fseU16.h"
+//#include "fseU16.h"
 #include "xxhash.h"
 
 

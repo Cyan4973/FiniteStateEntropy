@@ -106,17 +106,77 @@ static int FSE_writeSingleU16(void* dest, U16 value)
 }
 
 
-static void FSE_encodeU16(ptrdiff_t* state, bitStream_forward_t* bitC, U16 symbol, const void* CTable1, const void* CTable2)
+void FSE_encodeU16(bitStream_forward_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 {
-    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) CTable1;
-    const U16* const stateTable = (const U16*) CTable2;
+    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
+    const U16* const stateTable = (const U16*) statePtr->stateTable;
     int nbBitsOut  = symbolTT[symbol].minBitsOut;
-    nbBitsOut -= (int)((symbolTT[symbol].maxState - *state) >> 31);
-    FSE_addBits(bitC, *state, nbBitsOut);
-    *state = stateTable[ (*state>>nbBitsOut) + symbolTT[symbol].deltaFindState];
+    nbBitsOut -= (int)((symbolTT[symbol].maxState - statePtr->value) >> 31);
+    FSE_addBits(bitC, statePtr->value, nbBitsOut);
+    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
 }
 
 
+static int FSE_compressU16_usingCTable (void* dst,
+                                        const U16* src, int srcSize,
+                                        const void* CTable)
+{
+    const U16* const istart = src;
+    const U16* ip;
+    const U16* const iend = istart + srcSize;
+
+    BYTE* op = (BYTE*) dst;
+    bitStream_forward_t bitC;
+    FSE_CState_t CState;
+
+
+    // init
+    FSE_initCStream(&bitC, op);
+    FSE_initState(&CState, CTable);
+
+    ip=iend;
+
+    // join to even
+    if (srcSize & 1)
+    {
+        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_flushBits(&bitC);
+    }
+
+    // join to mod 4
+    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (srcSize & 2))   // test bit 2
+    {
+        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_flushBits(&bitC);
+        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_flushBits(&bitC);
+    }
+
+    // 2 or 4 encoding per loop
+    while (ip>istart)   // from end to beginning, up to 3 symbols at a time
+    {
+        FSE_encodeU16(&bitC, &CState, *--ip);
+
+        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   // This test must be static
+            FSE_flushBits(&bitC);
+
+        FSE_encodeU16(&bitC, &CState, *--ip);
+
+        if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   // This test must be static
+        {
+            FSE_encodeU16(&bitC, &CState, *--ip);
+            FSE_encodeU16(&bitC, &CState, *--ip);
+        }
+
+        FSE_flushBits(&bitC);
+    }
+
+    FSE_flushState(&bitC, &CState);
+    return FSE_closeCStream(&bitC, 1);
+}
+
+
+/*
 static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source, int sourceSize, const void* CTable)
 {
     const U16* const istart = (const U16*) source;
@@ -170,6 +230,7 @@ static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source
 
     return (int) (op-ostart);
 }
+*/
 
 
 int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog)
