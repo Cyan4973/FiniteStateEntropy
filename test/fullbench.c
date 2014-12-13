@@ -1,6 +1,7 @@
 /*
     fullbench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2014
+    Copyright (C) Yann Collet 2012-2015
+
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -21,15 +22,6 @@
     - public forum : https://groups.google.com/forum/#!forum/lz4c
     - website : http://fastcompression.blogspot.com/
 */
-
-//**************************************
-// Compiler Specific
-//**************************************
-// GCC does not support _rotl outside of Windows
-#if !defined(_WIN32)
-#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
-#endif
-
 
 //**************************************
 // Includes
@@ -86,28 +78,23 @@
 #define DEFAULT_BLOCKSIZE (64 KB)
 #define DEFAULT_PROBA 20
 
-//**************************************
-// Local structures
-//**************************************
-
 
 //**************************************
 // MACRO
 //**************************************
-#define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
+#define DISPLAY(...)  fprintf(stderr, __VA_ARGS__)
 #define PROGRESS(...) no_prompt ? 0 : DISPLAY(__VA_ARGS__)
 
 
-//**************************************
-// Benchmark Parameters
-//**************************************
-static int no_prompt = 0;
+/**************************************
+*  Benchmark Parameters
+***************************************/
+static U32 no_prompt = 0;
 
 
 /*********************************************************
-  Private functions
-*********************************************************/
-
+*  Private functions
+**********************************************************/
 static U32 BMK_GetMilliStart(void)
 {
     struct timeb tb;
@@ -173,8 +160,8 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
 
 
 /*********************************************************
-  Benchmark function
-*********************************************************/
+*  Benchmark function
+**********************************************************/
 static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
 
@@ -852,6 +839,11 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
     return FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
+static int local_FSE_decompress(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dstSize;
+    return FSE_decompress((void*)src, srcSize, dst);   // change direction
+}
 
 
 int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
@@ -946,6 +938,14 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         func = local_FSE_compress;
         break;
 
+    case 11:
+        {
+            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            funcName = "FSE_decompress";
+            func = local_FSE_decompress;
+            break;
+        }
+
     /* Specific test functions */
     case 100:
         funcName = "trivialCount";
@@ -1021,7 +1021,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         double bestTime = 999.;
         U32 benchNb=1;
         int errorCode = 0;
-        DISPLAY("%1u-%-24.24s : \r", benchNb, funcName);
+        DISPLAY("%2u-%-24.24s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -1040,9 +1040,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%1u-%-24.24s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2u-%-24.24s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%1u#%-24.24s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#%-24.24s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
     free(oBuffer);

@@ -179,7 +179,7 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (short* const normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header);
+int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header);
 
 int FSE_sizeof_DTable(unsigned tableLog);
 int FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
@@ -259,6 +259,13 @@ The first thing to do is to init the bitStream, and the state.
     FSE_initCStream(&bitC, dstBuffer);
     FSE_initState(&state, CTable);
 
+Right afterwards, you can insert a block of data,
+for example a header, using the following functions :
+    pos = FSE_CStream_getPos(&bitC);
+    size = doSomething(pos);
+    FSE_CStream_skip(&bitC, size);
+
+
 You can then encode your input data, byte after byte.
 Remember decoding will be done in reverse direction.
     FSE_encodeByte(&bitStream, &state, symbol);
@@ -297,6 +304,23 @@ unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, 
 unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned nbBits);
 void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip);
 int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
+
+/*
+size_t FSE_getDStreamSize(void* srcBuffer);
+size_t FSE_initDStream(bitStream_backward_t* bitD, unsigned* optInfo, void* srcBuffer, size_t srcSize);
+
+void*  FSE_DStream_getPos(const bitStream_backward_t* bitD);
+void*  FSE_DStream_skip(bitStream_backward_t* bitD, size_t size);
+
+void   FSE_initDState(FSE_DState_t* statePtr, const void* DTable);
+
+unsigned char FSE_decodeSymbol(FSE_DState_t* statePtr, bitStream_backward_t* bitC);
+unsigned int  FSE_readBits(bitStream_backward_t* bitD, unsigned nbBits);
+size_t FSE_updateBitStream(bitStream_backward_t* bitD);
+
+size_t FSE_closeDStream(bitStream_backward_t* bitD);
+*/
+
 
 /*
 Now is the turn to decompose FSE_decompress_usingDTable().

@@ -219,11 +219,13 @@ size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
     return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
 }
 
-static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog, unsigned safeWrite)
+static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
+                                       const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
+                                       unsigned safeWrite)
 {
     BYTE* const ostart = (BYTE*) header;
     BYTE* out = ostart;
-    BYTE* oend = ostart + headerBufferSize;
+    BYTE* const oend = ostart + headerBufferSize;
     int nbBits;
     const int tableSize = 1 << tableLog;
     int remaining;

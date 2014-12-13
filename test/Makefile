@@ -23,10 +23,9 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE=v0.1.2
+RELEASE = v0.2.0
 
 DESTDIR?=
-CC     := $(CC)
 CFLAGS ?= -O3
 CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
 CF32    = -m32
