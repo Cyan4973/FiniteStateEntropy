@@ -776,7 +776,7 @@ static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 255;
     (void)dst; (void)dstSize;
-    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
 }
 
 static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -784,7 +784,7 @@ static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
 }
 
 extern int FSE_countFast(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
@@ -811,13 +811,13 @@ static U32   g_CTable[2350];
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src;
-    return FSE_normalizeCount(g_normTable, 0, g_countTable, (U32)srcSize, 255);
+    return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, (U32)srcSize, 255);
 }
 
 static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
+    return (int)FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
 }
 
 /*
@@ -831,18 +831,18 @@ static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* sr
 static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return FSE_buildCTable(g_CTable, g_normTable, 255, g_tableLog);
+    return (int)FSE_buildCTable(g_CTable, g_normTable, 255, g_tableLog);
 }
 
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    return FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
+    return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
 static int local_FSE_decompress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return FSE_decompress((void*)src, srcSize, dst);   // change direction
+    return (int)FSE_decompress((void*)src, (U32)srcSize, dst);   // change direction
 }
 
 
@@ -926,7 +926,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         {
             U32 max=255;
             FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
-            g_tableLog = FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
             func = local_FSE_compress_usingCTable;

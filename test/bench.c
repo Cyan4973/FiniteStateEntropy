@@ -632,7 +632,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                int errorCode = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                int errorCode = (int)compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
                 if (errorCode==-1)
                 {
                     DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb);
@@ -744,7 +744,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         chunkP = (chunkParameters_t*) malloc(((benchedSize / chunkSize)+1) * sizeof(chunkParameters_t));
         orig_buff = (char*)malloc((size_t )benchedSize);
         nbChunks = (int) (benchedSize / chunkSize) + 1;
-        maxCompressedChunkSize = FSE_compressBound(chunkSize);
+        maxCompressedChunkSize = (int)FSE_compressBound(chunkSize);
         compressedBuffSize = nbChunks * maxCompressedChunkSize;
         compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
         destBuffer = (char*)malloc((size_t )benchedSize);
@@ -861,7 +861,7 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
         orig_buff = (char*)malloc(benchedSize);
         digest_buff = (char*)malloc(benchedSize);
         nbChunks = (int) (benchedSize / blockSize) + 1;
-        compressedBuffSize = nbChunks * FSE_compressBound((int)blockSize);
+        compressedBuffSize = (int)(nbChunks * FSE_compressBound((int)blockSize));
         compressedBuffer = (char*)malloc((size_t)compressedBuffSize);
         destBuffer = (char*)malloc(benchedSize);
 
@@ -990,7 +990,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, unsigned benchedSize,
     // Init
     crcOrig = XXH64(src, benchedSize,0);
     FSE_count(count, (BYTE*)src, benchedSize, &nbSymbols);
-    tableLog = FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
+    tableLog = (U32)FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
     CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
     FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
     DTable = malloc( FSE_sizeof_DTable(tableLog) );

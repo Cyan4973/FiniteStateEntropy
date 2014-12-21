@@ -48,7 +48,7 @@ extern "C" {
 /******************************************
    Static allocation
 ******************************************/
-/* You can pre-allocate a CTable as a table of U32 using formula below */
+/* You can statically allocate a CTable as a table of U32 using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
 
 

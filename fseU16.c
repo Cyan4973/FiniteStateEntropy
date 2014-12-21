@@ -106,7 +106,7 @@ static int FSE_writeSingleU16(void* dest, U16 value)
 }
 
 
-void FSE_encodeU16(bitStream_forward_t* bitC, FSE_CState_t* statePtr, U16 symbol)
+void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
     const U16* const stateTable = (const U16*) statePtr->stateTable;
@@ -126,13 +126,13 @@ static int FSE_compressU16_usingCTable (void* dst,
     const U16* const iend = istart + srcSize;
 
     BYTE* op = (BYTE*) dst;
-    bitStream_forward_t bitC;
+    FSE_CStream_t bitC;
     FSE_CState_t CState;
 
 
     // init
     FSE_initCStream(&bitC, op);
-    FSE_initState(&CState, CTable);
+    FSE_initCState(&CState, CTable);
 
     ip=iend;
 
@@ -171,8 +171,8 @@ static int FSE_compressU16_usingCTable (void* dst,
         FSE_flushBits(&bitC);
     }
 
-    FSE_flushState(&bitC, &CState);
-    return FSE_closeCStream(&bitC, 1);
+    FSE_flushCState(&bitC, &CState);
+    return (int)FSE_closeCStream(&bitC, 1);
 }
 
 
@@ -254,23 +254,23 @@ int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSi
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     // Scan for stats
-    errorCode = FSE_countU16 (counting, ip, sourceSize, &maxSymbolValue);
+    errorCode = (int)FSE_countU16 (counting, ip, sourceSize, &maxSymbolValue);
     if (errorCode == -1) return -1;
     if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
 
     // Normalize
-    errorCode = FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
+    errorCode = (int)FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
     if (errorCode == -1) return -1;
     if (errorCode ==  0) return FSE_writeSingleU16(ostart, *istart);
     tableLog = errorCode;
 
     // Write table description header
-    errorCode = FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
+    errorCode = (int)FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
     if (errorCode == -1) return -1;
     op += errorCode;
 
     // Compress
-    errorCode = FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
+    errorCode = (int)FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
     if (errorCode==-1) return -1;
     op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
 

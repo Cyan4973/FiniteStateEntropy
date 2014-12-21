@@ -133,7 +133,7 @@ typedef   signed long long  S64;
 ****************************************************************/
 #define FSE_LIST_ERRORS(ITEM) \
         ITEM(FSE_OK_NoError) ITEM(FSE_ERROR_GENERIC) \
-        ITEM(FSE_ERROR_dstSize_tooSmall) \
+        ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_tooSmall)\
         ITEM(FSE_ERROR_maxCode)
 
 #define FSE_GENERATE_ENUM(ENUM) ENUM,
@@ -324,7 +324,7 @@ size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* norm
 }
 
 
-int FSE_readHeader (short* const normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header)
+int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header)
 {
     const BYTE* const istart = (const BYTE*) header;
     const BYTE* ip = (const BYTE*) header;
@@ -579,7 +579,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
 }
 
 
-void FSE_initCStream(bitStream_forward_t* bitC, void* start)
+void FSE_initCStream(FSE_CStream_t* bitC, void* start)
 {
     bitC->bitContainer = 0;
     bitC->bitPos = 0;
@@ -587,7 +587,7 @@ void FSE_initCStream(bitStream_forward_t* bitC, void* start)
     bitC->ptr = bitC->startPtr + 4;
 }
 
-void FSE_initState(FSE_CState_t* statePtr, const void* CTable)
+void FSE_initCState(FSE_CState_t* statePtr, const void* CTable)
 {
     const U32 tableLog = ( (U16*) CTable) [0];
     statePtr->value = (ptrdiff_t)1<<tableLog;
@@ -596,15 +596,26 @@ void FSE_initState(FSE_CState_t* statePtr, const void* CTable)
     statePtr->stateLog = tableLog;
 }
 
+void*  FSE_getCStreamStart(const FSE_CStream_t* bitC)
+{
+    return bitC->ptr;
+}
 
-void FSE_addBits(bitStream_forward_t* bitC, size_t value, unsigned nbBits)
+void   FSE_reserveCStreamSize(FSE_CStream_t* bitC, size_t size)
+{
+    bitC->ptr += size;
+}
+
+
+
+void FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits)
 {
     static const unsigned mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   // up to 25 bits
     bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
     bitC->bitPos += nbBits;
 }
 
-void FSE_flushBits(bitStream_forward_t* bitC)
+void FSE_flushBits(FSE_CStream_t* bitC)
 {
     size_t nbBytes = bitC->bitPos >> 3;
     *(size_t*)(bitC->ptr) = bitC->bitContainer;
@@ -613,7 +624,7 @@ void FSE_flushBits(bitStream_forward_t* bitC)
     bitC->bitContainer >>= nbBytes*8;
 }
 
-void FSE_encodeByte(bitStream_forward_t* bitC, FSE_CState_t* statePtr, unsigned char symbol)
+void FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* statePtr, unsigned char symbol)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
     const U16* const stateTable = (const U16*) statePtr->stateTable;
@@ -624,31 +635,31 @@ void FSE_encodeByte(bitStream_forward_t* bitC, FSE_CState_t* statePtr, unsigned 
 }
 
 
-void FSE_flushState(bitStream_forward_t* bitC, const FSE_CState_t* statePtr)
+void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtr)
 {
     FSE_addBits(bitC, statePtr->value, statePtr->stateLog);
     FSE_flushBits(bitC);
 }
 
-size_t FSE_closeCStream(bitStream_forward_t* bitC, U32 optionalId)
+size_t FSE_closeCStream(FSE_CStream_t* bitC, U32 optInfo)
 {
-    BYTE* endPtr;
+    char* endPtr;
     U32 descriptor;
-    U32 supplBits;
+    U32 unusedBits;
 
     FSE_flushBits(bitC);
 
-    endPtr = (BYTE*)(bitC->ptr);
+    endPtr = bitC->ptr;
     endPtr += bitC->bitPos > 0;
-    supplBits = 8 - bitC->bitPos;
-    if (supplBits==8) supplBits = 0;
+    unusedBits = 8-bitC->bitPos;
+    if (unusedBits==8) unusedBits = 0;
 
-    descriptor = (U32)(endPtr - (BYTE*)(bitC->startPtr)) << 3;
-    descriptor += supplBits;
-    descriptor += (optionalId-1)<<30;   // optional field [1-4]
+    descriptor = (U32)(endPtr - bitC->startPtr) << 8;
+    descriptor += unusedBits << 5;
+    descriptor += optInfo;   // optional field [0-31]
     *(U32*)(bitC->startPtr) = descriptor;
 
-    return (endPtr-(BYTE*)(bitC->startPtr));
+    return (endPtr-bitC->startPtr);
 }
 
 
@@ -661,14 +672,14 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
     const BYTE* const iend = istart + srcSize;
 
     int nbStreams = 1 + ilp;         // ilp : Instruction Level Parallelism
-    bitStream_forward_t bitC;
+    FSE_CStream_t bitC;
     FSE_CState_t CState1, CState2;
 
 
     // init
     (void)dstSize;   // objective : ensure it fits into dstBuffer (Todo)
     FSE_initCStream(&bitC, dst);
-    FSE_initState(&CState1, CTable);
+    FSE_initCState(&CState1, CTable);
     CState2 = CState1;
 
     ip=iend;
@@ -710,8 +721,8 @@ FORCE_INLINE size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
         FSE_flushBits(&bitC);
     }
 
-    FSE_flushState(&bitC, &CState2);
-    FSE_flushState(&bitC, &CState1);
+    FSE_flushCState(&bitC, &CState2);
+    FSE_flushCState(&bitC, &CState1);
     return FSE_closeCStream(&bitC, nbStreams);
 }
 
@@ -816,6 +827,144 @@ int FSE_decompressSingleSymbol (void* out, int osize, const BYTE symbol)
 }
 
 
+static const U32 FSE_blockHeaderSize = 4;
+
+
+/* FSE_getDStreamSize
+ * Read the header of an FSE block to provide its size in bytes (including its header).
+ * The header block must be provided as source input.
+ * Header block size is 4 bytes.
+ * If srcSize is not large enough, function result will be an errorCode.
+ */
+size_t FSE_DStream_getSize(void* srcBuffer, size_t srcSize, unsigned* optInfo)
+{
+    U32 header;
+    if (srcSize < FSE_blockHeaderSize) return (size_t)-FSE_ERROR_srcSize_tooSmall;
+    header = *(U32*)srcBuffer;
+    *optInfo = header & 31;
+    return header >> 8;
+}
+
+
+/* FSE_getDStreamSize
+ * Initialize a bitReadB_t.
+ * srcBuffer must point at the beginning of an FSE block, starting with its header.
+ * The function result is the size of the FSE_block.
+ * If srcSize is not large enough, the function will return an errorCode;
+ */
+size_t FSE_DStream_init(bitReadB_t* bitD, unsigned* optInfo, const void* srcBuffer, size_t srcSize)
+{
+    U32 header;
+    U32 blockSize;
+    if (srcSize < FSE_blockHeaderSize) return (size_t)-FSE_ERROR_srcSize_tooSmall;
+
+    header = *(U32*)srcBuffer;
+    *optInfo = header & 31;
+    blockSize = header >> 8;
+    if (blockSize > srcSize) return (size_t)-FSE_ERROR_srcSize_tooSmall;
+
+    bitD->endPtr = (char*)srcBuffer;
+    bitD->ptr    = (char*)srcBuffer + blockSize - 4;
+    bitD->bitContainer = *(U32*)(bitD->ptr);
+    bitD->bitsConsumed = (header >> 5) & 7;
+
+    return blockSize;
+}
+
+
+/* FSE_DStream_getStart
+ * Useful when some data is embedded at the beginning of an FSE block.
+ * return : ptr to where such data should be.
+ */
+void*  FSE_DStream_getStart(const bitReadB_t* bitD)
+{
+    return (void*) (bitD->endPtr + 4);
+}
+
+/* FSE_DStream_skip
+ * Instruct bitReadB_t to skip some embedded data at the beginning of the block.
+ * return : size, or an errorCode (size too large for example).
+ */
+size_t FSE_DStream_skip(bitReadB_t* bitD, size_t skippedSize)
+{
+    size_t maxSize = bitD->ptr - bitD->endPtr;
+    if (skippedSize > maxSize) return (size_t)-FSE_ERROR_GENERIC;
+    bitD->endPtr += skippedSize;
+    return skippedSize;
+}
+
+/* FSE_readBits
+ * Read next n bits from the bitContainer.
+ * Use this fast function *only* if n > 0.
+ * Note : for this function to work properly, don't read more than maxNbBits==25
+ * return : value extracted.
+ */
+U32 FSE_readBits2(bitReadB_t* bitD, U32 nbBits)
+{
+    U32 value = ((bitD->bitContainer << bitD->bitsConsumed) >> 1) >> (31-nbBits);
+    bitD->bitsConsumed += nbBits;
+    return value;
+}
+U32 FSE_readBitsFast2(bitReadB_t* bitD, U32 nbBits)
+{
+    U32 value = (bitD->bitContainer << bitD->bitsConsumed) >> (32-nbBits);
+    bitD->bitsConsumed += nbBits;
+    return value;
+}
+
+/* FSE_DStream_reload
+ * Read next n bits from the bitContainer.
+ * Use this fast function *only* if n > 0.
+ * Note : for this function to work properly, don't read more than maxNbBits==25
+ * return : value extracted.
+ */
+void FSE_DStream_reload(bitReadB_t* bitD)
+{
+    bitD->ptr -= bitD->bitsConsumed >> 3;
+    bitD->bitsConsumed &= 7;
+    bitD->bitContainer = * (U32*) (bitD->ptr);
+}
+
+/* FSE_initDState
+ */
+void FSE_initDState(FSE_DState_t* DStatePtr, bitReadB_t* bitD, const void* DTable, unsigned tableLog)
+{
+    DStatePtr->state = FSE_readBitsFast2(bitD, tableLog);
+    FSE_DStream_reload(bitD);
+    DStatePtr->table = DTable;
+}
+
+
+unsigned char FSE_decodeSymbol2(FSE_DState_t* DStatePtr, bitReadB_t* bitD)
+{
+    const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
+    BYTE symbol;
+    U32 lowBits;
+    const U32 nbBits = DInfo.nbBits;
+
+    symbol = DInfo.symbol;
+    //lowBits = fast ? FSE_readBitsFast(bitC, nbBits) : FSE_readBits(bitC, nbBits);
+    //lowBits = FSE_readBits2(bitD, nbBits);
+    lowBits = FSE_readBitsFast2(bitD, nbBits);
+    DStatePtr->state = DInfo.newState + lowBits;
+
+    return symbol;
+}
+
+
+/* FSE_endOfBitStream
+   Tells if bitD has reached end of bitStream of not */
+size_t FSE_endOfBitStream(const FSE_DState_t* DStatePtr, const bitReadB_t* bitD)
+{
+    return ((bitD->ptr == bitD->endPtr) && (DStatePtr->state==0) && (bitD->bitsConsumed==0));
+}
+
+
+
+
+
+
+
 void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip)
 {
     *((BYTE**)ip) -= bitC->bitsConsumed >> 3;
@@ -825,20 +974,20 @@ void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip)
 
 
 FORCE_INLINE const void* FSE_initDecompressionStream_generic(
-    const void** p, bitStream_backward_t* bitC, unsigned* optionalId,
+    const void** p, bitStream_backward_t* bitC, unsigned* optInfo,
     unsigned maxCompressedSize, unsigned safe)
 {
     const BYTE* iend;
     const BYTE* ip = (const BYTE*)*p;
-    U32 descriptor;
+    U32 header;
+    U32 blockSize;
 
-    descriptor = * (U32*) ip;
-    *optionalId = (descriptor >> 30) + 1;
-    descriptor &= 0x3FFFFFFF;
-    bitC->bitsConsumed = descriptor & 7;
-    descriptor >>= 3;
+    header = * (U32*) ip;
+    *optInfo = header & 31;
+    bitC->bitsConsumed = (header>>5) & 7;
+    blockSize = header >> 8;
 
-    iend = ip + descriptor;
+    iend = ip + blockSize;
     if (safe) if (iend > ip+maxCompressedSize) return NULL;
     ip = iend - 4;
     *p = (const void*)ip;
@@ -890,14 +1039,14 @@ U32 FSE_readBitsFast(bitStream_backward_t* bitC, U32 nbBits)
 
 BYTE FSE_decodeSymbol(U32* state, bitStream_backward_t* bitC, const void* DTable, unsigned fast)
 {
-    const FSE_decode_t* const decodeTable = (const FSE_decode_t*) DTable;
+    const FSE_decode_t DInfo = ((const FSE_decode_t*)DTable)[*state];
     BYTE symbol;
     U32 lowBits;
-    const U32 nbBits = decodeTable[*state].nbBits;
+    const U32 nbBits = DInfo.nbBits;
 
-    symbol = decodeTable[*state].symbol;
+    symbol = DInfo.symbol;
     lowBits = fast ? FSE_readBitsFast(bitC, nbBits) : FSE_readBits(bitC, nbBits);
-    *state = decodeTable[*state].newState + lowBits;
+    *state = DInfo.newState + lowBits;
 
     return symbol;
 }
@@ -913,6 +1062,47 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     unsigned char* dest, const unsigned originalSize, const void* compressed, unsigned maxCompressedSize,
     const void* DTable, const unsigned tableLog, unsigned safe, unsigned nbStates, unsigned fast)
 {
+#if 0
+    BYTE* op = (BYTE*) dest;
+    BYTE* const oend = op + originalSize;
+    BYTE* const olimit = oend-1;
+
+    U32 optInfo;
+    bitReadB_t bitD;
+    FSE_DState_t state1, state2;
+
+    // Init
+    const size_t blockSize = FSE_DStream_init(&bitD, &optInfo, compressed, (size_t)(-1));   // replaced last arg by maxCompressed Size
+    (void)maxCompressedSize; (void)safe; (void)fast;
+    if (FSE_isError(blockSize)) return -1;
+    FSE_initDState(&state1, &bitD, DTable, tableLog);
+    if (nbStates==2) FSE_initDState(&state2, &bitD, DTable, tableLog);
+
+
+    // 2 symbols per loop
+    while (op<olimit)
+    {
+        if (nbStates==2) *op++ = FSE_decodeSymbol2(&state2, &bitD);
+        else *op++ = FSE_decodeSymbol2(&state1, &bitD);
+
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(U32)*8)    // This test must be static
+            FSE_DStream_reload(&bitD);
+
+        *op++ = FSE_decodeSymbol2(&state1, &bitD);
+        FSE_DStream_reload(&bitD);
+    }
+
+    // last symbol
+    if (op<oend)
+    {
+        *op++ = FSE_decodeSymbol2(&state1, &bitD);
+        FSE_DStream_reload(&bitD);
+    }
+
+    if (!FSE_endOfBitStream(&state1, &bitD)) return -1;
+
+    return (int)blockSize;
+#else
     const void* ip = compressed;
     const void* iend;
     BYTE* op = (BYTE*) dest;
@@ -920,7 +1110,7 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     BYTE* const olimit = oend-1;
     bitStream_backward_t bitC;
     U32 state1;
-    U32 state2;
+    U32 state2=0;
 
     // Init
     if (safe) iend = FSE_initDecompressionStream_safe(&ip, &bitC, &nbStates, maxCompressedSize);
@@ -950,19 +1140,20 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
     if ((ip!=compressed) || bitC.bitsConsumed) return -1;   // Not fully decoded stream
 
     return FSE_closeDecompressionStream(iend, ip);
+#endif
 }
 
-U32 FSE_getNbStates(const void* buffer)
+U32 FSE_getOptInfo(const void* buffer)
 {
-    U32 descriptor = * (U32*)buffer;
-    return (descriptor>>30) + 1;
+    U32 header = * (U32*)buffer;
+    return header&31;
 }
 
 FORCE_INLINE int FSE_decompress_usingDTable_generic(
     unsigned char* dest, const unsigned originalSize, const void* compressed, unsigned maxCompressedSize,
     const void* DTable, const unsigned tableLog, unsigned safe, unsigned fast)
 {
-    U32 nbStates = FSE_getNbStates(compressed);
+    U32 nbStates = FSE_getOptInfo(compressed);
     if (nbStates==2)
         return FSE_decompressStreams_usingDTable_generic(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, safe, 2, fast);
     if (nbStates==1)
@@ -1078,7 +1269,12 @@ size_t FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (unsigned* c
     U32 Counting4[FSE_MAX_SYMBOL_VALUE+1] = { 0 };
 
     // Init checks
-    if (!sourceSize) return (size_t)-FSE_ERROR_GENERIC;                             // Error : no input
+    if (!sourceSize)
+    {
+        memset(count, 0, (maxSymbolValue + 1) * sizeof(FSE_FUNCTION_TYPE));
+        *maxSymbolValuePtr = 0;
+        return 0;
+    }
     if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_GENERIC;   // maxSymbolValue too large : unsupported
     if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;            // 0: default
 
