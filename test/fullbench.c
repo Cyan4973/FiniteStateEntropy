@@ -855,8 +855,6 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
     return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
 }
 
-int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
-
 static int local_FSE_decompress_usingDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;

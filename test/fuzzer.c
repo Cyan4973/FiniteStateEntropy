@@ -72,23 +72,23 @@ typedef unsigned long long  U64;
 #define PRIME2   2246822519U
 
 
-//**************************************
-// Macros
-//**************************************
+/***************************************************
+*  Macros
+***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 
 
-//***************************************************
-// Local variables
-//***************************************************
+/***************************************************
+*  Local variables
+***************************************************/
 static char* programName;
 static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 
 
-//******************************
-// local functions
-//******************************
+/***************************************************
+*  local functions
+***************************************************/
 static int FUZ_GetMilliStart(void)
 {
     struct timeb tb;
@@ -149,7 +149,6 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
 {
     BYTE* op = (BYTE*)buffer;
     BYTE* const oend = op + buffSize;
-    // Fill buffer
     while (op<oend) *op++ = (BYTE)FUZ_rand(seed);
 }
 
@@ -214,21 +213,21 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
         /* Compression / Decompression tests */
         {
             int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
-            int sizeCompressed;
+            size_t sizeCompressed;
             U32 hashOrig;
             BYTE* bufferTest = bufferSrc + testNb;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            if (sizeCompressed == -1)
+            if (FSE_isError(sizeCompressed))
                 DISPLAY ("Compression failed ! \n");
             else
             {
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
-                int result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                size_t result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
                     DISPLAY ("Output buffer (bufferVerif) overrun (write beyond specified end) !\n");
-                if ((result==-1) && (sizeCompressed>=2))
+                if ((FSE_isError(result)) && (sizeCompressed>=2))
                     DISPLAY ("Decompression failed ! \n");
                 else
                 {
@@ -242,13 +241,13 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
         {
             BYTE* bufferTest = bufferSrc + testNb;   /* Read some random noise */
             short count[256];
-            int result;
+            size_t result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
             result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest);
-            if (result != -1)
+            if (!FSE_isError(result))
             {
-                result = FUZ_checkCount (count, tableLog, maxSV);
-                if (result==-1)
+                int check = FUZ_checkCount (count, tableLog, maxSV);
+                if (check==-1)
                     DISPLAY ("symbol distribution corrupted !\n");
             }
         }
@@ -367,7 +366,7 @@ static void unitTest(void)
 
 
 /*****************************************************************
-   Command line
+*  Command line
 *****************************************************************/
 int main (int argc, char** argv)
 {

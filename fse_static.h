@@ -64,6 +64,7 @@ extern "C" {
 ******************************************/
 #define FSE_LIST_ERRORS(ITEM) \
         ITEM(FSE_OK_NoError) ITEM(FSE_ERROR_GENERIC) \
+        ITEM(FSE_ERROR_tableLog_tooLarge) ITEM(FSE_ERROR_maxSymbolValue_tooLarge) \
         ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_tooSmall)\
         ITEM(FSE_ERROR_maxCode)
 
@@ -88,7 +89,7 @@ size_t FSE_buildCTable_singleSymbol (void* CTable, unsigned char symbolValue);
 *  FSE streaming API
 ******************************************/
 unsigned int  FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
-/* faster, but works only if nbBits >= 1 */
+/* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
 
 unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned fastMode);
 /* can trigger fast decoding if fastMode==1. FastMode must be a clear 0 or 1 known at compile time */

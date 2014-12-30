@@ -67,6 +67,7 @@
 /****************************************************************
 *  Includes
 ****************************************************************/
+#include <stdlib.h>    // malloc, free
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
 #include "fse_static.h"
@@ -150,10 +151,7 @@ typedef struct
 
 typedef struct
 {
-    U16 tableLog;
-    U16 maxSymbolValue;
-    U16 stateTable[FSE_MAX_TABLESIZE];
-    FSE_symbolCompressionTransform symbolTT[FSE_MAX_SYMBOL_VALUE+1];   // Also used by FSE_compressU16
+    U32 fakeTable[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];   /* compatible with FSE_compressU16() */
 } CTable_max_t;
 
 
@@ -319,7 +317,7 @@ size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* norm
 }
 
 
-int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header)
+size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header)
 {
     const BYTE* const istart = (const BYTE*) header;
     const BYTE* ip = (const BYTE*) header;
@@ -334,7 +332,7 @@ int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsig
     bitStream = * (U32*) ip;
     bitStream >>= 2;
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read tableLog
-    if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return -1;
+    if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return (size_t)-FSE_ERROR_tableLog_tooLarge;
     bitStream >>= 4;
     *tableLogPtr = nbBits;
     remaining = (1<<nbBits)+1;
@@ -398,11 +396,10 @@ int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsig
         }
     }
     *maxSymbolValuePtr = charnum-1;
-    if (remaining < 1) return -1;
-    if (nbBits > FSE_MAX_TABLELOG) return -1;  // Too large
+    if (remaining < 1) return (size_t)-FSE_ERROR_GENERIC;
 
     ip += bitCount>0;
-    return (int) (ip-istart);
+    return ip-istart;
 }
 
 
@@ -425,6 +422,19 @@ size_t FSE_sizeof_CTable (unsigned maxSymbolValue, unsigned tableLog)
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;
     size = FSE_CTABLE_SIZE_U32 (tableLog, maxSymbolValue) * sizeof(U32);
     return size;
+}
+
+void* FSE_createCTable (unsigned maxSymbolValue, unsigned tableLog)
+{
+    size_t size;
+    if (tableLog > FSE_TABLELOG_ABSOLUTE_MAX) tableLog = FSE_TABLELOG_ABSOLUTE_MAX;
+    size = FSE_CTABLE_SIZE_U32 (tableLog, maxSymbolValue) * sizeof(U32);
+    return malloc(size);
+}
+
+void  FSE_freeCTable (void* CTable)
+{
+    free(CTable);
 }
 
 /* Emergency distribution strategy (fallback); compression will suffer a lot ; consider increasing table size */
@@ -1013,7 +1023,7 @@ size_t FSE_endOfBitStream(const FSE_DStream_t* bitD, const FSE_DState_t* DStateP
 }
 
 
-FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
+FORCE_INLINE size_t FSE_decompressStreams_usingDTable_generic(
     unsigned char* dest, const unsigned originalSize,
     const void* compressed, unsigned maxCompressedSize,
     const void* DTable, const unsigned tableLog, unsigned safe, unsigned nbStates, unsigned fast)
@@ -1028,7 +1038,7 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
 
     /* Init */
     const size_t blockSize = FSE_initDStream(&bitD, &optInfo, compressed, safe ? maxCompressedSize : (size_t)(-1));   /* replaced last arg by maxCompressed Size */
-    if (FSE_isError(blockSize)) return -1;
+    if (FSE_isError(blockSize)) return (size_t)-FSE_ERROR_GENERIC;
 
     (void)maxCompressedSize; (void)safe; (void)fast;
     FSE_initDState(&state1, &bitD, DTable, tableLog);
@@ -1055,9 +1065,9 @@ FORCE_INLINE int FSE_decompressStreams_usingDTable_generic(
         FSE_reloadDStream(&bitD);
     }
 
-    if (!FSE_endOfBitStream(&bitD, &state1)) return -1;
+    if (!FSE_endOfBitStream(&bitD, &state1)) return (size_t)-FSE_ERROR_GENERIC;
 
-    return (int)blockSize;
+    return blockSize;
 }
 
 U32 FSE_getOptInfo(const void* buffer)
@@ -1066,7 +1076,7 @@ U32 FSE_getOptInfo(const void* buffer)
     return header&31;
 }
 
-static int FSE_decompress_usingDTable_generic(
+static size_t FSE_decompress_usingDTable_generic(
     unsigned char* dest, const unsigned originalSize, const void* compressed, unsigned maxCompressedSize,
     const void* DTable, const unsigned tableLog, unsigned safe, unsigned fast)
 {
@@ -1078,7 +1088,7 @@ static int FSE_decompress_usingDTable_generic(
     return -1;   // should not happen
 }
 
-FORCE_INLINE int FSE_decompress_usingDTable_fastModeSelector(
+FORCE_INLINE size_t FSE_decompress_usingDTable_fastModeSelector(
     unsigned char* dest, const unsigned originalSize, const void* compressed, unsigned maxCompressedSize,
     const void* DTable, const unsigned tableLog, unsigned safe, unsigned fast)
 {
@@ -1086,7 +1096,7 @@ FORCE_INLINE int FSE_decompress_usingDTable_fastModeSelector(
     return FSE_decompress_usingDTable_generic(dest, originalSize, compressed, maxCompressedSize, DTable, tableLog, safe, 0);
 }
 
-int FSE_decompress_usingDTable (unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fast)
+size_t FSE_decompress_usingDTable (unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fast)
 {
     return FSE_decompress_usingDTable_fastModeSelector(dest, originalSize, compressed, 0, DTable, tableLog, 0, fast);
 }
@@ -1360,29 +1370,35 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 
 #define FSE_DECODE_TYPE FSE_TYPE_NAME(FSE_decode_t, FSE_FUNCTION_EXTENSION)
 
-int FSE_FUNCTION_NAME(FSE_sizeof_DTable, FSE_FUNCTION_EXTENSION) (unsigned tableLog)
+void* FSE_FUNCTION_NAME(FSE_createDTable, FSE_FUNCTION_EXTENSION) (unsigned tableLog)
 {
-    if (tableLog > FSE_TABLELOG_ABSOLUTE_MAX) return -1;
-    return (int) ( (1<<tableLog) * (int) sizeof (FSE_DECODE_TYPE) );
+    if (tableLog > FSE_TABLELOG_ABSOLUTE_MAX) tableLog = FSE_TABLELOG_ABSOLUTE_MAX;
+    return malloc( (1<<tableLog) * sizeof (FSE_DECODE_TYPE) );
 }
 
-int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
+void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (void* DTable)
+{
+    free(DTable);
+}
+
+
+size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
 (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) DTable;
     const U32 tableSize = 1 << tableLog;
-    const S16 largeLimit= 1 << (tableLog-1);
     const U32 tableMask = tableSize-1;
     const U32 step = FSE_tableStep(tableSize);
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
     U32 position = 0;
     U32 highThreshold = tableSize-1;
-    unsigned noLarge = 1;
-    unsigned s;
+    const S16 largeLimit= 1 << (tableLog-1);
+    U32 noLarge = 1;
+    U32 s;
 
     // Checks
-    if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return -1;
-    if (tableLog > FSE_MAX_TABLELOG) return -1;
+    if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_maxSymbolValue_tooLarge;
+    if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_tableLog_tooLarge;
 
     // Init, lay down lowprob symbols
     for (s=0; s<=maxSymbolValue; s++)
@@ -1411,7 +1427,7 @@ int FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         }
     }
 
-    if (position!=0) return -1;   // position must reach all cells once, otherwise normalizedCounter is incorrect
+    if (position!=0) return (size_t)-FSE_ERROR_GENERIC;   // position must reach all cells once, otherwise normalizedCounter is incorrect
 
     // Build table Decoding table
     {

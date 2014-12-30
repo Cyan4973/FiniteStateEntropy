@@ -991,9 +991,9 @@ static void BMK_benchCore_Mem(char* dst, char* src, unsigned benchedSize,
     crcOrig = XXH64(src, benchedSize,0);
     FSE_count(count, (BYTE*)src, benchedSize, &nbSymbols);
     tableLog = (U32)FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
-    CTable = malloc( FSE_sizeof_CTable(nbSymbols, tableLog) );
+    CTable = FSE_createCTable(tableLog, nbSymbols);
     FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
-    DTable = malloc( FSE_sizeof_DTable(tableLog) );
+    DTable = FSE_createDTable(tableLog);
     fastMode = FSE_buildDTable(DTable, norm, nbSymbols, tableLog);
 
     DISPLAY("\r%79s\r", "");

@@ -108,18 +108,18 @@ int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void*
 ******************************************/
 /*
 int FSE_compress(char* dest, const char* source, int inputSize) does the following:
-1. count symbol occurrence from table source[] into table count[]
+1. count symbol occurrence from source[] into table count[]
 2. normalize counters so that sum(count[]) == Power_of_2 (2^tableLog)
 3. save normalized counters to memory buffer using writeHeader()
-4. build encoding tables from normalized counters
-5. encode the data stream using encoding tables
+4. build encoding table 'CTable' from normalized counters
+5. encode the data stream using encoding table
 
 int FSE_decompress(char* dest, int originalSize, const char* compressed) performs:
 1. read normalized counters with readHeader()
-2. build decoding tables from normalized counters
-3. decode the data stream using these decoding tables
+2. build decoding table 'DTable' from normalized counters
+3. decode the data stream using decoding table
 
-The following API allows to target specific sub-functions.
+The following API allows triggering specific sub-functions.
 */
 
 /* *** COMPRESSION *** */
@@ -132,7 +132,8 @@ size_t FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, const uns
 size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
 size_t FSE_writeHeader (void* headerBuffer, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_sizeof_CTable(unsigned maxSymbolValue, unsigned tableLog);
+void*  FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
+void   FSE_freeCTable (void* CTable);
 size_t FSE_buildCTable(void* CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const void* CTable);
@@ -179,29 +180,31 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-int FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header);
+size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header);
 
-int FSE_sizeof_DTable(unsigned tableLog);
-int FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+void*  FSE_createDTable(unsigned tableLog);
+void   FSE_freeDTable(void* DTable);
+size_t FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
+size_t FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
 
 /*
 The first step is to obtain the normalized frequencies of symbols.
 This can be performed by reading a header with FSE_readHeader().
-'normalizedCounter' must be already allocated, and have at least '*maxSymbolValuePtr+1' cells.
+'normalizedCounter' must be already allocated, and have at least '*maxSymbolValuePtr+1' cells of short.
 In practice, that means it's necessary to know 'maxSymbolValue' beforehand,
 or size the table to handle worst case situations (typically 256).
 FSE_readHeader will provide 'tableLog' and 'maxSymbolValue' stored into the header.
 The result of FSE_readHeader() is the number of bytes read from 'header'.
 The following values have special meaning :
-return 2 : there is only a single symbol value. The value is provided into the second byte.
+return 2 : there is only a single symbol value. The value is provided into the second byte of header.
 return 1 : data is uncompressed
-If there is an error, the function will return -1.
+If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
 The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
-The space required by 'DTable' must be already allocated. Its size is provided by FSE_sizeof_DTable().
+The space required by 'DTable' must be already allocated and properly aligned.
+One can create a DTable using FSE_createDTable().
 The function will return 1 if table is compatible with fastMode, 0 otherwise.
 If there is an error, the function will return -1.
 
