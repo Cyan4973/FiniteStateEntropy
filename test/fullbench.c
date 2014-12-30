@@ -31,7 +31,7 @@
 #include <string.h>      // strcmp
 #include <sys/timeb.h>   // timeb
 
-#include "fse.h"
+#include "fse_static.h"
 //#include "fseU16.h"
 #include "xxhash.h"
 
@@ -787,8 +787,6 @@ static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t
     return (int)FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
 }
 
-extern int FSE_countFast(unsigned* count, const unsigned char* source, unsigned sourceSize, unsigned* maxNbSymbolsPtr);
-
 static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[256];
@@ -807,6 +805,10 @@ static short g_normTable[256];
 static U32   g_countTable[256];
 static U32   g_tableLog;
 static U32   g_CTable[2350];
+static U32   g_DTable[FSE_DTABLE_SIZE_U32(12,256)];
+static U32   g_max;
+static int   g_skip;
+static U32   g_fast;
 
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -839,10 +841,32 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
+static int local_FSE_readHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    short norm[256];
+    U32 maxSymbolValue, tableLog;
+    (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_readHeader(norm, &maxSymbolValue, &tableLog, dst);   // input is into dst
+}
+
+static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
+}
+
+int FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
+
+static int local_FSE_decompress_usingDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dstSize;
+    return (int)FSE_decompress_usingDTable((void*)src, (U32)srcSize, (BYTE*)dst + g_skip, g_DTable, g_tableLog, g_fast);   // change direction : input is into dst
+}
+
 static int local_FSE_decompress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return (int)FSE_decompress((void*)src, (U32)srcSize, dst);   // change direction
+    return (int)FSE_decompress((void*)src, (U32)srcSize, dst);   // change direction : input is into dst
 }
 
 
@@ -941,10 +965,38 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 11:
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            funcName = "FSE_readHeader";
+            func = local_FSE_readHeader;
+            break;
+        }
+
+    case 12:
+        {
+            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer);
+            funcName = "FSE_buildDTable";
+            func = local_FSE_buildDTable;
+            break;
+        }
+
+    case 13:
+        {
+            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer);
+            g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
+            funcName = "FSE_decompress_usingDTable";
+            func = local_FSE_decompress_usingDTable;
+            break;
+        }
+
+    case 14:
+        {
+            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             funcName = "FSE_decompress";
             func = local_FSE_decompress;
             break;
         }
+
 
     /* Specific test functions */
     case 100:
@@ -1021,7 +1073,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         double bestTime = 999.;
         U32 benchNb=1;
         int errorCode = 0;
-        DISPLAY("%2u-%-24.24s : \r", benchNb, funcName);
+        DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -1040,9 +1092,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-24.24s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2u-%-26.26s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%2u#%-24.24s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#%-26.26s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
     free(oBuffer);

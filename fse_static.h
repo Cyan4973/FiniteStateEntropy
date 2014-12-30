@@ -39,24 +39,59 @@ extern "C" {
 
 
 /******************************************
-   Tool functions
+*  Tool functions
 ******************************************/
 #define FSE_MAX_HEADERSIZE 512
 #define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
 
 
 /******************************************
-   Static allocation
+*  Static allocation
 ******************************************/
 /* You can statically allocate a CTable as a table of U32 using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
+#define FSE_DTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1<<maxTableLog)
 
 
 /******************************************
-   FSE API for DLL
+*  FSE supported API for DLL
 ******************************************/
 #include "fse.h"
 
+
+/******************************************
+*  Error Management
+******************************************/
+#define FSE_LIST_ERRORS(ITEM) \
+        ITEM(FSE_OK_NoError) ITEM(FSE_ERROR_GENERIC) \
+        ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_tooSmall)\
+        ITEM(FSE_ERROR_maxCode)
+
+#define FSE_GENERATE_ENUM(ENUM) ENUM,
+typedef enum { FSE_LIST_ERRORS(FSE_GENERATE_ENUM) } FSE_errorCodes;  /* enum is exposed, to detect & handle specific errors; compare function result to -enum value */
+
+
+/******************************************
+*  FSE advanced API
+******************************************/
+size_t FSE_countFast(unsigned* count, const unsigned char* src, size_t srcSize, unsigned* maxSymbolValuePtr);
+/* same as FSE_count(), but won't check if input really respect that all values within src are <= *maxSymbolValuePtr */
+
+size_t FSE_buildCTable_rawUncompression (void* CTable, unsigned nbBits);
+/* create a fake CTable, designed to not compress an input where each element uses nbBits */
+
+size_t FSE_buildCTable_singleSymbol (void* CTable, unsigned char symbolValue);
+/* create a fake CTable, designed to compress a single identical value */
+
+
+/******************************************
+*  FSE streaming API
+******************************************/
+unsigned int  FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
+/* faster, but works only if nbBits >= 1 */
+
+unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned fastMode);
+/* can trigger fast decoding if fastMode==1. FastMode must be a clear 0 or 1 known at compile time */
 
 
 #if defined (__cplusplus)

@@ -259,31 +259,33 @@ int FSED_decompressSingleU16 (U16* out, int osize, U16 value)
 }
 
 
-int FSED_decompressU16_usingDTable (unsigned short* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
+int FSED_decompressU16_usingDTable (U16* dest, const unsigned originalSize,
+                            const void* compressed,
+                            const void* DTable, const unsigned tableLog)
 {
-    const void* ip = (const BYTE*) compressed;
-    const void* iend;
-    unsigned short* op = dest;
-    unsigned short* const oend = op + originalSize;
-    bitStream_backward_t bitC;
-    unsigned nbStates;
-    U32 state;
+    U16* op = dest;
+    U16* const oend = op + originalSize;
+    FSE_DStream_t DStream;
+    FSE_DState_t  DState;
+    size_t blockSize;
+    U32 options;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
-    state = FSE_readBits(&bitC, tableLog); FSE_updateBitStream(&bitC, &ip);
+    blockSize = FSE_getDStreamSize(compressed, 4, &options);
+    blockSize = FSE_initDStream(&DStream, &options, compressed, blockSize);
+    FSE_initDState(&DState, &DStream, DTable, tableLog);
 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
-        unsigned short value = (U16)FSE_readBits(&bitC, nbBits);
+        int nbBits = FSE_decodeSymbol(&DState, &DStream);
+        unsigned short value = (U16)FSE_readBits(&DStream, nbBits);
         value += 1<<nbBits;
         *op++ = value;
-        FSE_updateBitStream(&bitC, &ip);
+        FSE_reloadDStream(&DStream);
     }
 
-    return FSE_closeDecompressionStream(iend, ip);
+    return blockSize;
 }
 
 
@@ -526,6 +528,8 @@ int FSED_writeSingleU32(void* dest, const U32* source, unsigned sourceSize)
 
 void FSED_encodeU32(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U32 value)
 {
+    //BYTE nbBits = (BYTE) FSED_highbit((value>>3)+1);
+    //FSE_addBits(bitC, (size_t)value, nbBits+3);
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
     if (sizeof(size_t)==4)   // static test
@@ -651,35 +655,35 @@ int FSED_decompressSingleU32 (U32* out, unsigned osize, const BYTE* istart)
 
 
 
-int FSED_decompressU32_usingDTable (unsigned* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
+int FSED_decompressU32_usingDTable (unsigned* dest, const unsigned originalSize,
+                              const void* compressed,
+                              const void* DTable, const unsigned tableLog)
 {
-    const void* ip = compressed;
-    const void* iend;
     unsigned int* op = dest;
     unsigned int* const oend = op + originalSize;
-    bitStream_backward_t bitC;
-    U32 nbStates;
-    U32 state;
+    FSE_DStream_t DStream;
+    FSE_DState_t  DState;
+    size_t blockSize;
+    U32 options;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
-    state = FSE_readBits(&bitC, tableLog);
-    FSE_updateBitStream(&bitC, &ip);
+    blockSize = FSE_getDStreamSize(compressed, 4, &options);
+    FSE_initDStream(&DStream, &options, compressed, blockSize);
+    FSE_initDState(&DState, &DStream, DTable, tableLog);
 
     // Hot loop
     while (op<oend)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
+        int nbBits = FSE_decodeSymbol(&DState, &DStream);
         U32 value;
-        FSE_updateBitStream(&bitC, &ip);
-        value = FSE_readBits(&bitC, nbBits);
+        FSE_reloadDStream(&DStream);
+        value = FSE_readBits(&DStream, nbBits);
         value += 1<<nbBits;
         *op++ = value;
-        FSE_updateBitStream(&bitC, &ip);
+        FSE_reloadDStream(&DStream);
     }
 
-    //return FSE_closeDecompressionStream(iend, ip);  // slower
-    return (int) ((const BYTE*)iend- (const BYTE*)compressed);
+    return blockSize;
 }
 
 

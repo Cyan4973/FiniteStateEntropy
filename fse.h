@@ -213,7 +213,7 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 
 /******************************************
-   FSE streaming API
+*  FSE streaming compression API
 ******************************************/
 typedef struct
 {
@@ -232,8 +232,6 @@ typedef struct
 } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
-void*  FSE_getCStreamStart(const FSE_CStream_t* bitC);
-void   FSE_reserveCStreamSize(FSE_CStream_t* bitC, size_t size);
 
 void   FSE_initCState(FSE_CState_t* CStatePtr, const void* CTable);
 void   FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned char symbol);
@@ -242,6 +240,9 @@ void   FSE_flushBits(FSE_CStream_t* bitC);
 
 void   FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* CStatePtr);
 size_t FSE_closeCStream(FSE_CStream_t* bitC, unsigned optionalId);
+
+void   FSE_initCStreamCustom(FSE_CStream_t* bitC, void* dstBuffer);
+size_t FSE_bitSizeofCStream(const FSE_CStream_t* bitC);
 
 /*
 These functions are inner components of FSE_compress_usingCTable().
@@ -261,22 +262,8 @@ The first thing to do is to init the bitStream, and the state.
     FSE_initCStream(&bitC, dstBuffer);
     FSE_initState(&state, CTable);
 
-
-Right afterwards, you can optionnally insert some customized block of data,
-for example a header, using the following functions :
-    pos = FSE_getCStreamStart(&bitC);
-    FSE_reserveCStreamSize(&bitC, customSize);
-    memcpy(pos, blockOfData, customSize);
-You can reserve multiple blocks this way. 
-For example, if you did now :
-    pos2 = FSE_getCStreamStart(&bitC);
-you'll notice that : pos2 == pos + customSize.
-Remember you'll have to notify the decoder stream
-about the presence *and size* of such data blocks
-at the beginning of decompression.
-
-
 You can then encode your input data, byte after byte.
+FSE_encodeByte() outputs a maximum of 'tableLog' bits at a time.
 Remember decoding will be done in reverse direction.
     FSE_encodeByte(&bitStream, &state, symbol);
 
@@ -284,38 +271,34 @@ At any time, you can add any bit sequence.
 Note : maximum allowed nbBits is 25, for compatibility with 32-bits decoders
     FSE_addBits(&bitStream, bitField, nbBits);
 
-The above methods don't commit data to memory, they just store it into local register.
+The above methods don't commit data to memory, they just store it into local register, for speed.
 Local register size is 64-bits on 64-bits systems, 32-bits on 32-bits systems (size_t).
-Writing data to memory is performed by the flushBits method.
-(PS : FSE_encodeByte() never writes more than 'tableLog' bits at a time)
+Writing data to memory is a manual operation, performed by the flushBits function.
     FSE_flushBits(&bitStream);
 
 Your last FSE encoding operation shall be to flush your last state value(s).
     FSE_flushState(&bitStream, &state);
 
-When you are done with compression, you must close the bitStream.
-It's possible to embed an optionalId into the header. It will be decoded by decompressor.
-The function returns the size in bytes of the compressed stream.
+You must then close the bitStream if you opened it with FSE_initCStream().
+It's possible to embed some user-info into the header, as an optionalId [0-31].
+The function returns the size in bytes of CStream.
 If there is an error, it returns an errorCode (which can be tested using FSE_isError()).
     size_t size = FSE_closeCStream(&bitStream, optionalId);
+
+
+If you wish to handle your own header format, use FSE_initCStreamCustom() instead.
+In which case, no header is created, and you will have to save relevant information yourself,
+to provide them to FSE_initDStreamCustom() for decompression.
+
+At the end of compression, you can get the size of the CStream by using FSE_bitSizeofCStream().
+The result of the function is the size of the CStream ** in bits ** (8 x bytes).
+    size_t bitSize = FSE_bitSizeofCStream(&bitStream);
 */
 
 
-typedef struct
-{
-    unsigned int bitContainer;
-    int bitsConsumed;
-} bitStream_backward_t;
-
-const void* FSE_initDecompressionStream (const void** p, bitStream_backward_t* bitC, unsigned* optionalId);
-const void* FSE_initDecompressionStream_safe (const void** p, bitStream_backward_t* bitC, unsigned* optionalId, unsigned maxCompressedSize);
-unsigned char FSE_decodeSymbol(unsigned int* state, bitStream_backward_t* bitC, const void* DTable, unsigned fast);
-unsigned int FSE_readBits(bitStream_backward_t* bitC, unsigned nbBits);
-void FSE_updateBitStream(bitStream_backward_t* bitC, const void** ip);
-int FSE_closeDecompressionStream(const void* decompressionStreamDescriptor, const void* input);
-
-
-/*** new   ***/
+/******************************************
+*  FSE streaming decompression API
+******************************************/
 
 typedef struct
 {
@@ -323,7 +306,7 @@ typedef struct
     unsigned bitsConsumed;
     const char* ptr;
     const char* endPtr;
-} bitReadB_t;
+} FSE_DStream_t;
 
 typedef struct
 {
@@ -331,61 +314,57 @@ typedef struct
     const void* table;
 } FSE_DState_t;
 
-size_t FSE_DStream_getSize(void* srcBuffer, size_t srcSize, unsigned* optInfo);
-size_t FSE_DStream_init(bitReadB_t* bitD, unsigned* optInfo, const void* srcBuffer, size_t srcSize);
+size_t FSE_getDStreamSize(const void* srcBuffer, size_t srcSize, unsigned* optInfo);
+size_t FSE_initDStream(FSE_DStream_t* bitD, unsigned* optInfo, const void* srcBuffer, size_t srcSize);
 
-void*  FSE_DStream_getStart(const bitReadB_t* bitD);
-size_t FSE_DStream_skip(bitReadB_t* bitD, size_t size);
+void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable, unsigned tableLog);
 
-void   FSE_initDState(FSE_DState_t* DStatePtr, bitReadB_t* bitD, const void* DTable, unsigned tableLog);
+unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
+unsigned int  FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
+void          FSE_reloadDStream(FSE_DStream_t* bitD);
 
-unsigned char FSE_decodeSymbol2(FSE_DState_t* DStatePtr, bitReadB_t* bitD);
-unsigned int  FSE_readBits2(bitReadB_t* bitD, unsigned nbBits);
-unsigned int  FSE_readBitsFast2(bitReadB_t* bitD, unsigned nbBits);
-void          FSE_DStream_reload(bitReadB_t* bitD);
+size_t FSE_endOfDStream(const FSE_DStream_t* bitD, const FSE_DState_t* DStatePtr);
 
-size_t FSE_endOfBitStream(const FSE_DState_t* DStatePtr, const bitReadB_t* bitD);
 
+size_t   FSE_initDStreamCustom(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize, size_t unusedBits);
+unsigned FSE_reloadIsSafe(const FSE_DStream_t* bitD);
 
 /*
-Now is the turn to decompose FSE_decompress_usingDTable().
-You will decode FSE_encoded symbols from the bitStream,
-but also any other bitFields you put in, **in reverse order**.
+Now is the time to decompose FSE_decompress_usingDTable() into its unitary elements.
+You will decode FSE-encoded symbols from the bitStream,
+and also any other bitFields you put in, **in reverse order**.
 
 You will need a few variables to track your bitStream. They are :
 
-const void* input;        // Your input buffer (where compressed data is)
-const void* decompressionStreamDescriptor;   // Required to init and close the bitStream
-const void* DTable;       // Provided by FSE_buildDTable()
-int   tableLog;           // Provided by FSE_readHeader()
-unsigned int state;       // Encoded fractional bits
-bitStream_backward_t bitStream;   // Store bits read from input
+const void* srcBuffer;    // Your input buffer (where compressed data is)
+FSE_DStream_t DStream;    // Stream context
+FSE_DState_t DState;      // State context. Multiple ones are possible
+const void* DTable;       // Decoding table, provided by FSE_buildDTable()
+U32 tableLog;             // Provided by FSE_readHeader()
+U32 fastMode;             // Tells if decoding is compatible with fast mode. Provided by FSE_buildDTable().
 
 The first thing to do is to init the bitStream.
-    decompressionStreamDescriptor = FSE_initDecompressionStream(&ip, &bitStream, &optionalId);
+    errorCode = FSE_initDStream(&DStream, &optionalId, srcBuffer, srcSize);
 
 You should then retrieve your initial state value :
-    state = FSE_readBits(&bitC, tableLog);
-    FSE_updateBitStream(&bitStream, &ip);
+    errorCode = FSE_initDState(&DState, &DStream, DTable, tableLog);
 
 You can then decode your data, byte after byte.
-Keep in mind data is decoded in reverse order, like a lifo container.
-    unsigned char symbol = FSE_decodeSymbol(&state, bitStream, &bitsConsumed, DTable);
+For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.
+Keep in mind that symbols are decoded in reverse order, as a lifo stack (last in, first out).
+    unsigned char symbol = FSE_decodeSymbol(&DState, &DStream, fastMode);
 
 You can retrieve any other bitfield you eventually stored into the bitStream (in reverse order)
 Note : maximum allowed nbBits is 25
-    unsigned int bitField = FSE_readBits(&bitStream, nbBits);
+    unsigned int bitField = FSE_readBits(&DStream, nbBits);
 
-Reading data to memory is performed by the update method.
+Reading data from memory is manually performed by the reload method.
 'bitConsumed' shall never > 32.
-For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.
 Don't hesitate to use this method. The cost of this operation is very low.
-    FSE_updateBitStream(&bitStream, &ip);
+    FSE_reloadDStream(&DStream);
 
-When you are done with decompression, you can close the bitStream (optional).
-The function returns the size in bytes of the compressed stream.
-If there is an error, it returns -1.
-    int size = FSE_closeDecompressionStream(decompressionStreamDescriptor, ip, bitsConsumed);
+You can test if you reached end of DStream by using :
+size_t FSE_endOfDStream(const FSE_DStream_t* bitD, const FSE_DState_t* DStatePtr);
 */
 
 

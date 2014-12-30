@@ -27,38 +27,39 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
+   - Source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
-//****************************************************************
-// Tuning parameters
-//****************************************************************
-// MEMORY_USAGE :
-// Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
-// Increasing memory usage improves compression ratio
-// Reduced memory usage can improve speed, due to cache effect
-// Recommended max value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
+/****************************************************************
+*  Tuning parameters
+*****************************************************************/
+/* MEMORY_USAGE :
+*  Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
+*  Increasing memory usage improves compression ratio
+*  Reduced memory usage can improve speed, due to cache effect
+*  Recommended max value is 14, for 16KB, which nicely fits into Intel x86 L1 cache */
 #define FSE_MAX_MEMORY_USAGE 14
 #define FSE_DEFAULT_MEMORY_USAGE 13
 
-// FSE_ILP :
-// Determine if the algorithm tries to explicitly exploit ILP
-// (Instruction Level Parallelism)
-// Default : Recommended
+/* FSE_ILP :
+*  Determine if the algorithm tries to explicitly exploit ILP
+*  (Instruction Level Parallelism)
+*  Default : Recommended */
 #define FSE_ILP 1
 
 
-//****************************************************************
-//* Includes
-//****************************************************************
+/****************************************************************
+*  Includes
+*****************************************************************/
 #include "fseU16.h"
 
 
-//****************************************************************
-//* Compiler specifics
-//****************************************************************
-#ifdef _MSC_VER    // Visual Studio
-#  pragma warning(disable : 4214)        // disable: C4214: non-int bitfields
+/****************************************************************
+*  Compiler specifics
+*****************************************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
 #endif
 
 
@@ -74,17 +75,17 @@ typedef struct
 
 
 /********************************************************************
-   Include type-specific functions from fse.c (C template emulation)
+*  Include type-specific functions from fse.c (C template emulation)
 ********************************************************************/
-#define FSE_DONTINCLUDECORE
+#define FSE_COMMONDEFS_ONLY
 
 #define FSE_FUNCTION_TYPE U16
 #define FSE_FUNCTION_EXTENSION U16
-#include "fse.c"   // FSE_countU16, FSE_buildCTableU16, FSE_buildDTableU16
+#include "fse.c"   /* FSE_countU16, FSE_buildCTableU16, FSE_buildDTableU16 */
 
 
 /*********************************************************
-  U16 Compression functions
+*  U16 Compression functions
 *********************************************************/
 
 static int FSE_noCompressionU16(void* dest, const U16* source, int sourceSize)
@@ -298,19 +299,18 @@ int FSE_decompressSingleU16 (U16* out, int osize, U16 value)
     return 3;
 }
 
-U16 FSE_decodeSymbolU16(U32* state, U32 bitStream, int* bitsConsumed, const void* DTable)
+unsigned char FSE_decodeSymbol2(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned fastMode);
+
+U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
-    const FSE_decode_tU16* const decodeTable = (const FSE_decode_tU16*) DTable;
-    U32 rest;
+    const FSE_decode_tU16 DInfo = ((const FSE_decode_tU16*)(DStatePtr->table))[DStatePtr->state];
     U16 symbol;
-    const int nbBits = decodeTable[*state].nbBits;
+    U32 lowBits;
+    const U32 nbBits = DInfo.nbBits;
 
-    symbol = decodeTable[*state].symbol;
-
-    rest = ( (bitStream << *bitsConsumed) >> 1) >> (31 - nbBits);  // faster than mask
-    *bitsConsumed += nbBits;
-
-    *state = decodeTable[*state].newState + rest;
+    symbol = DInfo.symbol;
+    lowBits = FSE_readBits(bitD, nbBits);
+    DStatePtr->state = DInfo.newState + lowBits;
 
     return symbol;
 }
@@ -325,40 +325,34 @@ int FSE_decompressU16_usingDTable (unsigned short* dest, const int originalSize,
     const BYTE* iend;
     U16* op = dest;
     U16* const oend = op + originalSize - 1;
-    bitStream_backward_t bitC;
-    U32 state;
+    FSE_DStream_t bitD;
+    FSE_DState_t state;
+    U32 options;
 
     // Init
     iend = ip + ( ( (* (U32*) ip) +7) / 8);
-    if (safe && (iend < ip)) return -1;   // Memory overflow
-    if (safe && (iend > (const BYTE*)compressed + maxCompressedSize)) return -1;   // Beyond input buffer
+    if (safe && (iend < ip)) return -1;   /* Memory overflow */
+    if (safe && (iend > (const BYTE*)compressed + maxCompressedSize)) return -1;   /* Beyond input buffer */
 
-    bitC.bitsConsumed = ( ( (* (U32*) ip)-1) & 7) + 1 + 24;
-    ip = iend - 4;
-    bitC.bitContainer = * (U32*) ip;
-
-    bitC.bitsConsumed = 32 - bitC.bitsConsumed;
-    state = (bitC.bitContainer << bitC.bitsConsumed) >> (32-tableLog);
-    bitC.bitsConsumed += tableLog;
-
-    FSE_updateBitStream(&bitC, (const void**)&ip);
+    FSE_initDStream(&bitD, &options, compressed, maxCompressedSize);
+    FSE_initDState(&state, &bitD, DTable, tableLog);
 
     // 2 symbols per loop
     while( ((safe) && ((op<oend-1) && (ip>=(const BYTE*)compressed)))
         || ((!safe) && (op<oend-1)) )
     {
-        *op++ = FSE_decodeSymbolU16(&state, bitC.bitContainer, &bitC.bitsConsumed, DTable);
+        *op++ = FSE_decodeSymbolU16(&state, &bitD);
         if ((sizeof(U32)*8 > FSE_MAX_TABLELOG*2+7) && (sizeof(void*)==8))   // Need this test to be static
-            *op++ = FSE_decodeSymbolU16(&state, bitC.bitContainer, &bitC.bitsConsumed, DTable);
-        FSE_updateBitStream(&bitC, (const void**)&ip);
+            *op++ = FSE_decodeSymbolU16(&state, &bitD);
+        FSE_reloadDStream(&bitD);
     }
     // last symbol
-    if (op<oend) *(oend-1) = FSE_decodeSymbolU16(&state, bitC.bitContainer, &bitC.bitsConsumed, DTable);
+    if (op<oend) *(oend-1) = FSE_decodeSymbolU16(&state, &bitD);
 
     // cheap last symbol storage
-    *oend = (U16) state;
+    *oend = (U16) (state.state);
 
-    if ((ip!=(const BYTE*)compressed) || bitC.bitsConsumed) return -1;   // Not fully decoded stream
+    if ((ip!=(const BYTE*)compressed) || bitD.bitsConsumed) return -1;   // Not fully decoded stream
 
     return (int) (iend- (const BYTE*)compressed);
 }

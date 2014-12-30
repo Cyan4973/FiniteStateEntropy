@@ -211,7 +211,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 DISPLAY ("Noise Compression result too large !\n");
         }
 
-        /* Compression / Decompression test */
+        /* Compression / Decompression tests */
         {
             int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
             int sizeCompressed;
@@ -240,7 +240,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* check header read function*/
         {
-            BYTE* bufferTest = bufferSrc + testNb;   // Read some random noise
+            BYTE* bufferTest = bufferSrc + testNb;   /* Read some random noise */
             short count[256];
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
@@ -253,6 +253,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             }
         }
 
+#if 0
         /* Attempt decompression on bogus data*/
         {
             int sizeOrig = FUZ_rand (&seed) & 0x1FFFF;
@@ -265,12 +266,13 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             if (bufferDst[sizeOrig] != saved)
                 DISPLAY ("Output buffer bufferDst corrupted !\n");
             if (result != -1)
-                if (! ( (*bufferTest==0) || (*bufferTest==1) ) )
+                if (! ( (*bufferTest==0) || (*bufferTest==1) ) )   /* why this condition ? */
                     DISPLAY ("Decompression completed ??\n");
         }
+#endif // 0
     }
 
-    // exit
+    /* exit */
     free (bufferNoise);
     free (bufferSrc);
     free (bufferDst);
@@ -279,7 +281,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
 
 /*****************************************************************
-   Unitary tests
+*  Unitary tests
 *****************************************************************/
 extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
