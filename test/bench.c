@@ -26,9 +26,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define TIMELOOP   2500
 
 
-//**************************************
-// Compiler Options
-//**************************************
+/**************************************
+*  Compiler Options
+***************************************/
 // Disable some Visual warning messages
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_DEPRECATE     // VS2005
@@ -47,9 +47,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 
-//**************************************
-// Includes
-//**************************************
+/**************************************
+*  Includes
+***************************************/
 #include <stdlib.h>      // malloc
 #include <stdio.h>       // fprintf, fopen, ftello64
 #include <string.h>      // strcat
@@ -73,9 +73,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "fseDist.h"
 
 
-//**************************************
-// Compiler specifics
-//**************************************
+/**************************************
+*  Compiler specifics
+***************************************/
 #if !defined(S_ISREG)
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
@@ -91,9 +91,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 
-//**************************************
-// Basic Types
-//**************************************
+/**************************************
+*  Basic Types
+***************************************/
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
 typedef uint8_t  BYTE;
@@ -110,9 +110,9 @@ typedef unsigned long long  U64;
 #endif
 
 
-//**************************************
-// Constants
-//**************************************
+/**************************************
+*  Constants
+***************************************/
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define GB *(1U<<30)
@@ -122,15 +122,15 @@ typedef unsigned long long  U64;
 #define DEFAULT_CHUNKSIZE   (32 KB)
 
 
-//**************************************
-// MACRO
-//**************************************
+/**************************************
+*  MACRO
+***************************************/
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
 
 
-//**************************************
-// Benchmark Parameters
-//**************************************
+/**************************************
+*  Benchmark Parameters
+***************************************/
 static U32 chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
@@ -151,19 +151,19 @@ void BMK_SetNbIterations(int nbLoops)
 
 typedef struct
 {
-    unsigned int id;
-    char* origBuffer;
-    int   origSize;
-    char* compressedBuffer;
-    int   compressedSize;
-    char* destBuffer;
-    int   destSize;
+    unsigned id;
+    char*  origBuffer;
+    size_t origSize;
+    char*  compressedBuffer;
+    size_t compressedSize;
+    char*  destBuffer;
+    size_t destSize;
 } chunkParameters_t;
 
 
-//*********************************************************
-//  Private functions
-//*********************************************************
+/*********************************************************
+*  local functions
+*********************************************************/
 
 #if defined(BMK_LEGACY_TIMER)
 
@@ -569,15 +569,11 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 }
 
 
-//int BMK_FSE2T_compress2(void* dest, const unsigned char* src, int srcSize, int nbSymbols, int tableLog)
-//{ (void)nbSymbols; (void)tableLog; return FSE2T_compress2(dest, src, srcSize, 10); }
-
-
 size_t BMK_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned nbSymbols, unsigned tableLog)
 { (void)nbSymbols; (void)tableLog; (void)dstSize; return ZLIBH_compress(dst, (const char*)src, (int)srcSize); }
 
-int BMK_ZLIBH_decompress(unsigned char* dest, unsigned originalSize, const void* compressed)
-{ (void)originalSize; return ZLIBH_decompress((char*)dest, compressed); }
+size_t BMK_ZLIBH_decompress(void* dest, size_t originalSize, const void* compressed, size_t cSize)
+{ (void)originalSize; (void)cSize; return ZLIBH_decompress((char*)dest, compressed); }
 
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
@@ -591,7 +587,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     U32 crcCheck=0;
     U32 crcOrig;
     size_t (*compressor)(void* dst, size_t, const void* src, size_t, unsigned, unsigned);
-    int (*decompressor)(unsigned char*, unsigned, const void*);
+    size_t (*decompressor)(void* dst, size_t origSize, const void* cSrc, size_t maxCSrcSize);
 
     // Init
     if (nbSymbols==0) { BMK_benchMemU16 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
@@ -662,7 +658,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                int errorCode = decompressor((unsigned char*)chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer);
+                size_t errorCode = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
                 if (errorCode != chunkP[chunkNb].compressedSize)
                 {
                     DISPLAY("!!! Error decompressing block %i  !!!!    \n", chunkNb);

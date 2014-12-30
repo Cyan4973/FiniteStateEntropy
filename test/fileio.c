@@ -431,14 +431,14 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
         while ((size_t)(iend-ip) > (size_t)FSE_compressBound(blockSize))
         {
             size_t writeSizeCheck;
-            int errorCode;
+            size_t errorCode;
             if (nbFullBlocks == 0)
             {
                 nbFullBlocks = *ip++;
                 if (!nbFullBlocks) goto _lastBlock;   // goto last block
             }
-            errorCode = FSE_decompress((unsigned char*)out_buff, blockSize, ip);
-            if (errorCode == -1) EXM_THROW(33, "Decoding error : compressed data block corrupted");
+            errorCode = FSE_decompress(out_buff, blockSize, ip, iend-ip);
+            if (FSE_isError(errorCode)) EXM_THROW(33, "Decoding error : compressed data block corrupted");
             ip += errorCode;
             filesize += blockSize;
             nbFullBlocks--;
@@ -473,8 +473,8 @@ _lastBlock:
         }
         lastBlockSize &= mask;
 
-        errorCode = FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip);
-        if (errorCode == -1) EXM_THROW(33, "Decoding error : last block failed");
+        errorCode = FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip, (size_t)(-1));
+        if (FSE_isError(errorCode)) EXM_THROW(33, "Decoding error : last block failed");
         ip += errorCode;
         filesize += lastBlockSize;
 

@@ -48,8 +48,8 @@ extern "C" {
 ******************************************/
 size_t FSE_compress(void* dst, size_t dstSize,
               const void* src, size_t srcSize);
-int FSE_decompress (unsigned char* dst, unsigned originalSize,
-                    const void* compressed);
+size_t FSE_decompress(void* dst, size_t originalSize,
+                const void* compressed, size_t maxCompressedSize);
 /*
 FSE_compress():
     Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
@@ -90,17 +90,6 @@ FSE_compress2():
              or -1 if there is an error
 */
 size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog);
-
-
-/*
-FSE_decompress_safe():
-    Same as FSE_decompress(), but ensures that the decoder never reads beyond compressed + maxCompressedSize.
-    note : you don't have to provide the exact compressed size. If you provide more, it's fine too.
-    This function is safe against malicious data.
-    return : size of compressed data
-             or -1 if there is an error
-*/
-int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize);
 
 
 /******************************************

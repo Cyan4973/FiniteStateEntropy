@@ -1107,9 +1107,7 @@ int FSE_decompress_usingDTable_safe (unsigned char* dest, const unsigned origina
 }
 
 
-FORCE_INLINE int FSE_decompress_generic (
-    unsigned char* dest, int originalSize,
-    const void* compressed, int maxCompressedSize, int safe)
+size_t FSE_decompress(void* dst, size_t originalSize, const void* compressed, size_t maxCompressedSize)
 {
     const BYTE* const istart = (const BYTE*)compressed;
     const BYTE* ip = istart;
@@ -1118,44 +1116,35 @@ FORCE_INLINE int FSE_decompress_generic (
     BYTE  headerId;
     unsigned maxSymbolValue;
     unsigned tableLog;
-    int errorCode, fastMode;
+    size_t errorCode, fastMode;
+    const unsigned safe = 0;   /* TBD */
 
-    if ((safe) && (maxCompressedSize<2)) return -1;   // too small input size
+    if ((safe) && (maxCompressedSize<2)) return (size_t)-FSE_ERROR_srcSize_tooSmall;   // too small input size
 
     // headerId early outs
     headerId = ip[0] & 3;
     if (ip[0]==0)   // Raw (uncompressed) data
     {
         if (safe && maxCompressedSize < originalSize + 1) return -1;
-        return FSE_decompressRaw (dest, originalSize, istart);
+        return FSE_decompressRaw (dst, originalSize, istart);
     }
-    if (ip[0]==1) return FSE_decompressSingleSymbol (dest, originalSize, istart[1]);
-    if (headerId!=2) return -1;   // unused headerId
+    if (ip[0]==1) return FSE_decompressSingleSymbol (dst, originalSize, istart[1]);
+    if (headerId!=2) return (size_t)-FSE_ERROR_GENERIC;   // unused headerId
 
     // normal FSE decoding mode
     errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart);
-    if (errorCode==-1) return -1;
+    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
     ip += errorCode;
 
     fastMode = FSE_buildDTable (DTable, counting, maxSymbolValue, tableLog);
-    if (fastMode==-1) return -1;
+    if (FSE_isError(fastMode)) return (size_t)-FSE_ERROR_GENERIC;
 
-    if (safe) errorCode = FSE_decompress_usingDTable_safe (dest, originalSize, ip, maxCompressedSize, DTable, tableLog, fastMode);
-    else errorCode = FSE_decompress_usingDTable (dest, originalSize, ip, DTable, tableLog, fastMode);
-    if (errorCode==-1) return -1;
+    if (safe) errorCode = FSE_decompress_usingDTable_safe (dst, originalSize, ip, maxCompressedSize, DTable, tableLog, fastMode);
+    else errorCode = FSE_decompress_usingDTable (dst, originalSize, ip, DTable, tableLog, fastMode);
+    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
     ip += errorCode;
 
-    return (int) (ip-istart);
-}
-
-int FSE_decompress (unsigned char* dest, unsigned originalSize, const void* compressed)
-{
-    return FSE_decompress_generic(dest, originalSize, compressed, 0, 0);
-}
-
-int FSE_decompress_safe (unsigned char* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize)
-{
-    return FSE_decompress_generic(dest, originalSize, compressed, maxCompressedSize, 1);
+    return ip-istart;
 }
 
 

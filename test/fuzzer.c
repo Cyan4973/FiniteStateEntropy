@@ -224,7 +224,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             else
             {
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
-                size_t result = FSE_decompress_safe (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
                     DISPLAY ("Output buffer (bufferVerif) overrun (write beyond specified end) !\n");
                 if ((FSE_isError(result)) && (sizeCompressed>=2))
