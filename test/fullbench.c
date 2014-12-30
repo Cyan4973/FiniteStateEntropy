@@ -1062,9 +1062,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 #endif
 
     default:
-        return 0;
-        //DISPLAY("Unknown algorithm number\n");
-        //exit(-1);
+        goto _end;
     }
 
     // Bench
@@ -1097,6 +1095,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         DISPLAY("%2u#%-26.26s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
+_end:
     free(oBuffer);
     free(cBuffer);
 
