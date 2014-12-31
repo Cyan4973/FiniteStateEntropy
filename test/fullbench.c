@@ -801,14 +801,15 @@ static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t
     return (int)FSE_compress(dst, dstSize, src, srcSize);
 }
 
-static short g_normTable[256];
-static U32   g_countTable[256];
-static U32   g_tableLog;
-static U32   g_CTable[2350];
-static U32   g_DTable[FSE_DTABLE_SIZE_U32(12,256)];
-static U32   g_max;
-static int   g_skip;
-static U32   g_fast;
+static short  g_normTable[256];
+static U32    g_countTable[256];
+static U32    g_tableLog;
+static U32    g_CTable[2350];
+static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
+static U32    g_max;
+static int    g_skip;
+static U32    g_fast;
+static size_t g_cSize;
 
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -841,12 +842,12 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
-static int local_FSE_readHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
+static int local_FSE_readHeader(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
 {
     short norm[256];
     U32 maxSymbolValue, tableLog;
-    (void)dstSize; (void)src; (void)srcSize;
-    return (int)FSE_readHeader(norm, &maxSymbolValue, &tableLog, dst);   // input is into dst
+    (void)initialBuffer; (void)initialBufferSize;
+    return (int)FSE_readHeader(norm, &maxSymbolValue, &tableLog, src, srcSize);   // input is into dst
 }
 
 static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -855,15 +856,16 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
     return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
 }
 
-static int local_FSE_decompress_usingDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+static int local_FSE_decompress_usingDTable(void* cSrc, size_t cSrcSize, const void* dst, size_t maxDstSize)
 {
-    (void)dstSize;
-    return (int)FSE_decompress_usingDTable((void*)src, (U32)srcSize, (BYTE*)dst + g_skip, g_DTable, g_tableLog, g_fast);   // change direction : input is into dst
+    (void)cSrcSize;
+    return (int)FSE_decompress_usingDTable((void*)dst, maxDstSize, (BYTE*)cSrc + g_skip, g_cSize, g_DTable, g_tableLog, g_fast);   // change direction : input is into dst
 }
 
-static int local_FSE_decompress(void* cSrc, size_t cSrcSize, const void* dst, size_t dstSize)  /* direction change */
+static int local_FSE_decompress(void* cSrc, size_t cSrcBufferSize, const void* dst, size_t maxDstSize)  /* direction change */
 {
-    return (int)FSE_decompress((void*)dst, dstSize, cSrc, cSrcSize);
+    (void)cSrcBufferSize;
+    return (int)FSE_decompress((void*)dst, maxDstSize, cSrc, g_cSize);
 }
 
 
@@ -970,7 +972,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 12:
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer);
+            FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, benchedSize);
             funcName = "FSE_buildDTable";
             func = local_FSE_buildDTable;
             break;
@@ -978,8 +980,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 
     case 13:
         {
-            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer);
+            g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, g_cSize);
+            g_cSize -= g_skip;
             g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
             funcName = "FSE_decompress_usingDTable";
             func = local_FSE_decompress_usingDTable;
@@ -988,7 +991,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 
     case 14:
         {
-            FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             funcName = "FSE_decompress";
             func = local_FSE_decompress;
             break;
@@ -1067,7 +1070,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     {
         double bestTime = 999.;
         U32 benchNb=1;
-        int errorCode = 0;
+        size_t errorCode = 0;
         DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
@@ -1081,7 +1084,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
             {
                 errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                if (errorCode < 0) { DISPLAY("Error %s \n", funcName); exit(-1); }
+                if (FSE_isError(errorCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(errorCode)); exit(-1); }
                 loopNb++;
             }
             milliTime = BMK_GetMilliSpan(milliTime);

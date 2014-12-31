@@ -33,7 +33,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdio.h>     // printf
 #include <string.h>    // memset
 #include <sys/timeb.h> // timeb
-#include "fse.h"
+#include "fse_static.h"
 #include "fseU16.h"
 #include "xxhash.h"
 
@@ -77,13 +77,7 @@ typedef unsigned long long  U64;
 ***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-
-
-/***************************************************
-*  Local variables
-***************************************************/
-static char* programName;
-static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
+static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 
 
 /***************************************************
@@ -175,7 +169,6 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb, maxSV, tableLog;
     U32 time = FUZ_GetMilliStart();
-    const U32 nbRandPerLoop = 4;
 
     generate (bufferSrc, BUFFERSIZE, 0.1, &seed);
     generateNoise (bufferNoise, BUFFERSIZE, &seed);
@@ -183,13 +176,16 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     if (startTestNb)
     {
         U32 i;
-        for (i=0; i<nbRandPerLoop*startTestNb; i++)
+        for (i=0; i<startTestNb; i++)
             FUZ_rand (&seed);
     }
 
     for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
         int tag=0;
+        U32 roundSeed = seed ^ 0xEDA5B371;
+        FUZ_rand(&seed);
+
         DISPLAYLEVEL (4, "\r test %5u  ", testNb);
         if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
         {
@@ -199,7 +195,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Noise Compression test */
         {
-            int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
+            int sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
             int sizeCompressed;
             BYTE* bufferTest = bufferNoise + testNb;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
@@ -212,7 +208,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Compression / Decompression tests */
         {
-            int sizeOrig = (FUZ_rand (&seed) & 0x1FFFF) + 1;
+            int sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
             size_t sizeCompressed;
             U32 hashOrig;
             BYTE* bufferTest = bufferSrc + testNb;
@@ -221,7 +217,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
             if (FSE_isError(sizeCompressed))
                 DISPLAY ("Compression failed ! \n");
-            else
+            else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
                 size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
@@ -243,7 +239,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             short count[256];
             size_t result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
-            result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest);
+            result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
             if (!FSE_isError(result))
             {
                 int check = FUZ_checkCount (count, tableLog, maxSV);
@@ -252,17 +248,17 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             }
         }
 
-#if 0
+#if 1
         /* Attempt decompression on bogus data*/
         {
-            int sizeOrig = FUZ_rand (&seed) & 0x1FFFF;
-            int sizeCompressed = FUZ_rand (&seed) & 0x1FFFF;
+            size_t maxDstSize = FUZ_rand (&roundSeed) & 0x1FFFF;
+            size_t sizeCompressed = FUZ_rand (&roundSeed) & 0x1FFFF;
             BYTE* bufferTest = bufferSrc + testNb;
-            BYTE saved = (bufferDst[sizeOrig] = 253);
+            BYTE saved = (bufferDst[maxDstSize] = 253);
             int result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
-            result = FSE_decompress_safe (bufferDst, sizeOrig, bufferTest, sizeCompressed);
-            if (bufferDst[sizeOrig] != saved)
+            result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
+            if (bufferDst[maxDstSize] != saved)
                 DISPLAY ("Output buffer bufferDst corrupted !\n");
             if (result != -1)
                 if (! ( (*bufferTest==0) || (*bufferTest==1) ) )   /* why this condition ? */
@@ -373,9 +369,8 @@ int main (int argc, char** argv)
     U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
     int argNb;
 
-    programName = argv[0];
     seed = FUZ_GetMilliStart() % 10000;
-    DISPLAYLEVEL (0, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
+    DISPLAYLEVEL (1, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];

@@ -50,7 +50,7 @@ extern "C" {
 ******************************************/
 /* You can statically allocate a CTable as a table of U32 using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
-#define FSE_DTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1<<maxTableLog)
+#define FSE_DTABLE_SIZE_U32(maxTableLog)                   (1<<maxTableLog)
 
 
 /******************************************
@@ -65,7 +65,7 @@ extern "C" {
 #define FSE_LIST_ERRORS(ITEM) \
         ITEM(FSE_OK_NoError) ITEM(FSE_ERROR_GENERIC) \
         ITEM(FSE_ERROR_tableLog_tooLarge) ITEM(FSE_ERROR_maxSymbolValue_tooLarge) \
-        ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_tooSmall)\
+        ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_wrong)\
         ITEM(FSE_ERROR_maxCode)
 
 #define FSE_GENERATE_ENUM(ENUM) ENUM,

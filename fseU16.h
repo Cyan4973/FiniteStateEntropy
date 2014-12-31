@@ -39,16 +39,22 @@ extern "C" {
 
 
 /******************************************
-   Tuning parameters
+*  Tuning parameters
 ******************************************/
-// FSE_MAX_SYMBOL_VALUE :
-// Maximum nb of symbol values authorized.
-// Required for allocation purposes
+/* FSE_MAX_SYMBOL_VALUE :
+*  Maximum nb of symbol values authorized.
+*  Required for allocation purposes */
 #define FSE_MAX_SYMBOL_VALUE 286   // This is just an example, typical value for zlib
 
 
 /******************************************
-   FSE U16 functions
+*  Includes
+******************************************/
+#include <stddef.h>    // size_t, ptrdiff_t
+
+
+/******************************************
+*  FSE U16 functions
 ******************************************/
 
 /* same as FSE normal functions,
@@ -58,8 +64,8 @@ extern "C" {
    Maximum allowed 'maxSymbolValue' value is controlled by constant FSE_MAX_SYMBOL_VALUE */
 int FSE_compressU16  (void* dest,
                       const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog);
-int FSE_decompressU16(unsigned short* dest, unsigned originalSize,
-                      const void* compressed);
+size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize,
+                  const void* cSrc, size_t cSrcSize);
 
 
 /******************************************

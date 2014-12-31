@@ -173,7 +173,7 @@ static int FSE_compressU16_usingCTable (void* dst,
     }
 
     FSE_flushCState(&bitC, &CState);
-    return (int)FSE_closeCStream(&bitC, 1);
+    return (int)FSE_closeCStream(&bitC);
 }
 
 
@@ -316,94 +316,55 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 }
 
 
-int FSE_decompressU16_usingDTable (unsigned short* dest, const int originalSize,
-                                   const void* compressed, int maxCompressedSize,
-                                   const void* DTable, const int tableLog,
-                                   int safe)
+size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
+                               const void* cSrc, size_t cSrcSize,
+                               const void* DTable, unsigned tableLog)
 {
-    const BYTE* ip = (const BYTE*) compressed;
-    const BYTE* iend;
-    U16* op = dest;
-    U16* const oend = op + originalSize - 1;
+    U16* ostart = dst;
+    U16* op = ostart;
     FSE_DStream_t bitD;
     FSE_DState_t state;
-    U32 options;
 
     // Init
-    iend = ip + ( ( (* (U32*) ip) +7) / 8);
-    if (safe && (iend < ip)) return -1;   /* Memory overflow */
-    if (safe && (iend > (const BYTE*)compressed + maxCompressedSize)) return -1;   /* Beyond input buffer */
-
-    FSE_initDStream(&bitD, &options, compressed, maxCompressedSize);
+    (void)maxDstSize;   // should be updated
+    FSE_initDStream(&bitD, cSrc, cSrcSize);
     FSE_initDState(&state, &bitD, DTable, tableLog);
 
-    // 2 symbols per loop
-    while( ((safe) && ((op<oend-1) && (ip>=(const BYTE*)compressed)))
-        || ((!safe) && (op<oend-1)) )
+    while(FSE_reloadDStream(&bitD))
     {
         *op++ = FSE_decodeSymbolU16(&state, &bitD);
-        if ((sizeof(U32)*8 > FSE_MAX_TABLELOG*2+7) && (sizeof(void*)==8))   // Need this test to be static
-            *op++ = FSE_decodeSymbolU16(&state, &bitD);
         FSE_reloadDStream(&bitD);
     }
-    // last symbol
-    if (op<oend) *(oend-1) = FSE_decodeSymbolU16(&state, &bitD);
 
-    // cheap last symbol storage
-    *oend = (U16) (state.state);
-
-    if ((ip!=(const BYTE*)compressed) || bitD.bitsConsumed) return -1;   // Not fully decoded stream
-
-    return (int) (iend- (const BYTE*)compressed);
+    return op-ostart;
 }
 
 
-int FSE_decompressU16_generic(
-                    unsigned short* dest, int originalSize,
-                    const void* compressed, int maxCompressedSize,
-                    int safe)
+size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
+                  const void* cSrc, size_t cSrcSize)
 {
-    const BYTE* const istart = (const BYTE*) compressed;
+    const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short   counting[FSE_MAX_SYMBOL_VALUE+1];
     FSE_decode_tU16 DTable[FSE_MAX_TABLESIZE];
-    BYTE  headerId;
     unsigned maxSymbolValue;
     unsigned tableLog;
-    int errorCode;
+    size_t errorCode;
 
-    if ((safe) && (maxCompressedSize<3)) return -1;   // too small input size
-
-    // headerId early outs
-    headerId = ip[0] & 3;
-    if (ip[0]==0)   // Raw (uncompressed) data
-    {
-        if (safe && maxCompressedSize < 2*originalSize + 1) return -1;
-        return FSE_decompressRawU16 (dest, originalSize, istart);
-    }
-    if (headerId==1) return FSE_decompressSingleU16 (dest, originalSize, *(U16*)(istart+1));
-    if (headerId!=2) return -1;   // unused headerId
+    // Sanity check
+    if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   // specific corner cases (uncompressed & rle)
 
     // normal FSE decoding mode
-    errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart);
-    if (errorCode==-1) return -1;
+    errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
+    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
     ip += errorCode;
+    cSrcSize -= errorCode;
 
     errorCode = FSE_buildDTableU16 (DTable, counting, maxSymbolValue, tableLog);
-    if (errorCode==-1) return -1;
+    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
 
-    if (safe) errorCode = FSE_decompressU16_usingDTable (dest, originalSize, ip, maxCompressedSize, DTable, tableLog, 1);
-    else errorCode = FSE_decompressU16_usingDTable (dest, originalSize, ip, 0, DTable, tableLog, 0);
-    if (errorCode==-1) return -1;
-    ip += errorCode;
+    FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
+    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
 
-    return (int) (ip-istart);
+    return errorCode;
 }
-
-
-int FSE_decompressU16 (unsigned short* dest, unsigned originalSize, const void* compressed)
-{ return FSE_decompressU16_generic(dest, originalSize, compressed, 0, 0); }
-
-int FSE_decompressU16_safe (unsigned short* dest, unsigned originalSize, const void* compressed, unsigned maxCompressedSize)
-{ return FSE_decompressU16_generic(dest, originalSize, compressed, maxCompressedSize, 1); }
-

@@ -967,7 +967,8 @@ int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb)
    BenchCore
 **********************************************************************/
 
-static void BMK_benchCore_Mem(char* dst, char* src, unsigned benchedSize,
+static void BMK_benchCore_Mem(char* dst,
+                              char* src, unsigned benchedSize,
                               unsigned nbSymbols, unsigned tableLog, char* inFileName,
                               U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime)
 {
@@ -1030,7 +1031,7 @@ static void BMK_benchCore_Mem(char* dst, char* src, unsigned benchedSize,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            cSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, DTable, tableLog, fastMode);
+            cSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, (size_t)(-1), DTable, tableLog, fastMode);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);

@@ -38,7 +38,7 @@ extern "C" {
 
 
 /******************************************
-   Includes
+*  Includes
 ******************************************/
 #include <stddef.h>    // size_t, ptrdiff_t
 
@@ -46,25 +46,40 @@ extern "C" {
 /******************************************
    FSE simple functions
 ******************************************/
-size_t FSE_compress(void* dst, size_t dstSize,
+size_t FSE_compress(void* dst, size_t maxDstSize,
               const void* src, size_t srcSize);
-size_t FSE_decompress(void* dst, size_t originalSize,
-                const void* compressed, size_t maxCompressedSize);
+size_t FSE_decompress(void* dst, size_t maxDstSize,
+                const void* cSrc, size_t cSrcSize);
 /*
 FSE_compress():
     Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
     'dst' buffer must be already allocated, and sized to handle worst case situations.
     Worst case size evaluation is provided by FSE_compressBound().
     return : size of compressed data
-             or an error value, which can be tested using FSE_isError()
+    Special values : if result == 0, data is uncompressible => Nothing is stored within cSrc !!
+                     if result == 1, data is RLE.
+                     if FSE_isError(result), it's an error code.
 
 FSE_decompress():
-    Decompress compressed data from buffer 'compressed',
-    into destination table of unsigned char 'dest', of size 'originalSize'.
-    Destination table must be already allocated, and large enough to accommodate 'originalSize' char.
-    The function will determine how many bytes are read from buffer 'compressed'.
-    return : size of compressed data
-             or -1 if there is an error.
+    Decompress FSE data from buffer 'cSrc', of size 'cSrcSize',
+    into already allocated destination buffer 'dst', of size 'maxDstSize'.
+    ** Important ** : This function doesn't decompress uncompressed nor RLE data !
+    return : size of regenerated data (<= maxDstSize)
+             or an error code, which can be tested using FSE_isError()
+*/
+
+
+size_t FSE_decompressRLE(void* dst, size_t originalSize,
+                   const void* cSrc, size_t cSrcSize);
+/*
+FSE_decompressRLE():
+    Decompress specific RLE corner case.
+    Basically equivalent to memset().
+    cSrcSize must be == 1. originalSize must be exact.
+    return : size of regenerated data (==originalSize)
+             or an error code, which can be tested using FSE_isError()
+
+Note : there is no function provided for uncompressed data, as it's just a simple memcpy()
 */
 
 
@@ -169,15 +184,17 @@ The function returns the size of compressed data (without header), or -1 if fail
 
 /* *** DECOMPRESSION *** */
 
-size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* header);
+size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t hbSize);
 
 void*  FSE_createDTable(unsigned tableLog);
 void   FSE_freeDTable(void* DTable);
 size_t FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_decompress_usingDTable(unsigned char* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog, unsigned fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t originalSize, const void* cSrc, size_t cSrcSize, const void* DTable, unsigned tableLog, size_t fastMode);
 
 /*
+If the block is RLE compressed, or uncompressed, use the relevant specific functions.
+
 The first step is to obtain the normalized frequencies of symbols.
 This can be performed by reading a header with FSE_readHeader().
 'normalizedCounter' must be already allocated, and have at least '*maxSymbolValuePtr+1' cells of short.
@@ -194,13 +211,14 @@ The next step is to create the decompression tables 'DTable' from 'normalizedCou
 This is performed by the function FSE_buildDTable().
 The space required by 'DTable' must be already allocated and properly aligned.
 One can create a DTable using FSE_createDTable().
-The function will return 1 if table is compatible with fastMode, 0 otherwise.
-If there is an error, the function will return -1.
+The function will return 1 if DTable is compatible with fastMode, 0 otherwise.
+If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
 'DTable' can then be used to decompress 'compressed', with FSE_decompress_usingDTable().
-FSE_decompress_usingDTable() will regenerate exactly 'originalSize' symbols, as a table of unsigned char.
-Only use fastMode if it was authorized by result of FSE_buildDTable(), otherwise decompression will fail.
-The function returns the size of compressed data (without header), or -1 if failed.
+Only trigger fastMode if it was authorized by result of FSE_buildDTable(), otherwise decompression will fail.
+FSE_decompress_usingDTable() check if the compressed size is correct, and refuse to work if not.
+Its result will tell how many bytes were regenerated.
+If there is an error, the function will return an error code, which can be tested using FSE_isError().
 */
 
 
@@ -231,10 +249,7 @@ void   FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits);
 void   FSE_flushBits(FSE_CStream_t* bitC);
 
 void   FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* CStatePtr);
-size_t FSE_closeCStream(FSE_CStream_t* bitC, unsigned optionalId);
-
-void   FSE_initCStreamCustom(FSE_CStream_t* bitC, void* dstBuffer);
-size_t FSE_bitSizeofCStream(const FSE_CStream_t* bitC);
+size_t FSE_closeCStream(FSE_CStream_t* bitC);
 
 /*
 These functions are inner components of FSE_compress_usingCTable().
@@ -291,35 +306,37 @@ The result of the function is the size of the CStream ** in bits ** (8 x bytes).
 /******************************************
 *  FSE streaming decompression API
 ******************************************/
+typedef unsigned int bitD_t;
+//typedef size_t bitD_t;
 
 typedef struct
 {
-    unsigned bitContainer;
+    bitD_t   bitContainer;
     unsigned bitsConsumed;
     const char* ptr;
-    const char* endPtr;
+    const char* start;
 } FSE_DStream_t;
 
 typedef struct
 {
-    unsigned    state;
+    bitD_t      state;
     const void* table;
 } FSE_DState_t;
 
-size_t FSE_getDStreamSize(const void* srcBuffer, size_t srcSize, unsigned* optInfo);
-size_t FSE_initDStream(FSE_DStream_t* bitD, unsigned* optInfo, const void* srcBuffer, size_t srcSize);
 
+size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
 void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable, unsigned tableLog);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 unsigned int  FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
-void          FSE_reloadDStream(FSE_DStream_t* bitD);
+unsigned int  FSE_reloadDStream(FSE_DStream_t* bitD);
 
-size_t FSE_endOfDStream(const FSE_DStream_t* bitD, const FSE_DState_t* DStatePtr);
+unsigned FSE_DStreamConsumed(const FSE_DStream_t* bitD);
+unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
+unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
 
 size_t   FSE_initDStreamCustom(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize, size_t unusedBits);
-unsigned FSE_reloadIsSafe(const FSE_DStream_t* bitD);
 
 /*
 Now is the time to decompose FSE_decompress_usingDTable() into its unitary elements.
@@ -328,35 +345,46 @@ and also any other bitFields you put in, **in reverse order**.
 
 You will need a few variables to track your bitStream. They are :
 
-const void* srcBuffer;    // Your input buffer (where compressed data is)
 FSE_DStream_t DStream;    // Stream context
 FSE_DState_t DState;      // State context. Multiple ones are possible
 const void* DTable;       // Decoding table, provided by FSE_buildDTable()
 U32 tableLog;             // Provided by FSE_readHeader()
-U32 fastMode;             // Tells if decoding is compatible with fast mode. Provided by FSE_buildDTable().
 
 The first thing to do is to init the bitStream.
     errorCode = FSE_initDStream(&DStream, &optionalId, srcBuffer, srcSize);
 
-You should then retrieve your initial state value :
+You should then retrieve your initial state(s) (multiple ones are possible) :
     errorCode = FSE_initDState(&DState, &DStream, DTable, tableLog);
 
-You can then decode your data, byte after byte.
+You can then decode your data, symbol after symbol.
 For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.
-Keep in mind that symbols are decoded in reverse order, as a lifo stack (last in, first out).
-    unsigned char symbol = FSE_decodeSymbol(&DState, &DStream, fastMode);
+Keep in mind that symbols are decoded in reverse order, like a lifo stack (last in, first out).
+    unsigned char symbol = FSE_decodeSymbol(&DState, &DStream);
 
-You can retrieve any other bitfield you eventually stored into the bitStream (in reverse order)
+You can retrieve any bitfield you eventually stored into the bitStream (in reverse order)
 Note : maximum allowed nbBits is 25
     unsigned int bitField = FSE_readBits(&DStream, nbBits);
 
 Reading data from memory is manually performed by the reload method.
-'bitConsumed' shall never > 32.
-Don't hesitate to use this method. The cost of this operation is very low.
+FSE_reloadDStream() result tells if there is still some more data to read from DStream.
     FSE_reloadDStream(&DStream);
 
-You can test if you reached end of DStream by using :
-size_t FSE_endOfDStream(const FSE_DStream_t* bitD, const FSE_DState_t* DStatePtr);
+When FSE_reloadDStream() result is zero, that means it reached the end of DStream,
+and will not read anymore from memory (any future call to reload will be discarded).
+
+Now, progress slowly to properly detect the exact end of stream.
+After each decoded symbol, check if DStream is fully consumed by calling :
+    FSE_DStreamConsumed(&DStream);
+
+which will return 1 if DStream is fully consumed.
+But that could also mean that DStream was consumed "too much".
+
+So now check if DStream has reached its exact end by checking both DStream and the relevant states.
+Checking if DStream has reached its end is performed by :
+    FSE_endOfDStream(&DStream);
+Check also the states. There may be some entropy stored there, still able to decode a high probability symbol.
+    FSE_endOfDState(&DState);
+    FSE_endOfDState(&DState);
 */
 
 
