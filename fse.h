@@ -1,7 +1,8 @@
 /* ******************************************************************
    FSE : Finite State Entropy coder
    header file
-   Copyright (C) 2013-2014, Yann Collet.
+   Copyright (C) 2013-2015, Yann Collet.
+
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -44,7 +45,7 @@ extern "C" {
 
 
 /******************************************
-   FSE simple functions
+*  FSE simple functions
 ******************************************/
 size_t FSE_compress(void* dst, size_t maxDstSize,
               const void* src, size_t srcSize);
@@ -73,8 +74,7 @@ size_t FSE_decompressRLE(void* dst, size_t originalSize,
                    const void* cSrc, size_t cSrcSize);
 /*
 FSE_decompressRLE():
-    Decompress specific RLE corner case.
-    Basically equivalent to memset().
+    Decompress specific RLE corner case (equivalent to memset()).
     cSrcSize must be == 1. originalSize must be exact.
     return : size of regenerated data (==originalSize)
              or an error code, which can be tested using FSE_isError()
@@ -84,7 +84,7 @@ Note : there is no function provided for uncompressed data, as it's just a simpl
 
 
 /******************************************
-   Tool functions
+*  Tool functions
 ******************************************/
 size_t FSE_compressBound(size_t size);       /* maximum compressed size */
 
@@ -93,9 +93,8 @@ unsigned    FSE_isError(size_t code);        /* tells if a return value is an er
 const char* FSE_getErrorName(size_t code);   /* provides error code string (useful for debugging) */
 
 
-
 /******************************************
-   FSE advanced functions
+*  FSE advanced functions
 ******************************************/
 /*
 FSE_compress2():
@@ -357,21 +356,20 @@ FSE_reloadDStream() result tells if there is still some more data to read from D
     FSE_reloadDStream(&DStream);
 
 FSE_reloadDStream() result informs about DStream end.
-0 means there is still some data left into the DStream.
-1 means it reached the end of buffer, and will not load data any more.
-2 means it reached the exact end of DStream, corresponding in general to the end of decompression.
-3 means it went too far, and started using fake bits. Decompression result is corrupted.
+0 : there is still some data left into the DStream.
+1 Dstream reached end of buffer, it will not load data any more.
+2 Dstream reached its exact end, corresponding in general to decompression completed.
+3 Dstream went too far. Decompression result is corrupted.
 
-When reaching end of buffer, progress slowly if you decoded multiple symbols per round,
+When reaching end of buffer(1), progress slowly if you decode multiple symbols per loop,
 to properly detect the exact end of stream.
 After each decoded symbol, check if DStream is fully consumed using this simple test :
     FSE_reloadDStream(&DStream) >= 2
 
-So now check if DStream has reached its exact end by checking both DStream and the relevant states.
+When it's done, verify decompression is fully completed, by checking both DStream and the relevant states.
 Checking if DStream has reached its end is performed by :
     FSE_endOfDStream(&DStream);
-Check also the states. There may be some entropy stored there, still able to decode a high probability symbol.
-    FSE_endOfDState(&DState);
+Check also the states. There might be some entropy left there, still able to decode some high probability symbol.
     FSE_endOfDState(&DState);
 */
 

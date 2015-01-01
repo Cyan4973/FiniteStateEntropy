@@ -1,6 +1,7 @@
 /*
-  commandline.c - simple command line interface manager, for FSE
-  Copyright (C) Yann Collet 2013-2014
+  commandline.c - simple command line interface for FSE
+  Copyright (C) Yann Collet 2013-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -22,23 +23,22 @@
 */
 /*
   Note : this is stand-alone program.
-  It is not part of FSE compression library, it is a user program of the FSE library.
+  It is not part of FSE compression library, just a user program of the FSE library.
   The license of FSE library is BSD.
   The license of this program is GPLv2.
 */
 
 
-//***************************************************
-// Compiler instructions
-//***************************************************
-#define _CRT_SECURE_NO_WARNINGS   // Remove warning under visual studio
-#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
-#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
+/***************************************************
+*  Compiler instructions
+****************************************************/
+#define _CRT_SECURE_NO_WARNINGS   /* Remove warning under visual studio */
+#define _POSIX_SOURCE 1           /* get fileno() within <stdio.h> for Unix */
 
 
-//***************************************************
-// Includes
-//***************************************************
+/***************************************************
+*  Includes
+***************************************************/
 #include <stdlib.h>   // exit
 #include <stdio.h>    // fprintf
 #include <string.h>   // strcmp, strcat
@@ -47,8 +47,9 @@
 #include "lz4hce.h"   // et_final
 
 
-//****************************
-// OS-specific Includes
+/***************************************************
+*  OS-specific Includes
+***************************************************/
 //****************************
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>    // _O_BINARY
@@ -65,33 +66,33 @@
 #endif
 
 
-//***************************************************
-// Constants
-//***************************************************
+/***************************************************
+*  Constants
+***************************************************/
 #define COMPRESSOR_NAME "FSE : Finite State Entropy"
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "%s, %i-bits demo by %s (%s)\n", COMPRESSOR_NAME, (int)sizeof(void*)*8, AUTHOR, __DATE__
 #define FSE_EXTENSION ".fse"
 
 
-//**************************************
-// Macros
-//**************************************
+/***************************************************
+*  Macros
+***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 
 
-//***************************************************
-// Local variables
-//***************************************************
+/***************************************************
+*  Local variables
+***************************************************/
 static char* programName;
 static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 static int   fse_pause = 0;
 
 
-//***************************************************
-// Functions
-//***************************************************
+/***************************************************
+*  Functions
+***************************************************/
 static int usage(void)
 {
     DISPLAY("Usage :\n");
@@ -281,7 +282,7 @@ int main(int argc, char** argv)
             size_t l = strlen(input_filename);
             if (!strcmp(input_filename+(l-4), FSE_EXTENSION)) decode=1;
         }
-        if (!decode)   // compression to file
+        if (!decode)   /* compression to file */
         {
             size_t l = strlen(input_filename);
             output_filename = (char*)calloc(1,l+5);
@@ -290,7 +291,7 @@ int main(int argc, char** argv)
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
-        // decompression to file (automatic name will work only if input filename has correct format extension)
+        /* decompression to file (automatic name will work only if input filename has correct format extension) */
         {
             size_t outl;
             size_t inl = strlen(input_filename);
