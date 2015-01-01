@@ -1,6 +1,7 @@
 /*
   fileio.c - simple generic file i/o handler
-  Copyright (C) Yann Collet 2013-2014
+  Copyright (C) Yann Collet 2013-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -26,11 +27,6 @@
   The license of FSE library is BSD.
   The license of this library is GPLv2.
 */
-
-//**************************************
-// Tuning parameters
-//**************************************
-
 
 //**************************************
 // Compiler Options

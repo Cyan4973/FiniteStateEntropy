@@ -39,28 +39,27 @@
 /***************************************************
 *  Includes
 ***************************************************/
-#include <stdlib.h>   // exit
-#include <stdio.h>    // fprintf
-#include <string.h>   // strcmp, strcat
+#include <stdlib.h>   /* exit */
+#include <stdio.h>    /* fprintf */
+#include <string.h>   /* strcmp, strcat */
 #include "bench.h"
 #include "fileio.h"
-#include "lz4hce.h"   // et_final
+#include "lz4hce.h"   /* et_final */
 
 
 /***************************************************
 *  OS-specific Includes
 ***************************************************/
-//****************************
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <fcntl.h>    // _O_BINARY
-#  include <io.h>       // _setmode, _isatty
+#  include <fcntl.h>    /* _O_BINARY */
+#  include <io.h>       /* _setmode, _isatty */
 #  ifdef __MINGW32__
-   int _fileno(FILE *stream);   // MINGW somehow forgets to include this windows declaration into <stdio.h>
+   int _fileno(FILE *stream);   /* MINGW somehow forgets to include this windows declaration into <stdio.h> */
 #  endif
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
-#  include <unistd.h>   // isatty
+#  include <unistd.h>   /* isatty */
 #  define SET_BINARY_MODE(file)
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #endif

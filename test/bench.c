@@ -1,6 +1,7 @@
 /*
 bench.c - Demo program to benchmark open-source compression algorithm
-Copyright (C) Yann Collet 2012-2014
+Copyright (C) Yann Collet 2012-2015
+
 GPL v2 License
 
 This program is free software; you can redistribute it and/or modify
@@ -19,9 +20,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 
-//**************************************
-// Tuning parameters
-//**************************************
+/**************************************
+*  Tuning parameters
+***************************************/
 #define NBLOOPS    4
 #define TIMELOOP   2500
 
@@ -29,19 +30,19 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 /**************************************
 *  Compiler Options
 ***************************************/
-// Disable some Visual warning messages
+/* Disable some Visual warning messages */
 #define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     // VS2005
+#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
 
-// Unix Large Files support (>4GB)
+/* Unix Large Files support (>4GB) */
 #define _FILE_OFFSET_BITS 64
-#if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
+#if (defined(__sun__) && (!defined(__LP64__)))   /* Sun Solaris 32-bits requires specific definitions */
 #  define _LARGEFILE_SOURCE
-#elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
+#elif ! defined(__LP64__)                        /* No point defining Large file for 64 bit */
 #  define _LARGEFILE64_SOURCE
 #endif
 
-// S_ISREG & gettimeofday() are not supported by MSVC
+/* S_ISREG & gettimeofday() are not supported by MSVC */
 #if defined(_MSC_VER) || defined(_WIN32)
 #  define BMK_LEGACY_TIMER 1
 #endif
@@ -80,7 +81,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
-// GCC does not support _rotl outside of Windows
+/* GCC does not support _rotl outside of Windows */
 #if !defined(_WIN32)
 #  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
 #endif
@@ -98,12 +99,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 # include <stdint.h>
 typedef uint8_t  BYTE;
 typedef uint16_t U16;
+typedef  int16_t S16;
 typedef uint32_t U32;
 typedef  int32_t S32;
 typedef uint64_t U64;
 #else
 typedef unsigned char       BYTE;
 typedef unsigned short      U16;
+typedef   signed short      S16;
 typedef unsigned int        U32;
 typedef   signed int        S32;
 typedef unsigned long long  U64;
@@ -239,9 +242,9 @@ static U64 BMK_GetFileSize(char* infilename)
 }
 
 
-//*********************************************************
-//  Public function
-//*********************************************************
+/*********************************************************
+*  Public function
+*********************************************************/
 
 void BMK_benchMemU32(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
                   U64* totalCompressedSize, double* totalCompressionTime, double* totalDecompressionTime,
@@ -491,7 +494,7 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
     U32 crcCheck=0;
     U32 crcOrig;
 
-    // Init
+    /* Init */
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
 
     DISPLAY("\r%79s\r", "");
@@ -573,7 +576,7 @@ size_t BMK_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t src
 { (void)nbSymbols; (void)tableLog; (void)dstSize; return ZLIBH_compress(dst, (const char*)src, (int)srcSize); }
 
 size_t BMK_ZLIBH_decompress(void* dest, size_t originalSize, const void* compressed, size_t cSize)
-{ (void)originalSize; (void)cSize; return ZLIBH_decompress((char*)dest, compressed); }
+{ (void)cSize; ZLIBH_decompress((char*)dest, compressed); return originalSize; }
 
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
@@ -587,9 +590,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     U32 crcCheck=0;
     U32 crcOrig;
     size_t (*compressor)(void* dst, size_t, const void* src, size_t, unsigned, unsigned);
-    size_t (*decompressor)(void* dst, size_t origSize, const void* cSrc, size_t maxCSrcSize);
+    size_t (*decompressor)(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
 
-    // Init
+    /* Init */
     if (nbSymbols==0) { BMK_benchMemU16 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
     if (nbSymbols==1) { BMK_benchMemU32 (chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
     if (nbSymbols==2) { BMK_benchMemLog2(chunkP, nbChunks, inFileName, benchedSize, totalCompressedSize, totalCompressionTime, totalDecompressionTime, memLog); return; }
@@ -612,7 +615,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         int nbLoops;
         int milliTime;
 
-        // Compression
+        /* Compression */
         DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, benchedSize);
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
@@ -624,12 +627,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                int errorCode = (int)compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
-                if (errorCode==-1)
-                {
-                    DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb);
-                    return;
-                }
+                size_t errorCode = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                if (FSE_isError(errorCode)) { DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb); return; }
                 chunkP[chunkNb].compressedSize = errorCode;
             }
             nbLoops++;
@@ -642,9 +641,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
 
-        //if (loopNb == nbIterations) DISPLAY("\n"); continue;   // skip decompression
+        /* if (loopNb == nbIterations) DISPLAY("\n"); continue;   *//* skip decompression */
         /* Decompression */
-        { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     // zeroing area, for CRC checking
+        { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     /* zeroing area, for CRC checking */
 
         nbLoops = 0;
         milliTime = BMK_GetMilliStart();
@@ -654,7 +653,11 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                size_t errorCode = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                size_t errorCode;
+                if (chunkP[chunkNb].compressedSize == 1)
+                    errorCode = FSE_decompressRLE(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                else
+                    errorCode = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
                 if (errorCode != chunkP[chunkNb].origSize)
                 {
                     DISPLAY("!!! Error decompressing block %i  !!!!    \n", chunkNb);
@@ -668,7 +671,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
-        // CRC Checking
+        /* CRC Checking */
         crcCheck = XXH32(chunkP[0].destBuffer, benchedSize,0);
         if (crcOrig!=crcCheck)
         {
@@ -700,14 +703,12 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 {
     int fileIdx=0;
     char* orig_buff;
-
     U64 totals = 0;
     U64 totalz = 0;
     double totalc = 0.;
     double totald = 0.;
 
 
-    // Loop for each file
     while (fileIdx<nbFiles)
     {
         FILE*  inFile;
@@ -721,18 +722,18 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
         char* destBuffer;
         chunkParameters_t* chunkP;
 
-        // Check file existence
+        /* Check file existence */
         inFileName = fileNamesTable[fileIdx++];
         inFile = fopen( inFileName, "rb" );
         if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
-        // Memory size evaluation
+        /* Memory size evaluation */
         inFileSize = BMK_GetFileSize(inFileName);
         benchedSize = (size_t) BMK_findMaxMem(inFileSize * 3) / 3;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         if (benchedSize < inFileSize) DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
 
-        // Allocation
+        /* Allocation */
         chunkP = (chunkParameters_t*) malloc(((benchedSize / chunkSize)+1) * sizeof(chunkParameters_t));
         orig_buff = (char*)malloc((size_t )benchedSize);
         nbChunks = (int) (benchedSize / chunkSize) + 1;
@@ -753,7 +754,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             return 12;
         }
 
-        // Init chunks data
+        /* Init chunks */
         {
             int i;
             size_t remaining = benchedSize;
@@ -771,7 +772,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             }
         }
 
-        // Fill input buffer
+        /* Fill input buffer */
         DISPLAY("Loading %s...       \r", inFileName);
         readSize = fread(orig_buff, 1, benchedSize, inFile);
         fclose(inFile);
@@ -786,7 +787,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
             return 13;
         }
 
-        // Bench
+        /* Bench */
         BMK_benchMem(chunkP, nbChunks, inFileName, (int)benchedSize, &totalz, &totalc, &totald, 255, BMK_tableLog);
         totals += benchedSize;
 

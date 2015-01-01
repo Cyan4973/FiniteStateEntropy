@@ -162,16 +162,22 @@ static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
 
 static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 {
-    BYTE* bufferNoise = (BYTE*) malloc (BUFFERSIZE+64);
-    BYTE* bufferSrc   = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferP0    = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferP1    = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferP15   = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferP90   = (BYTE*) malloc (BUFFERSIZE+64);
+    BYTE* bufferP100  = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb, maxSV, tableLog;
     U32 time = FUZ_GetMilliStart();
 
-    generate (bufferSrc, BUFFERSIZE, 0.1, &seed);
-    generateNoise (bufferNoise, BUFFERSIZE, &seed);
+    generateNoise (bufferP0, BUFFERSIZE, &seed);
+    generate (bufferP1  , BUFFERSIZE, 0.01, &seed);
+    generate (bufferP15 , BUFFERSIZE, 0.15, &seed);
+    generate (bufferP90 , BUFFERSIZE, 0.90, &seed);
+    memset(bufferP100, (BYTE)FUZ_rand(&seed), BUFFERSIZE);
 
     if (startTestNb)
     {
@@ -182,6 +188,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
     for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
+        BYTE* bufferTest;
         int tag=0;
         U32 roundSeed = seed ^ 0xEDA5B371;
         FUZ_rand(&seed);
@@ -193,25 +200,23 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             time = FUZ_GetMilliStart();
         }
 
-        /* Noise Compression test */
-        {
-            size_t sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
-            size_t sizeCompressed;
-            BYTE* bufferTest = bufferNoise + testNb;
-            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
-            sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            if (FSE_isError(sizeCompressed))
-                DISPLAY ("Noise Compression failed ! \n");
-            if (sizeCompressed > sizeOrig+1)
-                DISPLAY ("Noise Compression result too large !\n");
-        }
-
         /* Compression / Decompression tests */
         {
             int sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
             size_t sizeCompressed;
             U32 hashOrig;
-            BYTE* bufferTest = bufferSrc + testNb;
+
+            if (FUZ_rand(&roundSeed) & 7) bufferTest = bufferP15 + testNb;
+            else
+            {
+                switch(FUZ_rand(&roundSeed) & 3)
+                {
+                    case 0: bufferTest = bufferP0 + testNb; break;
+                    case 1: bufferTest = bufferP1 + testNb; break;
+                    case 2: bufferTest = bufferP90 + testNb; break;
+                    default : bufferTest = bufferP100 + testNb; break;
+                }
+            }
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
@@ -235,7 +240,6 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* check header read function*/
         {
-            BYTE* bufferTest = bufferSrc + testNb;   /* Read some random noise */
             short count[256];
             size_t result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
@@ -253,7 +257,6 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
         {
             size_t maxDstSize = FUZ_rand (&roundSeed) & 0x1FFFF;
             size_t sizeCompressed = FUZ_rand (&roundSeed) & 0x1FFFF;
-            BYTE* bufferTest = bufferSrc + testNb;
             BYTE saved = (bufferDst[maxDstSize] = 253);
             size_t result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
@@ -269,8 +272,11 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     }
 
     /* exit */
-    free (bufferNoise);
-    free (bufferSrc);
+    free (bufferP0);
+    free (bufferP1);
+    free (bufferP15);
+    free (bufferP90);
+    free (bufferP100);
     free (bufferDst);
     free (bufferVerif);
 }
