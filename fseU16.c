@@ -88,22 +88,10 @@ typedef struct
 *  U16 Compression functions
 *********************************************************/
 
-static int FSE_noCompressionU16(void* dest, const U16* source, int sourceSize)
+static int FSE_compressRleU16(void* dst, U16 value)
 {
-    BYTE* header = (BYTE*)dest;
-    *header=0;
-    memcpy(header+1, source, sourceSize*2);
-    return sourceSize*2 + 1;
-}
-
-
-static int FSE_writeSingleU16(void* dest, U16 value)
-{
-    BYTE* header = (BYTE*) dest;
-    U16* valueP16 = (U16*)(header+1);
-    *header=1;
-    *valueP16 = value;
-    return 3;
+    *(U16*)dst = value;
+    return 2;
 }
 
 
@@ -118,9 +106,9 @@ void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 }
 
 
-static int FSE_compressU16_usingCTable (void* dst,
-                                        const U16* src, int srcSize,
-                                        const void* CTable)
+static size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
+                                      const U16* src, int srcSize,
+                                      const void* CTable)
 {
     const U16* const istart = src;
     const U16* ip;
@@ -132,6 +120,7 @@ static int FSE_compressU16_usingCTable (void* dst,
 
 
     // init
+    (void)(maxDstSize);   /* tbd */
     FSE_initCStream(&bitC, op);
     FSE_initCState(&CState, CTable);
 
@@ -148,7 +137,6 @@ static int FSE_compressU16_usingCTable (void* dst,
     if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (srcSize & 2))   // test bit 2
     {
         FSE_encodeU16(&bitC, &CState, *--ip);
-        FSE_flushBits(&bitC);
         FSE_encodeU16(&bitC, &CState, *--ip);
         FSE_flushBits(&bitC);
     }
@@ -173,118 +161,65 @@ static int FSE_compressU16_usingCTable (void* dst,
     }
 
     FSE_flushCState(&bitC, &CState);
-    return (int)FSE_closeCStream(&bitC);
+    return FSE_closeCStream(&bitC);
 }
 
 
-/*
-static int FSE_compressU16_usingCTable (void* dest, const unsigned short* source, int sourceSize, const void* CTable)
+size_t FSE_compressU16(void* dst, size_t maxDstSize,
+       const unsigned short* src, size_t srcSize,
+       unsigned maxSymbolValue, unsigned tableLog)
 {
-    const U16* const istart = (const U16*) source;
-    const U16* ip;
-    const U16* const iend = istart + sourceSize;
-
-    BYTE* const ostart = (BYTE*) dest;
-    BYTE* op = (BYTE*) dest;
-
-    const int tableLog = ( (U16*) CTable) [0];
-    const int tableSize = 1 << tableLog;
-    const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) (stateTable + tableSize);
-
-
-    ptrdiff_t state=tableSize;
-    bitStream_forward_t bitC = {0,0};   // According to C90/C99, {0} should be enough. However, GCC complain....
-    U32* streamSize = (U32*) op;
-    op += 4;
-
-    ip=iend-1;
-    // cheap last-symbol storage
-    state += *ip--;
-
-    while (ip>istart+1)   // from end to beginning, up to 3 symbols at a time
-    {
-        FSE_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);
-
-        if (sizeof(bitContainer_t)*8 < FSE_MAX_TABLELOG*2+7 )   // Need this test to be static
-            FSE_flushBits((void**)&op, &bitC);
-
-        FSE_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);
-
-        if (sizeof(bitContainer_t)*8 > FSE_MAX_TABLELOG*3+7 )   // Need this test to be static
-            FSE_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);
-
-        FSE_flushBits((void**)&op, &bitC);
-    }
-
-    while (ip>=istart)   // simpler version, one symbol at a time
-    {
-        FSE_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);
-        FSE_flushBits((void**)&op, &bitC);
-    }
-
-    // Finalize block
-    FSE_addBits(&bitC, state, tableLog);
-    FSE_flushBits((void**)&op, &bitC);
-    *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitC.bitPos);
-    op += bitC.bitPos > 0;
-
-    return (int) (op-ostart);
-}
-*/
-
-
-int FSE_compressU16 (void* dest, const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog)
-{
-    const U16* const istart = source;
+    const U16* const istart = src;
     const U16* ip = istart;
 
-    BYTE* const ostart = (BYTE*) dest;
+    BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
+    BYTE* const omax = ostart + maxDstSize;
 
     U32   counting[FSE_MAX_SYMBOL_VALUE+1];
     S16   norm[FSE_MAX_SYMBOL_VALUE+1];
     CTable_max_t CTable;
 
-    int   errorCode;
+    size_t   errorCode;
 
 
     // early out
-    if (sourceSize <= 1) return FSE_noCompressionU16 (ostart, istart, sourceSize);
+    if (srcSize <= 1) return srcSize;
     if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
+    if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_maxSymbolValue_tooLarge;
+    if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_tableLog_tooLarge;
 
     // Scan for stats
-    errorCode = (int)FSE_countU16 (counting, ip, sourceSize, &maxSymbolValue);
-    if (errorCode == -1) return -1;
-    if (errorCode==(int)sourceSize) return FSE_writeSingleU16(ostart, *istart);
+    errorCode = FSE_countU16 (counting, ip, srcSize, &maxSymbolValue);
+    if (FSE_isError(errorCode)) return errorCode;
+    if (errorCode == srcSize) return FSE_compressRleU16(ostart, *istart);
 
     // Normalize
-    errorCode = (int)FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
-    if (errorCode == -1) return -1;
-    if (errorCode ==  0) return FSE_writeSingleU16(ostart, *istart);
-    tableLog = errorCode;
+    tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
+    errorCode = FSE_normalizeCount (norm, tableLog, counting, srcSize, maxSymbolValue);
+    if (FSE_isError(errorCode)) return errorCode;
 
     // Write table description header
-    errorCode = (int)FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
-    if (errorCode == -1) return -1;
+    errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
+    if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
     // Compress
-    errorCode = (int)FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
-    if (errorCode==-1) return -1;
-    op += FSE_compressU16_usingCTable (op, ip, sourceSize, &CTable);
+    errorCode = FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
+    if (FSE_isError(errorCode)) return errorCode;
+    op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, &CTable);
 
-    // check compressibility
-    if ( (size_t)(op-ostart) >= (size_t)(sourceSize-1)*(sizeof(short)) )
-        return FSE_noCompressionU16 (ostart, istart, sourceSize);
+    /* check compressibility */
+    if ( (size_t)(op-ostart) >= (size_t)(srcSize-1)*(sizeof(U16)) )
+        return 0;   /* no compression */
 
-    return (int) (op-ostart);
+    return op-ostart;
 }
 
 
 /*********************************************************
-   U16 Decompression functions
+*  U16 Decompression functions
 *********************************************************/
 int FSE_decompressRawU16 (U16* out, int osize, const BYTE* in)
 {
@@ -298,8 +233,6 @@ int FSE_decompressSingleU16 (U16* out, int osize, U16 value)
     for (i=0; i<osize; i++) *out++ = value;
     return 3;
 }
-
-unsigned char FSE_decodeSymbol2(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned fastMode);
 
 U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
@@ -330,11 +263,12 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     FSE_initDStream(&bitD, cSrc, cSrcSize);
     FSE_initDState(&state, &bitD, DTable, tableLog);
 
-    while(FSE_reloadDStream(&bitD))
+    while(FSE_reloadDStream(&bitD) < 2)
     {
         *op++ = FSE_decodeSymbolU16(&state, &bitD);
-        FSE_reloadDStream(&bitD);
     }
+
+    if (FSE_reloadDStream(&bitD) > 2) return (size_t)-FSE_ERROR_GENERIC;
 
     return op-ostart;
 }
@@ -363,7 +297,7 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     errorCode = FSE_buildDTableU16 (DTable, counting, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
 
-    FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
+    errorCode = FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
     if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
 
     return errorCode;

@@ -62,10 +62,11 @@ extern "C" {
    Useful for alphabet size > 256.
    All symbol values within input table must be <= 'maxSymbolValue'.
    Maximum allowed 'maxSymbolValue' value is controlled by constant FSE_MAX_SYMBOL_VALUE */
-int FSE_compressU16  (void* dest,
-                      const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog);
-size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize,
-                  const void* cSrc, size_t cSrcSize);
+size_t FSE_compressU16(void* dst, size_t maxDstSize,
+       const unsigned short* src, size_t srcSize,
+       unsigned maxSymbolValue, unsigned tableLog);
+
+size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
 
 
 /******************************************

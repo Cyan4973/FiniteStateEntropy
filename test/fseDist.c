@@ -299,7 +299,7 @@ int FSED_decompressU16 (U16* dst, size_t maxDstSize,
     size_t headerSize;
 
     // normal FSE decoding mode
-    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart, cSrcSize);
     ip += headerSize;
     cSrcSize -= headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
@@ -692,7 +692,7 @@ int FSED_decompressU32 (U32* dst, size_t maxDstSize,
     size_t headerSize;
 
     // normal FSE decoding mode
-    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart, cSrcSize);
     ip += headerSize;
     cSrcSize = headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);

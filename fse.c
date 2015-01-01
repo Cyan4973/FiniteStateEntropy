@@ -915,9 +915,14 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
         bitD->ptr -= bitD->bitsConsumed >> 3;
         bitD->bitsConsumed &= 7;
         bitD->bitContainer = * (bitD_t*) (bitD->ptr);
-        return 1;
+        return 0;
     }
-    if (bitD->ptr == bitD->start) return 0;
+    if (bitD->ptr == bitD->start)
+    {
+        if (bitD->bitsConsumed < sizeof(bitD_t)*8 - 3) return 1;
+        if (bitD->bitsConsumed == sizeof(bitD_t)*8 - 3) return 2;
+        return 3;
+    }
     {
         U32 nbBytes = bitD->bitsConsumed >> 3;
         if (bitD->ptr - nbBytes < bitD->start)
@@ -925,7 +930,7 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
         bitD->ptr -= nbBytes;
         bitD->bitsConsumed -= nbBytes*8;
         bitD->bitContainer = * (bitD_t*) (bitD->ptr);
-        return (bitD->ptr > bitD->start);
+        return (bitD->ptr == bitD->start);
     }
 }
 
@@ -961,14 +966,10 @@ BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned
 
 /* FSE_endOfDStream
    Tells if bitD has reached end of bitStream or not */
-unsigned FSE_DStreamConsumed(const FSE_DStream_t* dsPtr)
-{
-    return dsPtr->bitsConsumed >= (sizeof(bitD_t)*8);
-}
 
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD)
 {
-    return ((bitD->ptr == bitD->start) && (bitD->bitsConsumed == (sizeof(bitD_t)*8)-3) );
+    return FSE_reloadDStream((FSE_DStream_t*)bitD)==2;
 }
 
 unsigned FSE_endOfDState(const FSE_DState_t* statePtr)
@@ -999,7 +1000,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
 
 
     /* 2 symbols per loop */
-    while (FSE_reloadDStream(&bitD) && (op<olimit))
+    while (!FSE_reloadDStream(&bitD) && (op<olimit))
     {
         *op++ = FSE_decodeSymbolFast(&state1, &bitD, fast);
 
@@ -1012,14 +1013,14 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     /* tail */
     while (1)
     {
-        if (FSE_DStreamConsumed(&bitD) || (op==omax)) break;
+        if ((FSE_reloadDStream(&bitD)>=2) || (op==omax)) break;
 
         *op++ = FSE_decodeSymbolFast(&state1, &bitD, fast);
 
         if (FSE_MAX_TABLELOG*2+7 > sizeof(bitD_t)*8)    /* This test must be static */
             FSE_reloadDStream(&bitD);
 
-        if (FSE_DStreamConsumed(&bitD) || (op==omax)) break;
+        if ((FSE_reloadDStream(&bitD)>=2) || (op==omax)) break;
 
         *op++ = FSE_decodeSymbolFast(&state2, &bitD, fast);
     }

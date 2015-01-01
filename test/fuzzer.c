@@ -255,16 +255,17 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t sizeCompressed = FUZ_rand (&roundSeed) & 0x1FFFF;
             BYTE* bufferTest = bufferSrc + testNb;
             BYTE saved = (bufferDst[maxDstSize] = 253);
-            int result;
+            size_t result;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
+            if (!FSE_isError(result))
+            {
+                if (result > maxDstSize) DISPLAY ("Decompression overrun output buffer\n");
+            }
             if (bufferDst[maxDstSize] != saved)
                 DISPLAY ("Output buffer bufferDst corrupted !\n");
-            if (result != -1)
-                if (! ( (*bufferTest==0) || (*bufferTest==1) ) )   /* why this condition ? */
-                    DISPLAY ("Decompression completed ??\n");
         }
-#endif // 0
+#endif /* Attempt decompression on bogus data*/
     }
 
     /* exit */

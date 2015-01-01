@@ -242,8 +242,8 @@ typedef struct
 } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
-
 void   FSE_initCState(FSE_CState_t* CStatePtr, const void* CTable);
+
 void   FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned char symbol);
 void   FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits);
 void   FSE_flushBits(FSE_CStream_t* bitC);
@@ -291,15 +291,6 @@ It's possible to embed some user-info into the header, as an optionalId [0-31].
 The function returns the size in bytes of CStream.
 If there is an error, it returns an errorCode (which can be tested using FSE_isError()).
     size_t size = FSE_closeCStream(&bitStream, optionalId);
-
-
-If you wish to handle your own header format, use FSE_initCStreamCustom() instead.
-In which case, no header is created, and you will have to save relevant information yourself,
-to provide them to FSE_initDStreamCustom() for decompression.
-
-At the end of compression, you can get the size of the CStream by using FSE_bitSizeofCStream().
-The result of the function is the size of the CStream ** in bits ** (8 x bytes).
-    size_t bitSize = FSE_bitSizeofCStream(&bitStream);
 */
 
 
@@ -331,12 +322,8 @@ unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 unsigned int  FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
 unsigned int  FSE_reloadDStream(FSE_DStream_t* bitD);
 
-unsigned FSE_DStreamConsumed(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
-
-
-size_t   FSE_initDStreamCustom(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize, size_t unusedBits);
 
 /*
 Now is the time to decompose FSE_decompress_usingDTable() into its unitary elements.
@@ -369,15 +356,16 @@ Reading data from memory is manually performed by the reload method.
 FSE_reloadDStream() result tells if there is still some more data to read from DStream.
     FSE_reloadDStream(&DStream);
 
-When FSE_reloadDStream() result is zero, that means it reached the end of DStream,
-and will not read anymore from memory (any future call to reload will be discarded).
+FSE_reloadDStream() result informs about DStream end.
+0 means there is still some data left into the DStream.
+1 means it reached the end of buffer, and will not load data any more.
+2 means it reached the exact end of DStream, corresponding in general to the end of decompression.
+3 means it went too far, and started using fake bits. Decompression result is corrupted.
 
-Now, progress slowly to properly detect the exact end of stream.
-After each decoded symbol, check if DStream is fully consumed by calling :
-    FSE_DStreamConsumed(&DStream);
-
-which will return 1 if DStream is fully consumed.
-But that could also mean that DStream was consumed "too much".
+When reaching end of buffer, progress slowly if you decoded multiple symbols per round,
+to properly detect the exact end of stream.
+After each decoded symbol, check if DStream is fully consumed using this simple test :
+    FSE_reloadDStream(&DStream) >= 2
 
 So now check if DStream has reached its exact end by checking both DStream and the relevant states.
 Checking if DStream has reached its end is performed by :
