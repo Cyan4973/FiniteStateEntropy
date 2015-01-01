@@ -274,7 +274,7 @@ void BMK_benchMemU32(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_compressU32(chunkP[chunkNb].compressedBuffer, (const U32*)(chunkP[chunkNb].origBuffer), chunkP[chunkNb].origSize/4, memLog);
+                chunkP[chunkNb].compressedSize = FSED_compressU32(chunkP[chunkNb].compressedBuffer, (const U32*)(chunkP[chunkNb].origBuffer), (int)chunkP[chunkNb].origSize/4, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -296,7 +296,7 @@ void BMK_benchMemU32(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_decompressU32((unsigned int*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize/4, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = FSED_decompressU32((unsigned int*)chunkP[chunkNb].origBuffer, (int)chunkP[chunkNb].origSize/4, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -353,7 +353,7 @@ static void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFil
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_compressU16(chunkP[chunkNb].compressedBuffer, (const U16*)(chunkP[chunkNb].origBuffer), chunkP[chunkNb].origSize/2, memLog);
+                chunkP[chunkNb].compressedSize = FSED_compressU16(chunkP[chunkNb].compressedBuffer, (const U16*)(chunkP[chunkNb].origBuffer), (U32)chunkP[chunkNb].origSize/2, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -375,7 +375,7 @@ static void BMK_benchMemU16(chunkParameters_t* chunkP, int nbChunks, char* inFil
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_decompressU16((unsigned short*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = FSED_decompressU16((unsigned short*)chunkP[chunkNb].origBuffer, (U32)chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -432,7 +432,7 @@ void BMK_benchMemLog2(chunkParameters_t* chunkP, int nbChunks, char* inFileName,
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_compressU16Log2(chunkP[chunkNb].compressedBuffer, (const U16*)(chunkP[chunkNb].origBuffer), chunkP[chunkNb].origSize/2, memLog);
+                chunkP[chunkNb].compressedSize = FSED_compressU16Log2(chunkP[chunkNb].compressedBuffer, (const U16*)(chunkP[chunkNb].origBuffer), (int)chunkP[chunkNb].origSize/2, memLog);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -454,7 +454,7 @@ void BMK_benchMemLog2(chunkParameters_t* chunkP, int nbChunks, char* inFileName,
         while(BMK_GetMilliSpan(milliTime) < 0) // TIMELOOP)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = FSED_decompressU16((unsigned short*)chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
+                chunkP[chunkNb].compressedSize = FSED_decompressU16((unsigned short*)chunkP[chunkNb].origBuffer, (U32)chunkP[chunkNb].origSize/2, chunkP[chunkNb].compressedBuffer);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -982,7 +982,7 @@ static void BMK_benchCore_Mem(char* dst,
     short norm[256];
     void* CTable;
     void* DTable;
-    unsigned fastMode;
+    size_t fastMode;
 
     // Init
     crcOrig = XXH64(src, benchedSize,0);

@@ -107,7 +107,7 @@ void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 
 
 static size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
-                                      const U16* src, int srcSize,
+                                      const U16* src, size_t srcSize,
                                       const void* CTable)
 {
     const U16* const istart = src;

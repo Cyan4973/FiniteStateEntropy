@@ -195,12 +195,12 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Noise Compression test */
         {
-            int sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
-            int sizeCompressed;
+            size_t sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
+            size_t sizeCompressed;
             BYTE* bufferTest = bufferNoise + testNb;
             DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            if (sizeCompressed == -1)
+            if (FSE_isError(sizeCompressed))
                 DISPLAY ("Noise Compression failed ! \n");
             if (sizeCompressed > sizeOrig+1)
                 DISPLAY ("Noise Compression result too large !\n");
@@ -288,7 +288,7 @@ static void unitTest(void)
 {
     BYTE testBuff[TBSIZE];
     U32 i;
-    int errorCode;
+    size_t errorCode;
     U32 seed=0, testNb=0;
 
     // FSE_count
@@ -298,13 +298,13 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
         max = 128;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
-        CHECK(errorCode<0, "Error : FSE_count() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
         max = 124;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
-        CHECK(errorCode>=0, "Error : FSE_count() should have failed : value > max");
+        CHECK(!FSE_isError(errorCode), "Error : FSE_count() should have failed : value > max");
         max = 65000;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
-        CHECK(errorCode<0, "Error : FSE_count() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
     }
 
     // FSE_countU16
@@ -316,21 +316,21 @@ static void unitTest(void)
 
         max = 124;
         errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : value too large");
+        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : value too large");
 
         for (i=0; i< tbu16Size; i++) tbu16[i] = i % (FSE_MAX_SYMBOL_VALUE+1);
 
         max = FSE_MAX_SYMBOL_VALUE;
         errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(errorCode<0, "Error : FSE_countU16() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_countU16() should have worked");
 
         max = FSE_MAX_SYMBOL_VALUE+1;
         errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : max too large");
+        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : max too large");
 
         max = FSE_MAX_SYMBOL_VALUE-1;
         errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(errorCode>=0, "Error : FSE_countU16() should have failed : max too low");
+        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : max too low");
     }
 
     // FSE_writeHeader
@@ -343,19 +343,19 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
         max = 128;
         errorCode = FSE_count(count, testBuff, TBSIZE, &max);
-        CHECK(errorCode<0, "Error : FSE_count() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
         tableLog = FSE_optimalTableLog(0, TBSIZE, max);
         errorCode = FSE_normalizeCount(norm, tableLog, count, TBSIZE, max);
-        CHECK(errorCode<0, "Error : FSE_normalizeCount() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
         errorCode = FSE_writeHeader(header, 513, norm, max, tableLog);
-        CHECK(errorCode<0, "Error : FSE_writeHeader() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
 
         errorCode = FSE_writeHeader(header, errorCode+1, norm, max, tableLog);
-        CHECK(errorCode<0, "Error : FSE_writeHeader() should have worked");
+        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
 
         errorCode = FSE_writeHeader(header, errorCode-1, norm, max, tableLog);
-        CHECK(errorCode>=0, "Error : FSE_writeHeader() should have failed");
+        CHECK(!FSE_isError(errorCode), "Error : FSE_writeHeader() should have failed");
     }
 
     DISPLAY("Unit tests completed\n");

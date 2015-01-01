@@ -459,7 +459,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
 
 _lastBlock:
     {
-        int errorCode;
+        size_t errorCode;
         int nbBytes = ((blockSizeId+10)/8)+1;   // Nb Bytes to describe last block size
         U32 lastBlockSize = LITTLE_ENDIAN_32(*(U32*)ip);
         U32 mask;
@@ -473,7 +473,7 @@ _lastBlock:
         }
         lastBlockSize &= mask;
 
-        errorCode = FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip, (size_t)(-1));
+        errorCode = FSE_decompress(out_buff, lastBlockSize, ip, (size_t)(-1));
         if (FSE_isError(errorCode)) EXM_THROW(33, "Decoding error : last block failed");
         ip += errorCode;
         filesize += lastBlockSize;

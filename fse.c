@@ -708,7 +708,7 @@ size_t FSE_closeCStream(FSE_CStream_t* bitC)
     unusedBits = 8-bitC->bitPos;
     if (unusedBits==8) unusedBits = 0;
 
-    bitC->startPtr[0] += unusedBits;
+    bitC->startPtr[0] += (BYTE)unusedBits;
 
     return (endPtr - bitC->startPtr);
 }
@@ -881,7 +881,7 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
         if (srcSize>=2) bitD->bitContainer += bitD->start[1] << 8;
         if (srcSize>=3) bitD->bitContainer += bitD->start[2] << 16;
         bitD->bitsConsumed = *(bitD->start) & 7;
-        bitD->bitsConsumed += (sizeof(bitD_t) - srcSize)*8;
+        bitD->bitsConsumed += (U32)(sizeof(bitD_t) - srcSize)*8;
     }
 
     return srcSize;
@@ -926,7 +926,7 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
     {
         U32 nbBytes = bitD->bitsConsumed >> 3;
         if (bitD->ptr - nbBytes < bitD->start)
-            nbBytes = bitD->ptr - bitD->start;  /* note : necessarily ptr > start */
+            nbBytes = (U32)(bitD->ptr - bitD->start);  /* note : necessarily ptr > start */
         bitD->ptr -= nbBytes;
         bitD->bitsConsumed -= nbBytes*8;
         bitD->bitContainer = * (bitD_t*) (bitD->ptr);
@@ -1290,7 +1290,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 void* FSE_FUNCTION_NAME(FSE_createDTable, FSE_FUNCTION_EXTENSION) (unsigned tableLog)
 {
     if (tableLog > FSE_TABLELOG_ABSOLUTE_MAX) tableLog = FSE_TABLELOG_ABSOLUTE_MAX;
-    return malloc( (1<<tableLog) * sizeof (FSE_DECODE_TYPE) );
+    return malloc( ((size_t)1<<tableLog) * sizeof (FSE_DECODE_TYPE) );
 }
 
 void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (void* DTable)

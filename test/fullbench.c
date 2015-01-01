@@ -792,7 +792,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return FSE_countFast(count, (BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_countFast(count, src, srcSize, &max);
 }
 
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -807,8 +807,8 @@ static U32    g_tableLog;
 static U32    g_CTable[2350];
 static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
-static int    g_skip;
-static U32    g_fast;
+static size_t g_skip;
+static size_t g_fast;
 static size_t g_cSize;
 
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)

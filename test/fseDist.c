@@ -282,7 +282,7 @@ int FSED_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
         *op++ = value;
     }
 
-    return op-ostart;
+    return (int)(op-ostart);
 }
 
 
@@ -665,7 +665,7 @@ int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
     FSE_initDState(&DState, &DStream, DTable, tableLog);
 
     // Hot loop
-    while (FSE_reloadDStream(&DStream))
+    while (FSE_reloadDStream(&DStream)<2)
     {
         int nbBits = FSE_decodeSymbol(&DState, &DStream);
         U32 value;
@@ -675,7 +675,7 @@ int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
         *op++ = value;
     }
 
-    return op-ostart;
+    return (int)(op-ostart);
 }
 
 
