@@ -91,8 +91,8 @@ size_t FSE_buildCTable_singleSymbol (void* CTable, unsigned char symbolValue);
 unsigned int  FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
 /* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
 
-unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, unsigned fastMode);
-/* can trigger fast decoding if fastMode==1. FastMode must be a clear 0 or 1 known at compile time */
+unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
+/* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
 
 
 #if defined (__cplusplus)

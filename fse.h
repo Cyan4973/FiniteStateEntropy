@@ -325,7 +325,7 @@ unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
 /*
-Now is the time to decompose FSE_decompress_usingDTable() into its unitary elements.
+Let's now decompose FSE_decompress_usingDTable() into its unitary elements.
 You will decode FSE-encoded symbols from the bitStream,
 and also any other bitFields you put in, **in reverse order**.
 
@@ -351,13 +351,13 @@ You can retrieve any bitfield you eventually stored into the bitStream (in rever
 Note : maximum allowed nbBits is 25
     unsigned int bitField = FSE_readBits(&DStream, nbBits);
 
+All above operations only read from local register (which size is controlled by bitD_t==32 bits).
 Reading data from memory is manually performed by the reload method.
-FSE_reloadDStream() result tells if there is still some more data to read from DStream.
-    FSE_reloadDStream(&DStream);
+    endSignal = FSE_reloadDStream(&DStream);
 
-FSE_reloadDStream() result informs about DStream end.
+FSE_reloadDStream() result tells if there is still some more data to read from DStream.
 0 : there is still some data left into the DStream.
-1 Dstream reached end of buffer, it will not load data any more.
+1 Dstream reached end of buffer, but is not yet fully extracted. It will not load data from memory any more.
 2 Dstream reached its exact end, corresponding in general to decompression completed.
 3 Dstream went too far. Decompression result is corrupted.
 
