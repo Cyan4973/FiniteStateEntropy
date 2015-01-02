@@ -228,9 +228,8 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
     unsigned charnum = 0;
     int previous0 = 0;
 
-    // HeaderId (normal case)
-    bitStream = 2;
-    bitCount  = 2;
+    bitStream = 0;
+    bitCount  = 0;
     // Table Size
     bitStream += (tableLog-FSE_MIN_TABLELOG) << bitCount;
     bitCount  += 4;
@@ -331,15 +330,14 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
     int previous0 = 0;
 
     bitStream = * (U32*) ip;
-    bitStream >>= 2;
-    nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   // read tableLog
+    nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   /* extract tableLog */
     if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return (size_t)-FSE_ERROR_tableLog_tooLarge;
     bitStream >>= 4;
+    bitCount = 4;
     *tableLogPtr = nbBits;
     remaining = (1<<nbBits)+1;
     threshold = 1<<nbBits;
     nbBits++;
-    bitCount = 6;
 
     while (remaining>1)
     {
@@ -585,7 +583,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
 }
 
 
-size_t FSE_buildCTable_rawUncompression (void* CTable, unsigned nbBits)
+size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits)
 {
     const unsigned tableSize = 1 << nbBits;
     const unsigned tableMask = tableSize - 1;
@@ -618,7 +616,7 @@ size_t FSE_buildCTable_rawUncompression (void* CTable, unsigned nbBits)
 }
 
 
-size_t FSE_buildCTable_singleSymbol (void* CTable, BYTE symbolValue)
+size_t FSE_buildCTable_rle (void* CTable, BYTE symbolValue)
 {
     const unsigned tableSize = 1;
     U16* tableU16 = ( (U16*) CTable) + 2;
@@ -856,11 +854,51 @@ size_t FSE_decompressRLE(void* dst, size_t originalSize,
     return originalSize;
 }
 
+
+size_t FSE_buildDTable_rle (void* DTable, BYTE symbolValue)
+{
+    FSE_decode_t* cell = DTable;
+
+    /* Sanity check */
+    if (((size_t)DTable) & 3) return (size_t)-FSE_ERROR_GENERIC;   // Must be allocated of 4 bytes boundaries
+
+    cell->newState = 0;
+    cell->symbol = symbolValue;
+    cell->nbBits = 0;
+
+    return 0;
+}
+
+
+size_t FSE_buildDTable_raw (void* DTable, unsigned nbBits)
+{
+    FSE_decode_t* dinfo = DTable;
+    const unsigned tableSize = 1 << nbBits;
+    const unsigned tableMask = tableSize - 1;
+    const unsigned maxSymbolValue = tableMask;
+    unsigned s;
+
+    /* Sanity checks */
+    if (nbBits < 1) return (size_t)-FSE_ERROR_GENERIC;             /* min size */
+    if (((size_t)DTable) & 3) return (size_t)-FSE_ERROR_GENERIC;   /* Must be allocated of 4 bytes boundaries */
+
+    /* Build Decoding Table */
+    for (s=0; s<=maxSymbolValue; s++)
+    {
+        dinfo->newState = 0;
+        dinfo->symbol = (BYTE)s;
+        dinfo->nbBits = (BYTE)nbBits;
+    }
+
+    return 0;
+}
+
+
 /* FSE_initDStream
  * Initialize a FSE_DStream_t.
  * srcBuffer must point at the beginning of an FSE block.
  * The function result is the size of the FSE_block (== srcSize).
- * If srcSize is not large enough, the function will return an errorCode;
+ * If srcSize is too small, the function will return an errorCode;
  */
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize)
 {
@@ -1059,16 +1097,15 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     /* normal FSE decoding mode */
     errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
     if (FSE_isError(errorCode)) return errorCode;
+    if (errorCode >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* too small input size */
     ip += errorCode;
     cSrcSize -= errorCode;
 
     fastMode = FSE_buildDTable (DTable, counting, maxSymbolValue, tableLog);
-    if (FSE_isError(fastMode)) return errorCode;
+    if (FSE_isError(fastMode)) return fastMode;
 
-    errorCode = FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog, fastMode);
-    if (FSE_isError(errorCode)) return errorCode;
-
-    return errorCode;
+    /* always return, even if it is an error code */
+    return FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog, fastMode);
 }
 
 
