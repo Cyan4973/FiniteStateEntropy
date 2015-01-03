@@ -152,7 +152,7 @@ static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
     int total = 1<<tableLog;
     int count = 0;
     int i;
-    if (tableLog > 31) return -1;
+    if (tableLog > 20) return -1;
     for (i=0; i<=maxSV; i++)
         count += abs(normalizedCount[i]);
     if (count != total) return -1;
@@ -217,58 +217,60 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     default : bufferTest = bufferP100 + testNb; break;
                 }
             }
-            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            DISPLAYLEVEL (4,"%3i ", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
             if (FSE_isError(sizeCompressed))
-                DISPLAY ("Compression failed ! \n");
+                DISPLAY ("\r test %5u : Compression failed ! \n", testNb);
             else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
                 size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
-                    DISPLAY ("Output buffer (bufferVerif) overrun (write beyond specified end) !\n");
-                if ((FSE_isError(result)) && (sizeCompressed>=2))
-                    DISPLAY ("Decompression failed ! \n");
+                    DISPLAY ("\r test %5u : Output buffer (bufferVerif) overrun (write beyond specified end) !\n", testNb);
+                if (FSE_isError(result))
+                    DISPLAY ("\r test %5u : Decompression failed ! \n", testNb);
                 else
                 {
                     U32 hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    if (hashEnd != hashOrig) DISPLAY ("Decompressed data corrupted !! \n");
+                    if (hashEnd != hashOrig) DISPLAY ("\r test %5u : Decompressed data corrupted !! \n", testNb);
                 }
             }
         }
 
-        /* check header read function*/
+        /* Attempt header decoding on bogus data */
         {
             short count[256];
             size_t result;
-            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);
+            DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
+            maxSV = 256;
             result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
             if (!FSE_isError(result))
             {
-                int check = FUZ_checkCount (count, tableLog, maxSV);
+                int check;
+                if (maxSV > 255)
+                    DISPLAY ("\r test %5u : count table overflow (%u)!\n", testNb, maxSV+1);
+                check = FUZ_checkCount (count, tableLog, maxSV);
                 if (check==-1)
-                    DISPLAY ("symbol distribution corrupted !\n");
+                    DISPLAY ("\r test %5u : symbol distribution corrupted !\n", testNb);
             }
         }
 
-#if 1
-        /* Attempt decompression on bogus data*/
+        /* Attempt decompression on bogus data */
         {
             size_t maxDstSize = FUZ_rand (&roundSeed) & 0x1FFFF;
             size_t sizeCompressed = FUZ_rand (&roundSeed) & 0x1FFFF;
             BYTE saved = (bufferDst[maxDstSize] = 253);
             size_t result;
-            DISPLAYLEVEL (4,"%3i\b\b\b", tag++);;
+            DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
             if (!FSE_isError(result))
             {
-                if (result > maxDstSize) DISPLAY ("Decompression overrun output buffer\n");
+                if (result > maxDstSize) DISPLAY ("\r test %5u : Decompression overrun output buffer\n", testNb);
             }
             if (bufferDst[maxDstSize] != saved)
-                DISPLAY ("Output buffer bufferDst corrupted !\n");
+                DISPLAY ("\r test %5u : Output buffer bufferDst corrupted !\n", testNb);
         }
-#endif /* Attempt decompression on bogus data*/
     }
 
     /* exit */

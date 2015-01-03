@@ -316,7 +316,7 @@ size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* norm
 }
 
 
-size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr,
+size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* tableLogPtr,
                  const void* headerBuffer, size_t hbSize)
 {
     const BYTE* const istart = (const BYTE*) headerBuffer;
@@ -339,7 +339,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
     threshold = 1<<nbBits;
     nbBits++;
 
-    while (remaining>1)
+    while ((remaining>1) && (charnum<=*maxSVPtr))
     {
         if (previous0)
         {
@@ -358,6 +358,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
             }
             n0 += bitStream & 3;
             bitCount += 2;
+            if (n0 > *maxSVPtr) return (size_t)-FSE_ERROR_GENERIC;
             while (charnum < n0) normalizedCounter[charnum++] = 0;
             ip += bitCount>>3;
             bitCount &= 7;
@@ -379,7 +380,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
                 bitCount   += nbBits;
             }
 
-            count--;   // extra accuracy
+            count--;   /* extra accuracy */
             remaining -= FSE_abs(count);
             normalizedCounter[charnum++] = count;
             previous0 = !count;
@@ -394,11 +395,11 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
             bitStream = (*(U32*)ip) >> bitCount;
         }
     }
-    *maxSymbolValuePtr = charnum-1;
+    *maxSVPtr = charnum-1;
     if (remaining < 1) return (size_t)-FSE_ERROR_GENERIC;
 
     ip += bitCount>0;
-    if ((size_t)(ip-istart) >= hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;
+    if ((size_t)(ip-istart) >= hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
     return ip-istart;
 }
 
@@ -1088,7 +1089,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     const BYTE* ip = istart;
     short counting[FSE_MAX_SYMBOL_VALUE+1];
     FSE_decode_t DTable[FSE_MAX_TABLESIZE];
-    unsigned maxSymbolValue;
+    unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     unsigned tableLog;
     size_t errorCode, fastMode;
 

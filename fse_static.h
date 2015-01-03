@@ -29,6 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
+   - Source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 #pragma once
@@ -87,7 +88,7 @@ size_t FSE_buildCTable_rle (void* CTable, unsigned char symbolValue);
 size_t FSE_buildDTable_raw (void* DTable, unsigned nbBits);
 /* create a fake DTable, designed to read an uncompressed bitstream where each element uses nbBits */
 
-size_t FSE_buildCTable_rle (void* DTable, unsigned char symbolValue);
+size_t FSE_buildDTable_rle (void* DTable, unsigned char symbolValue);
 /* create a fake DTable, designed to always generate the same symbolValue */
 
 
