@@ -243,7 +243,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             short count[256];
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
-            maxSV = 256;
+            maxSV = 255;
             result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
             if (!FSE_isError(result))
             {

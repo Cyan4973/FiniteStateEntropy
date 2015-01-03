@@ -964,7 +964,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 11:
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            g_max = 256;
+            g_max = 255;
             funcName = "FSE_readHeader";
             func = local_FSE_readHeader;
             break;
@@ -973,7 +973,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 12:
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            g_max = 256;
+            g_max = 255;
             FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, benchedSize);
             funcName = "FSE_buildDTable";
             func = local_FSE_buildDTable;
@@ -983,7 +983,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 13:
         {
             g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            g_max = 256;
+            g_max = 255;
             g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, g_cSize);
             g_cSize -= g_skip;
             g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);

@@ -395,8 +395,8 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             bitStream = (*(U32*)ip) >> bitCount;
         }
     }
+    if (remaining != 1) return (size_t)-FSE_ERROR_GENERIC;
     *maxSVPtr = charnum-1;
-    if (remaining < 1) return (size_t)-FSE_ERROR_GENERIC;
 
     ip += bitCount>0;
     if ((size_t)(ip-istart) >= hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
