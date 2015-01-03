@@ -845,9 +845,8 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
 static int local_FSE_readHeader(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
 {
     short norm[256];
-    U32 maxSymbolValue, tableLog;
     (void)initialBuffer; (void)initialBufferSize;
-    return (int)FSE_readHeader(norm, &maxSymbolValue, &tableLog, src, srcSize);   // input is into dst
+    return (int)FSE_readHeader(norm, &g_max, &g_tableLog, src, srcSize);
 }
 
 static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
