@@ -671,8 +671,8 @@ int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
         bitD_t value;
         FSE_reloadDStream(&DStream);
         value = FSE_readBits(&DStream, nbBits);
-        value += 1<<nbBits;
-        *op++ = value;
+        value += (bitD_t)1<<nbBits;
+        *op++ = (U32)value;
     }
 
     return (int)(op-ostart);
