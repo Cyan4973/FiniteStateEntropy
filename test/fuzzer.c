@@ -297,19 +297,20 @@ extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned 
 static void unitTest(void)
 {
     BYTE testBuff[TBSIZE];
-    U32 i;
+    BYTE cBuff[FSE_COMPRESSBOUND(TBSIZE)];
+    BYTE verifBuff[TBSIZE];
     size_t errorCode;
-    U32 seed=0, testNb=0;
+    U32 seed=0, testNb=0, lseed=0;
 
-    // FSE_count
+    /* FSE_count */
     {
         U32 table[256];
-        U32 max;
-        for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
-        max = 128;
+        U32 max, i;
+        for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&lseed) & 63) + '0';
+        max = '0' + 63;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
-        max = 124;
+        max -= 1;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
         CHECK(!FSE_isError(errorCode), "Error : FSE_count() should have failed : value > max");
         max = 65000;
@@ -317,10 +318,10 @@ static void unitTest(void)
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
     }
 
-    // FSE_countU16
+    /* FSE_countU16 */
     {
         U32 table[FSE_MAX_SYMBOL_VALUE+2];
-        U32 max;
+        U32 max, i;
         U16* tbu16 = (U16*)testBuff;
         unsigned tbu16Size = TBSIZE / 2;
 
@@ -343,12 +344,12 @@ static void unitTest(void)
         CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : max too low");
     }
 
-    // FSE_writeHeader
+    /* FSE_writeHeader */
     {
         U32 count[129];
         S16 norm[129];
         BYTE header[513];
-        U32 max, tableLog;
+        U32 max, tableLog, i;
 
         for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
         max = 128;
@@ -367,6 +368,34 @@ static void unitTest(void)
         errorCode = FSE_writeHeader(header, errorCode-1, norm, max, tableLog);
         CHECK(!FSE_isError(errorCode), "Error : FSE_writeHeader() should have failed");
     }
+
+
+    /* FSE_buildCTable_raw & FSE_buildDTable_raw */
+    {
+        U32 CTable[FSE_CTABLE_SIZE_U32(8, 256)];
+        U32 DTable[FSE_DTABLE_SIZE_U32(8)];
+        U64 crcOrig, crcVerif;
+        size_t cSize, verifSize;
+
+        U32 i;
+        for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&seed) & 63) + '0';
+        crcOrig = XXH64(testBuff, TBSIZE, 0);
+
+        errorCode = FSE_buildCTable_raw(CTable, 8);
+        CHECK(FSE_isError(errorCode), "FSE_buildCTable_raw should have worked");
+        errorCode = FSE_buildDTable_raw(DTable, 8);
+        CHECK(FSE_isError(errorCode), "FSE_buildDTable_raw should have worked");
+
+        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, CTable);
+        CHECK(FSE_isError(cSize), "FSE_compress_usingCTable should have worked using raw CTable");
+
+        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, DTable, 8, 0);
+        CHECK(FSE_isError(verifSize), "FSE_decompress_usingDTable should have worked using raw DTable");
+
+        crcVerif = XXH64(verifBuff, verifSize, 0);
+        CHECK(crcOrig != crcVerif, "Raw regenerated data is corrupted");
+    }
+
 
     DISPLAY("Unit tests completed\n");
 }

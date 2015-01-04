@@ -190,7 +190,7 @@ void*  FSE_createDTable(unsigned tableLog);
 void   FSE_freeDTable(void* DTable);
 size_t FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_decompress_usingDTable(void* dst, size_t originalSize, const void* cSrc, size_t cSrcSize, const void* DTable, unsigned tableLog, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const void* DTable, unsigned tableLog, size_t fastMode);
 
 /*
 If the block is RLE compressed, or uncompressed, use the relevant specific functions.
@@ -216,8 +216,8 @@ If there is an error, the function will return an error code, which can be teste
 
 'DTable' can then be used to decompress 'compressed', with FSE_decompress_usingDTable().
 Only trigger fastMode if it was authorized by result of FSE_buildDTable(), otherwise decompression will fail.
-FSE_decompress_usingDTable() check if the compressed size is correct, and refuse to work if not.
-Its result will tell how many bytes were regenerated.
+cSrcSize must be correct, otherwise decompression will fail.
+FSE_decompress_usingDTable() result will tell how many bytes were regenerated.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 */
 

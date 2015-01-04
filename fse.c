@@ -597,20 +597,20 @@ size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits)
     if (nbBits < 1) return (size_t)-FSE_ERROR_GENERIC;             /* min size */
     if (((size_t)CTable) & 3) return (size_t)-FSE_ERROR_GENERIC;   /* Must be allocated of 4 bytes boundaries */
 
-    // header
+    /* header */
     tableU16[-2] = (U16) nbBits;
     tableU16[-1] = (U16) maxSymbolValue;
 
-    // Build table
+    /* Build table */
     for (s=0; s<tableSize; s++)
-        tableU16[s] = (U16)s;
+        tableU16[s] = (U16)tableSize + s;
 
-    // Build Symbol Transformation Table
+    /* Build Symbol Transformation Table */
     for (s=0; s<=maxSymbolValue; s++)
     {
         symbolTT[s].minBitsOut = (BYTE)nbBits;
-        symbolTT[s].deltaFindState = 0;
-        symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   // ensures state <= maxState
+        symbolTT[s].deltaFindState = s-1;
+        symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   /* ensures state <= maxState */
     }
 
     return 0;
@@ -1037,10 +1037,11 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
 
     FSE_DStream_t bitD;
     FSE_DState_t state1, state2;
+    size_t errorCode;
 
     /* Init */
-    const size_t blockSize = FSE_initDStream(&bitD, cSrc, cSrcSize);   /* replaced last arg by maxCompressed Size */
-    if (blockSize != cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
+    errorCode = FSE_initDStream(&bitD, cSrc, cSrcSize);   /* replaced last arg by maxCompressed Size */
+    if (FSE_isError(errorCode)) return errorCode;
 
     FSE_initDState(&state1, &bitD, DTable, tableLog);
     FSE_initDState(&state2, &bitD, DTable, tableLog);
