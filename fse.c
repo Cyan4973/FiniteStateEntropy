@@ -603,7 +603,7 @@ size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits)
 
     /* Build table */
     for (s=0; s<tableSize; s++)
-        tableU16[s] = (U16)tableSize + s;
+        tableU16[s] = (U16)(tableSize + s);
 
     /* Build Symbol Transformation Table */
     for (s=0; s<=maxSymbolValue; s++)
