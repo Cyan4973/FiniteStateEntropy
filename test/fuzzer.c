@@ -171,6 +171,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb, maxSV, tableLog;
+    const size_t maxTestSizeMask = 0x1FFFF;
     U32 time = FUZ_GetMilliStart();
 
     generateNoise (bufferP0, BUFFERSIZE, &seed);
@@ -202,19 +203,20 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Compression / Decompression tests */
         {
-            int sizeOrig = (FUZ_rand (&roundSeed) & 0x1FFFF) + 1;
+            size_t sizeOrig = (FUZ_rand (&roundSeed) & maxTestSizeMask) + 1;
+            size_t offset = (FUZ_rand(&roundSeed) % (BUFFERSIZE - 64 - maxTestSizeMask));
             size_t sizeCompressed;
             U32 hashOrig;
 
-            if (FUZ_rand(&roundSeed) & 7) bufferTest = bufferP15 + testNb;
+            if (FUZ_rand(&roundSeed) & 7) bufferTest = bufferP15 + offset;
             else
             {
                 switch(FUZ_rand(&roundSeed) & 3)
                 {
-                    case 0: bufferTest = bufferP0 + testNb; break;
-                    case 1: bufferTest = bufferP1 + testNb; break;
-                    case 2: bufferTest = bufferP90 + testNb; break;
-                    default : bufferTest = bufferP100 + testNb; break;
+                    case 0: bufferTest = bufferP0 + offset; break;
+                    case 1: bufferTest = bufferP1 + offset; break;
+                    case 2: bufferTest = bufferP90 + offset; break;
+                    default : bufferTest = bufferP100 + offset; break;
                 }
             }
             DISPLAYLEVEL (4,"%3i ", tag++);;
@@ -258,8 +260,8 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Attempt decompression on bogus data */
         {
-            size_t maxDstSize = FUZ_rand (&roundSeed) & 0x1FFFF;
-            size_t sizeCompressed = FUZ_rand (&roundSeed) & 0x1FFFF;
+            size_t maxDstSize = FUZ_rand (&roundSeed) & maxTestSizeMask;
+            size_t sizeCompressed = FUZ_rand (&roundSeed) & maxTestSizeMask;
             BYTE saved = (bufferDst[maxDstSize] = 253);
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
