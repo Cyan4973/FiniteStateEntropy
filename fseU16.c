@@ -238,7 +238,7 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
     const FSE_decode_tU16 DInfo = ((const FSE_decode_tU16*)(DStatePtr->table))[DStatePtr->state];
     U16 symbol;
-    U32 lowBits;
+    bitD_t lowBits;
     const U32 nbBits = DInfo.nbBits;
 
     symbol = DInfo.symbol;
