@@ -886,9 +886,9 @@ size_t FSE_buildDTable_raw (void* DTable, unsigned nbBits)
     /* Build Decoding Table */
     for (s=0; s<=maxSymbolValue; s++)
     {
-        dinfo->newState = 0;
-        dinfo->symbol = (BYTE)s;
-        dinfo->nbBits = (BYTE)nbBits;
+        dinfo[s].newState = 0;
+        dinfo[s].symbol = (BYTE)s;
+        dinfo[s].nbBits = (BYTE)nbBits;
     }
 
     return 0;
