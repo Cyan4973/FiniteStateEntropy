@@ -916,9 +916,17 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
     {
         bitD->start = (char*)srcBuffer;
         bitD->ptr   = bitD->start;
-        bitD->bitContainer = (BYTE)bitD->start[0];
-        if (srcSize>=2) bitD->bitContainer += (BYTE)(bitD->start[1]) << 8;
-        if (srcSize>=3) bitD->bitContainer += (BYTE)(bitD->start[2]) << 16;
+        bitD->bitContainer = *(BYTE*)(bitD->start);
+        switch(srcSize)
+        {
+            case 7: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[6]) << (sizeof(bitD_t)*8 - 16);
+            case 6: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[5]) << (sizeof(bitD_t)*8 - 24);
+            case 5: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[4]) << (sizeof(bitD_t)*8 - 32);
+            case 4: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[3]) << 24;
+            case 3: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[2]) << 16;
+            case 2: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[1]) <<  8;
+            default:;
+        }
         bitD->bitsConsumed = *(bitD->start) & 7;
         bitD->bitsConsumed += (U32)(sizeof(bitD_t) - srcSize)*8;
     }
