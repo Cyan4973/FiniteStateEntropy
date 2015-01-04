@@ -297,8 +297,8 @@ If there is an error, it returns an errorCode (which can be tested using FSE_isE
 /******************************************
 *  FSE streaming decompression API
 ******************************************/
-typedef unsigned int bitD_t;
-//typedef size_t bitD_t;
+//typedef unsigned int bitD_t;
+typedef size_t bitD_t;
 
 typedef struct
 {
@@ -319,7 +319,7 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
 void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable, unsigned tableLog);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
-unsigned int  FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
+bitD_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
 unsigned int  FSE_reloadDStream(FSE_DStream_t* bitD);
 
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);

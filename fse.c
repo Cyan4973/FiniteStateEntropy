@@ -930,19 +930,19 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
 /* FSE_readBits
  * Read next n bits from the bitContainer.
  * Use the fast variant *only* if n > 0.
- * Note : for this function to work properly, don't read more than maxNbBits==25
+ * Note : for this function to work properly on 32-bits, don't read more than maxNbBits==25
  * return : value extracted.
  */
-U32 FSE_readBits(FSE_DStream_t* bitD, U32 nbBits)
+bitD_t FSE_readBits(FSE_DStream_t* bitD, U32 nbBits)
 {
-    U32 value = ((bitD->bitContainer << bitD->bitsConsumed) >> 1) >> (((sizeof(bitD_t)*8)-1)-nbBits);
+    bitD_t value = ((bitD->bitContainer << bitD->bitsConsumed) >> 1) >> (((sizeof(bitD_t)*8)-1)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-U32 FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 */
+bitD_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 */
 {
-    U32 value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(bitD_t)*8)-nbBits);
+    bitD_t value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(bitD_t)*8)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
@@ -986,7 +986,7 @@ BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32  nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
-    U32 lowBits = FSE_readBits(bitD, nbBits);
+    bitD_t lowBits = FSE_readBits(bitD, nbBits);
 
     DStatePtr->state = DInfo.newState + lowBits;
     return symbol;
@@ -997,7 +997,7 @@ BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32 nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
-    U32 lowBits = FSE_readBitsFast(bitD, nbBits);
+    bitD_t lowBits = FSE_readBitsFast(bitD, nbBits);
 
     DStatePtr->state = DInfo.newState + lowBits;
     return symbol;
@@ -1025,7 +1025,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
     BYTE* const omax = op + maxDstSize;
-    BYTE* const olimit = omax-1;
+    BYTE* const olimit = omax-3;
 
     FSE_DStream_t bitD;
     FSE_DState_t state1, state2;
@@ -1047,6 +1047,12 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
             FSE_reloadDStream(&bitD);
 
         *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
+
+        if (FSE_MAX_TABLELOG*4+7 < sizeof(bitD_t)*8)    /* This test must be static */
+        {
+            *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
+            *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
+        }
     }
 
     /* tail */

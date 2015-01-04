@@ -95,7 +95,7 @@ size_t FSE_buildDTable_rle (void* DTable, unsigned char symbolValue);
 /******************************************
 *  FSE streaming API
 ******************************************/
-unsigned int  FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
+bitD_t FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
 /* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
 
 unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
