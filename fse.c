@@ -61,22 +61,22 @@
 #define FSE_FUNCTION_TYPE BYTE
 #define FSE_FUNCTION_EXTENSION
 
-#endif   // !FSE_COMMONDEFS_ONLY
+#endif   /* !FSE_COMMONDEFS_ONLY */
 
 
 /****************************************************************
 *  Includes
 ****************************************************************/
-#include <stdlib.h>    // malloc, free
-#include <string.h>    // memcpy, memset
-#include <stdio.h>     // printf (debug)
+#include <stdlib.h>     /* malloc, free */
+#include <string.h>     /* memcpy, memset */
+#include <stdio.h>      /* printf (debug) */
 #include "fse_static.h"
 
 
 /****************************************************************
 *  Basic Types
 *****************************************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
 typedef  uint8_t BYTE;
 typedef uint16_t U16;
@@ -160,13 +160,13 @@ typedef struct
 ****************************************************************/
 FORCE_INLINE unsigned FSE_highbit (register U32 val)
 {
-#   if defined(_MSC_VER)   // Visual
+#   if defined(_MSC_VER)   /* Visual */
     unsigned long r;
     _BitScanReverse ( &r, val );
     return (unsigned) r;
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304)   // GCC Intrinsic
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304)   /* GCC Intrinsic */
     return 31 - __builtin_clz (val);
-#   else   // Software version
+#   else   /* Software version */
     static const unsigned DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
     U32 v = val;
     unsigned r;
@@ -182,8 +182,6 @@ FORCE_INLINE unsigned FSE_highbit (register U32 val)
 
 
 #ifndef FSE_COMMONDEFS_ONLY
-
-//static unsigned FSE_64bits(void) { return sizeof(void*)==8; }
 
 unsigned FSE_isError(size_t code) { return (code > (size_t)(-FSE_ERROR_maxCode)); }
 
@@ -230,12 +228,12 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
 
     bitStream = 0;
     bitCount  = 0;
-    // Table Size
+    /* Table Size */
     bitStream += (tableLog-FSE_MIN_TABLELOG) << bitCount;
     bitCount  += 4;
 
-    // Init
-    remaining = tableSize+1;   // +1 for extra accuracy
+    /* Init */
+    remaining = tableSize+1;   /* +1 for extra accuracy */
     threshold = tableSize;
     nbBits = tableLog+1;
 

@@ -40,7 +40,7 @@ endif
 
 default: fse
 
-all: fse fse32 fullbench fullbench32 fuzzer fuzzer32 probagen
+all: fse fse32 fullbench fullbench32 fuzzer fuzzer32 fuzzerU16 probagen
 
 fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
@@ -48,11 +48,14 @@ fse: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c
 fse32: bench.c commandline.c fileio.c lz4hce.c xxhash.c fseDist.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
 
-fuzzer: fuzzer.c xxhash.c ../fse.c ../fseU16.c
+fuzzer: fuzzer.c xxhash.c ../fse.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
-fuzzer32: fuzzer.c xxhash.c ../fse.c ../fseU16.c
+fuzzer32: fuzzer.c xxhash.c ../fse.c
 	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+
+fuzzerU16: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
@@ -64,18 +67,20 @@ probagen: probaGenerator.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
-test: fullbench fullbench32 fuzzer fuzzer32
-	./fullbench -i1
-	./fullbench32 -i1
+test: fullbench fullbench32 fuzzer fuzzer32 fuzzerU16
 	./fuzzer
+	./fullbench -i1
 	./fuzzer32
+	./fullbench32 -i1
+	./fuzzerU16
 
 memtest: fuzzer fullbench
 	valgrind --leak-check=yes ./fuzzer -i256
 	valgrind --leak-check=yes ./fullbench -i1
+	valgrind --leak-check=yes ./fuzzerU16 -i128
 
 test-all: test memtest
 	@echo test completed

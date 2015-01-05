@@ -1,7 +1,8 @@
 /*
 Fuzzer.c
 Automated test program for FSE
-Copyright (C) Yann Collet 2012-2013
+Copyright (C) Yann Collet 2013-2015
+
 GPL v2 License
 
 This program is free software; you can redistribute it and/or modify
@@ -17,31 +18,34 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+You can contact the author at :
+- FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
+- Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 
-//******************************
-// Compiler options
-//******************************
-#define _CRT_SECURE_NO_WARNINGS   // Visual warning
+/******************************
+*  Compiler options
+******************************/
+#define _CRT_SECURE_NO_WARNINGS   /* Visual warning */
 
 
-//******************************
-// Include
-//******************************
-#include <stdlib.h>    // malloc, abs
-#include <stdio.h>     // printf
-#include <string.h>    // memset
-#include <sys/timeb.h> // timeb
+/******************************
+*  Include
+*******************************/
+#include <stdlib.h>     /* malloc, abs */
+#include <stdio.h>      /* printf */
+#include <string.h>     /* memset */
+#include <sys/timeb.h>  /* timeb */
 #include "fse_static.h"
-#include "fseU16.h"
 #include "xxhash.h"
 
 
-//****************************************************************
-//* Basic Types
-//****************************************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+/****************************************************************
+*  Basic Types
+****************************************************************/
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
 typedef  uint8_t BYTE;
 typedef uint16_t U16;
@@ -316,32 +320,6 @@ static void unitTest(void)
         max = 65000;
         errorCode = FSE_count(table, testBuff, TBSIZE, &max);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
-    }
-
-    /* FSE_countU16 */
-    {
-        U32 table[FSE_MAX_SYMBOL_VALUE+2];
-        U32 max, i;
-        U16* tbu16 = (U16*)testBuff;
-        unsigned tbu16Size = TBSIZE / 2;
-
-        max = 124;
-        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : value too large");
-
-        for (i=0; i< tbu16Size; i++) tbu16[i] = i % (FSE_MAX_SYMBOL_VALUE+1);
-
-        max = FSE_MAX_SYMBOL_VALUE;
-        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(FSE_isError(errorCode), "Error : FSE_countU16() should have worked");
-
-        max = FSE_MAX_SYMBOL_VALUE+1;
-        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : max too large");
-
-        max = FSE_MAX_SYMBOL_VALUE-1;
-        errorCode = FSE_countU16(table, tbu16, tbu16Size, &max);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_countU16() should have failed : max too low");
     }
 
     /* FSE_writeHeader */

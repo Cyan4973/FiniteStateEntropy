@@ -29,6 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
+   - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 #pragma once
@@ -44,13 +45,13 @@ extern "C" {
 /* FSE_MAX_SYMBOL_VALUE :
 *  Maximum nb of symbol values authorized.
 *  Required for allocation purposes */
-#define FSE_MAX_SYMBOL_VALUE 286   // This is just an example, typical value for zlib
+#define FSE_MAX_SYMBOL_VALUE 286   /* This is just an example, typical value for zlib */
 
 
 /******************************************
 *  Includes
 ******************************************/
-#include <stddef.h>    // size_t, ptrdiff_t
+#include <stddef.h>    /* size_t, ptrdiff_t */
 
 
 /******************************************
