@@ -217,7 +217,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 /*****************************************************************
 *  Unitary tests
 *****************************************************************/
-extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
+extern size_t FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
 #define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                          DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }

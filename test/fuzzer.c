@@ -367,7 +367,7 @@ static void unitTest(void)
         cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, CTable);
         CHECK(FSE_isError(cSize), "FSE_compress_usingCTable should have worked using raw CTable");
 
-        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, DTable, 8, 0);
+        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, DTable, 0);
         CHECK(FSE_isError(verifSize), "FSE_decompress_usingDTable should have worked using raw DTable");
 
         crcVerif = XXH64(verifBuff, verifSize, 0);

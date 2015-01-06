@@ -261,7 +261,7 @@ int FSED_decompressSingleU16 (U16* out, int osize, U16 value)
 
 int FSED_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
                             const void* cSrc, size_t cSrcSize,
-                            const void* DTable, const unsigned tableLog)
+                            const void* DTable)
 {
     U16* const ostart = dst;
     U16* op = ostart;
@@ -271,7 +271,7 @@ int FSED_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     // Init
     (void)maxDstSize;
     FSE_initDStream(&DStream, cSrc, cSrcSize);
-    FSE_initDState(&DState, &DStream, DTable, tableLog);
+    FSE_initDState(&DState, &DStream, DTable);
 
     // Hot loop
     while (FSE_reloadDStream(&DStream))
@@ -303,7 +303,7 @@ int FSED_decompressU16 (U16* dst, size_t maxDstSize,
     ip += headerSize;
     cSrcSize -= headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
-    errorCode = FSED_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
+    errorCode = FSED_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 
     return (int) (errorCode);
 }
@@ -652,7 +652,7 @@ int FSED_decompressSingleU32 (U32* out, unsigned osize, const BYTE* istart)
 
 int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
                               const void* cSrc, size_t cSrcSize,
-                              const void* DTable, U32 tableLog)
+                              const void* DTable)
 {
     U32* const ostart = dst;
     U32* op = ostart;
@@ -662,7 +662,7 @@ int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
     // Init
     (void)maxDstSize;
     FSE_initDStream(&DStream, cSrc, cSrcSize);
-    FSE_initDState(&DState, &DStream, DTable, tableLog);
+    FSE_initDState(&DState, &DStream, DTable);
 
     // Hot loop
     while (FSE_reloadDStream(&DStream)<2)
@@ -688,7 +688,6 @@ int FSED_decompressU32 (U32* dst, size_t maxDstSize,
     U32  DTable[1<<FSED_U32_MAXMEMLOG];
     unsigned  nbSymbols;
     unsigned  tableLog;
-    int compressedSize;
     size_t headerSize;
 
     // normal FSE decoding mode
@@ -696,8 +695,6 @@ int FSED_decompressU32 (U32* dst, size_t maxDstSize,
     ip += headerSize;
     cSrcSize = headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
-    compressedSize = FSED_decompressU32_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
-
-    return compressedSize;
+    return FSED_decompressU32_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }
 

@@ -251,7 +251,7 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 
 size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
                                const void* cSrc, size_t cSrcSize,
-                               const void* DTable, unsigned tableLog)
+                               const void* DTable)
 {
     U16* const ostart = dst;
     U16* op = ostart;
@@ -261,7 +261,7 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
 
     /* Init */
     FSE_initDStream(&bitD, cSrc, cSrcSize);
-    FSE_initDState(&state, &bitD, DTable, tableLog);
+    FSE_initDState(&state, &bitD, DTable);
 
     while((FSE_reloadDStream(&bitD) < 2) && (op<oend))
     {
@@ -297,5 +297,5 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     errorCode = FSE_buildDTableU16 (DTable, counting, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
 
-    return FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable, tableLog);
+    return FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }

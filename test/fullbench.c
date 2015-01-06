@@ -858,7 +858,7 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
 static int local_FSE_decompress_usingDTable(void* cSrc, size_t cSrcSize, const void* dst, size_t maxDstSize)
 {
     (void)cSrcSize;
-    return (int)FSE_decompress_usingDTable((void*)dst, maxDstSize, (BYTE*)cSrc + g_skip, g_cSize, g_DTable, g_tableLog, g_fast);   // change direction : input is into dst
+    return (int)FSE_decompress_usingDTable((void*)dst, maxDstSize, (BYTE*)cSrc + g_skip, g_cSize, g_DTable, g_fast);   /* change direction : input is into dst */
 }
 
 static int local_FSE_decompress(void* cSrc, size_t cSrcBufferSize, const void* dst, size_t maxDstSize)  /* direction change */

@@ -190,7 +190,7 @@ void*  FSE_createDTable(unsigned tableLog);
 void   FSE_freeDTable(void* DTable);
 size_t FSE_buildDTable (void* DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const void* DTable, unsigned tableLog, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const void* DTable, size_t fastMode);
 
 /*
 If the block is RLE compressed, or uncompressed, use the relevant specific functions.
@@ -316,7 +316,7 @@ typedef struct
 
 
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
-void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable, unsigned tableLog);
+void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 bitD_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);

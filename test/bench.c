@@ -1027,7 +1027,7 @@ static void BMK_benchCore_Mem(char* dst,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            dSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, cSize, DTable, tableLog, fastMode);
+            dSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, cSize, DTable, fastMode);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
