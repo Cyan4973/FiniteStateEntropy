@@ -23,23 +23,22 @@
     - website : http://fastcompression.blogspot.com/
 */
 
-//**************************************
-// Includes
-//**************************************
-#include <stdlib.h>      // malloc
-#include <stdio.h>       // fprintf, fopen, ftello64
-#include <string.h>      // strcmp
-#include <sys/timeb.h>   // timeb
+/**************************************
+*  Includes
+**************************************/
+#include <stdlib.h>      /* malloc */
+#include <stdio.h>       /* fprintf, fopen, ftello64 */
+#include <string.h>      /* strcmp */
+#include <sys/timeb.h>   /* timeb */
 
 #include "fse_static.h"
-//#include "fseU16.h"
 #include "xxhash.h"
 
 
-//**************************************
-// Basic Types
-//**************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+/**************************************
+*  Basic Types
+**************************************/
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
   typedef uint8_t  BYTE;
   typedef uint16_t U16;
@@ -55,9 +54,9 @@
 #endif
 
 
-//****************************
-// Constants
-//****************************
+/**************************************
+*  Constants
+**************************************/
 #define PROGRAM_DESCRIPTION "FSE speed analyzer"
 #ifndef FSE_VERSION
 #  define FSE_VERSION ""
@@ -75,13 +74,13 @@
 
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
-#define DEFAULT_BLOCKSIZE (64 KB)
+#define DEFAULT_BLOCKSIZE (48 KB)
 #define DEFAULT_PROBA 20
 
 
-//**************************************
-// MACRO
-//**************************************
+/**************************************
+*  Macros
+***************************************/
 #define DISPLAY(...)  fprintf(stderr, __VA_ARGS__)
 #define PROGRESS(...) no_prompt ? 0 : DISPLAY(__VA_ARGS__)
 

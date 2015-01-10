@@ -146,12 +146,12 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     {
         FSE_encodeU16(&bitC, &CState, *--ip);
 
-        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   // This test must be static
+        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* This test must be static */
             FSE_flushBits(&bitC);
 
         FSE_encodeU16(&bitC, &CState, *--ip);
 
-        if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   // This test must be static
+        if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   /* This test must be static */
         {
             FSE_encodeU16(&bitC, &CState, *--ip);
             FSE_encodeU16(&bitC, &CState, *--ip);
@@ -221,18 +221,6 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 /*********************************************************
 *  U16 Decompression functions
 *********************************************************/
-int FSE_decompressRawU16 (U16* out, int osize, const BYTE* in)
-{
-    memcpy (out, in+1, osize*2);
-    return osize*2+1;
-}
-
-int FSE_decompressSingleU16 (U16* out, int osize, U16 value)
-{
-    int i;
-    for (i=0; i<osize; i++) *out++ = value;
-    return 3;
-}
 
 U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
@@ -280,7 +268,7 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short   counting[FSE_MAX_SYMBOL_VALUE+1];
-    FSE_decode_tU16 DTable[FSE_MAX_TABLESIZE];
+    FSE_decode_tU16 DTable[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
     unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     unsigned tableLog;
     size_t errorCode;
@@ -290,12 +278,12 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
 
     /* normal FSE decoding mode */
     errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
-    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
+    if (FSE_isError(errorCode)) return errorCode;
     ip += errorCode;
     cSrcSize -= errorCode;
 
     errorCode = FSE_buildDTableU16 (DTable, counting, maxSymbolValue, tableLog);
-    if (FSE_isError(errorCode)) return (size_t)-FSE_ERROR_GENERIC;
+    if (FSE_isError(errorCode)) return errorCode;
 
     return FSE_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }

@@ -1,27 +1,27 @@
 /*
-FuzzerU16.c
-Automated test program for FSE U16
-Copyright (C) Yann Collet 2013-2015
+    FuzzerU16.c
+    Automated test program for FSE U16
+    Copyright (C) Yann Collet 2013-2015
 
-GPL v2 License
+    GPL v2 License
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-You can contact the author at :
-- FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
-- Public forum : https://groups.google.com/forum/#!forum/lz4c
+    You can contact the author at :
+    - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
+    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 
@@ -122,16 +122,16 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
     U16* op = buffer;
     U16* const oend = op + buffSize;
     U16 val16 = 240;
-    U16 max16 = 285;
+    U16 max16 = FSE_MAX_SYMBOL_VALUE;
 
     /* Build Symbol Table */
     while (remaining)
     {
         const U32 n = (U32) (remaining * p) + 1;
         const U32 end = pos + n;
-        while (pos<end) tableU16[pos++]= val16;
+        while (pos<end) tableU16[pos++] = val16;
         val16++;
-        if (val16 > max16) val16 = 1;
+        if (val16 >= max16) val16 = 1;
         remaining -= n;
     }
 
@@ -144,11 +144,14 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
 }
 
 
+#define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
+
 static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 {
     size_t bufferDstSize = BUFFERSIZE*sizeof(U16) + 64;
     U16* bufferP8    = (U16*) malloc (bufferDstSize);
-    void* bufferDst  = malloc (bufferDstSize);
+    void* bufferDst  =        malloc (bufferDstSize);
     U16* bufferVerif = (U16*) malloc (bufferDstSize);
     unsigned testNb;
     const size_t maxTestSizeMask = 0x1FFFF;
@@ -188,26 +191,21 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             DISPLAYLEVEL (4,"%3i ", tag++);;
             hashOrig = XXH64 (bufferTest, sizeOrig * sizeof(U16), 0);
             sizeCompressed = FSE_compressU16 (bufferDst, bufferDstSize, bufferTest, sizeOrig, FSE_MAX_SYMBOL_VALUE, 12);
-            if (FSE_isError(sizeCompressed))
-                DISPLAY ("\r test %5u : FSE_compressU16 failed ! \n", testNb);
-            else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
+            CHECK(FSE_isError(sizeCompressed), "\r test %5u : FSE_compressU16 failed !", testNb);
+            if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
+                U64 hashEnd;
                 U16 saved = (bufferVerif[sizeOrig] = 1024 + 250);
                 size_t result = FSE_decompressU16 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                if (bufferVerif[sizeOrig] != saved)
-                    DISPLAY ("\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !\n", testNb);
-                if (FSE_isError(result))
-                    DISPLAY ("\r test %5u : FSE_decompressU16 failed ! \n", testNb);
-                else
-                {
-                    U64 hashEnd = XXH64 (bufferVerif, sizeOrig * sizeof(U16), 0);
-                    if (hashEnd != hashOrig) DISPLAY ("\r test %5u : Decompressed data corrupted !! \n", testNb);
-                }
+                CHECK(bufferVerif[sizeOrig] != saved, "\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !", testNb);
+                CHECK(FSE_isError(result), "\r test %5u : FSE_decompressU16 failed : %s ! (origSize = %u, cSize = %u)", testNb, FSE_getErrorName(result), (U32)sizeOrig, (U32)sizeCompressed);
+                hashEnd = XXH64 (bufferVerif, result * sizeof(U16), 0);
+                CHECK(hashEnd != hashOrig, "\r test %5u : Decompressed data corrupted !!", testNb);
             }
         }
     }
 
-    /* exit */
+    /* clean */
     free (bufferP8);
     free (bufferDst);
     free (bufferVerif);
@@ -219,8 +217,6 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 *****************************************************************/
 extern size_t FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
-#define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
 #define TBSIZE (16 KB)
 static void unitTest(void)
 {
