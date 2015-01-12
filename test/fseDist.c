@@ -36,7 +36,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdlib.h>   // malloc
 #include <stdio.h>    // fprintf, fopen, ftello64
 #include <string.h>   // memcpy
-#include "fse.h"
+#include "fse_static.h"
 
 
 //**************************************
@@ -85,7 +85,7 @@ typedef unsigned long long  U64;
 //*********************************************************
 //  Common internal functions
 //*********************************************************
-inline int FSED_highbit (register U32 val)
+static int FSED_highbit (register U32 val)
 {
 #   if defined(_MSC_VER)   // Visual
     unsigned long r;
@@ -163,11 +163,11 @@ int FSED_writeSingleU16(void* dest, U16 distance)
 }
 
 
-static inline void FSED_encodeU16(ptrdiff_t* state, bitStream_forward_t* bitC, U16 value, const void* symbolTT, const void* stateTable)
+static void FSED_encodeU16(FSE_CState_t* statePtr, FSE_CStream_t* bitC, U16 value)
 {
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
-    FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
+    FSE_encodeByte(bitC, statePtr, nbBits);
 }
 
 
@@ -178,28 +178,26 @@ int FSED_compressU16_usingCTable (void* dest, const U16* source, int sourceSize,
     const U16* const iend = istart + sourceSize;
 
     BYTE* op = (BYTE*) dest;
-    int tableLog = *(U16*)CTable;
-    U32* streamSize;
-    ptrdiff_t state;
-    bitStream_forward_t bitC = {0,0};
-    const void* stateTable;
-    const void* symbolTT;
+    FSE_CStream_t bitC;
+    FSE_CState_t state;
 
-
-    streamSize = (U32*)FSE_initCompressionStream((void**)&op);
-    FSE_initStateAndPtrs(&state, &symbolTT, &stateTable, CTable);
+    // init
+    FSE_initCStream(&bitC, op);
+    FSE_initCState(&state, CTable);
 
     ip=iend-1;
+
     while (ip>istart)
     {
-        FSED_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);
-        if (sizeof(size_t)>4) FSED_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable);   // static test
-        FSE_flushBits((void**)&op, &bitC);
+        FSED_encodeU16(&state, &bitC, *ip--);
+        if (sizeof(size_t)>4)   // static test
+            FSED_encodeU16(&state, &bitC, *ip--);
+        FSE_flushBits(&bitC);
     }
-    if (ip==istart) { FSED_encodeU16(&state, &bitC, *ip--, symbolTT, stateTable); FSE_flushBits((void**)&op, &bitC); }
+    if (ip==istart) { FSED_encodeU16(&state, &bitC, *ip--); FSE_flushBits(&bitC); }
 
-    FSE_addBits(&bitC, state, tableLog);
-    return FSE_closeCompressionStream(op, &bitC, streamSize, 0);
+    FSE_flushCState(&bitC, &state);
+    return (int)FSE_closeCStream(&bitC);
 }
 
 
@@ -227,7 +225,7 @@ int FSED_compressU16 (void* dest, const U16* source, unsigned sourceSize, unsign
 
     // Normalize
     tableLog = FSE_optimalTableLog(tableLog, sourceSize, maxSymbolValue);
-    tableLog = FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
+    tableLog = (U32)FSE_normalizeCount (norm, tableLog, counting, sourceSize, maxSymbolValue);
     if (tableLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, FSE_headerBound(maxSymbolValue, tableLog), norm, maxSymbolValue, tableLog);
@@ -261,56 +259,53 @@ int FSED_decompressSingleU16 (U16* out, int osize, U16 value)
 }
 
 
-int FSED_decompressU16_usingDTable (unsigned short* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
+int FSED_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
+                            const void* cSrc, size_t cSrcSize,
+                            const void* DTable)
 {
-    const void* ip = (const BYTE*) compressed;
-    const void* iend;
-    unsigned short* op = dest;
-    unsigned short* const oend = op + originalSize;
-    bitStream_backward_t bitC;
-    unsigned nbStates;
-    U32 state;
+    U16* const ostart = dst;
+    U16* op = ostart;
+    FSE_DStream_t DStream;
+    FSE_DState_t  DState;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
-    state = FSE_readBits(&bitC, tableLog); FSE_updateBitStream(&bitC, &ip);
+    (void)maxDstSize;
+    FSE_initDStream(&DStream, cSrc, cSrcSize);
+    FSE_initDState(&DState, &DStream, DTable);
 
     // Hot loop
-    while (op<oend)
+    while (FSE_reloadDStream(&DStream))
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
-        unsigned short value = (U16)FSE_readBits(&bitC, nbBits);
+        int nbBits = FSE_decodeSymbol(&DState, &DStream);
+        unsigned short value = (U16)FSE_readBits(&DStream, nbBits);
         value += 1<<nbBits;
         *op++ = value;
-        FSE_updateBitStream(&bitC, &ip);
     }
 
-    return FSE_closeDecompressionStream(iend, ip);
+    return (int)(op-ostart);
 }
 
 
-int FSED_decompressU16 (U16* dest, int originalSize,
-                       const void* compressed)
+int FSED_decompressU16 (U16* dst, size_t maxDstSize,
+                       const void* cSrc, size_t cSrcSize)
 {
-    const BYTE* const istart = (const BYTE*) compressed;
+    const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short norm[16];
-    U32  DTable[1<<FSED_U16_MAXMEMLOG];
-    BYTE headerId;
+    U32  DTable[FSE_DTABLE_SIZE_U32(FSED_U16_MAXMEMLOG)];
     unsigned  nbSymbols;
     unsigned  tableLog;
-
-    // headerId early outs
-    headerId = ip[0] & 3;
-    if (headerId==0) return FSED_decompressRawU16 (dest, originalSize, istart);
-    if (headerId==1) return FSED_decompressSingleU16 (dest, originalSize, (U16)(*(U16*)(istart+1)));
+    int errorCode;
+    size_t headerSize;
 
     // normal FSE decoding mode
-    ip += FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart, cSrcSize);
+    ip += headerSize;
+    cSrcSize -= headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
-    ip += FSED_decompressU16_usingDTable (dest, originalSize, ip, DTable, tableLog);
+    errorCode = FSED_decompressU16_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 
-    return (int) (ip-istart);
+    return (int) (errorCode);
 }
 
 
@@ -359,12 +354,12 @@ int FSED_countU16Log2 (unsigned int* count, const U16* source, int sourceSize)
 }
 
 
-static inline void FSED_encodeU16Log2(ptrdiff_t* state, bitStream_forward_t* bitC, U16 value, const void* symbolTT, const void* stateTable)
+static void FSED_encodeU16Log2(FSE_CState_t* statePtr, FSE_CStream_t* bitC, U16 value)
 {
     int nbBits = FSED_highbit(value>>LN);
     BYTE symbol = (BYTE)FSED_Log2(value);
     FSE_addBits(bitC, nbBits, (size_t)value);
-    FSE_encodeByte(state, bitC, symbol, symbolTT, stateTable);
+    FSE_encodeByte(bitC, statePtr, symbol);
 }
 
 
@@ -374,38 +369,32 @@ int FSED_compressU16Log2_usingCTable (void* dest, const U16* source, int sourceS
     const U16* ip;
     const U16* const iend = istart + sourceSize;
 
-    BYTE* const ostart = (BYTE*) dest;
     BYTE* op = (BYTE*) dest;
 
     const int memLog = ( (U16*) CTable) [0];
-    const int tableSize = 1 << memLog;
-    const U16* const stateTable = ( (const U16*) CTable) + 2;
-    const void* const symbolTT = (const void*) (stateTable + tableSize);
 
-    ptrdiff_t state=tableSize;
-    bitStream_forward_t bitC = {0,0};
-    U32* streamSize = (U32*) op;
-    op += 4;
+    FSE_CState_t state;
+    FSE_CStream_t bitC;
 
+    // init
+    FSE_initCStream(&bitC, op);
+    FSE_initCState(&state, CTable);
     ip=iend-1;
-    // cheap last-symbol storage
-    //if (*ip < tableSize) state += *ip--;
 
     while (ip>istart)
     {
-        FSED_encodeU16Log2(&state, &bitC, *ip--, symbolTT, stateTable);
-        if (sizeof(size_t)>4) FSED_encodeU16Log2(&state, &bitC, *ip--, symbolTT, stateTable);   // static test
-        FSE_flushBits((void**)&op, &bitC);
+        FSED_encodeU16Log2(&state, &bitC, *ip--);
+        if (sizeof(size_t)>4)   // static test
+            FSED_encodeU16Log2(&state, &bitC, *ip--);
+        FSE_flushBits(&bitC);
     }
-    if (ip==istart) { FSED_encodeU16Log2(&state, &bitC, *ip--, symbolTT, stateTable); FSE_flushBits((void**)&op, &bitC); }
+    if (ip==istart) { FSED_encodeU16Log2(&state, &bitC, *ip--); FSE_flushBits(&bitC); }
 
     // Finalize block
-    FSE_addBits(&bitC, state, memLog);
-    FSE_flushBits((void**)&op, &bitC);
-    *streamSize = (U32) ( ( (op- (BYTE*) streamSize) *8) + bitC.bitPos);
-    op += bitC.bitPos > 0;
+    FSE_addBits(&bitC, state.value, memLog);
+    FSE_flushBits(&bitC);
 
-    return (int) (op-ostart);
+    return (int)FSE_closeCStream(&bitC);
 }
 
 
@@ -432,7 +421,7 @@ int FSED_compressU16Log2 (void* dest, const U16* source, unsigned sourceSize, un
     nbSymbols = FSED_countU16Log2 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
+    memLog = (U32)FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU16 (ostart, *source);   // only one distance in the set
 
     op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, memLog), norm, nbSymbols, memLog);
@@ -532,12 +521,15 @@ int FSED_writeSingleU32(void* dest, const U32* source, unsigned sourceSize)
 }
 
 
-void FSED_encodeU32(ptrdiff_t* state, bitStream_forward_t* bitC, void** op, U32 value, const void* symbolTT, const void* stateTable)
+void FSED_encodeU32(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U32 value)
 {
+    //BYTE nbBits = (BYTE) FSED_highbit((value>>3)+1);
+    //FSE_addBits(bitC, (size_t)value, nbBits+3);
     BYTE nbBits = (BYTE) FSED_highbit(value);
     FSE_addBits(bitC, (size_t)value, nbBits);
-    if (sizeof(size_t)==4) FSE_flushBits(op, bitC);   // static test
-    FSE_encodeByte(state, bitC, nbBits, symbolTT, stateTable);
+    if (sizeof(size_t)==4)   // static test
+        FSE_flushBits(bitC);
+    FSE_encodeByte(bitC, statePtr, nbBits);
 }
 
 
@@ -549,25 +541,22 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 
     BYTE* op = (BYTE*) dest;
     int tableLog = *(U16*)CTable;
-    bitStream_forward_t bitC = {0,0};
+    FSE_CStream_t bitC;
+    FSE_CState_t state;
 
-    void* streamSize;
-    ptrdiff_t state;
-    const void* CTablePtr1;
-    const void* CTablePtr2;
-
-    streamSize = (U32*)FSE_initCompressionStream((void**)&op);
-    FSE_initStateAndPtrs(&state, &CTablePtr1, &CTablePtr2, CTable);
-
+    // init
+    FSE_initCStream(&bitC, op);
+    FSE_initCState(&state, CTable);
     ip=iend;
+
     while (ip>istart)
     {
-        FSED_encodeU32(&state, &bitC, (void**)&op, *--ip, CTablePtr1, CTablePtr2);
-        FSE_flushBits((void**)&op, &bitC);
+        FSED_encodeU32(&bitC, &state, *--ip);
+        FSE_flushBits(&bitC);
     }
 
-    FSE_addBits(&bitC, state, tableLog); FSE_flushBits((void**)&op, &bitC);
-    return FSE_closeCompressionStream(op, &bitC, streamSize, 0);
+    FSE_addBits(&bitC, state.value, tableLog); FSE_flushBits(&bitC);
+    return (int)FSE_closeCStream(&bitC);
 }
 
 
@@ -594,7 +583,7 @@ int FSED_compressU32 (void* dest, const U32* source, unsigned sourceSize, unsign
     nbSymbols = FSED_countU32 (counting, ip, sourceSize);
 
     // Normalize
-    memLog = FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
+    memLog = (U32)FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
     if (memLog==0) return FSED_writeSingleU32 (ostart, source, sourceSize);
 
     op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, memLog), norm, nbSymbols, memLog);
@@ -661,59 +650,51 @@ int FSED_decompressSingleU32 (U32* out, unsigned osize, const BYTE* istart)
 
 
 
-int FSED_decompressU32_usingDTable (unsigned* dest, const unsigned originalSize, const void* compressed, const void* DTable, const unsigned tableLog)
+int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
+                              const void* cSrc, size_t cSrcSize,
+                              const void* DTable)
 {
-    const void* ip = compressed;
-    const void* iend;
-    unsigned int* op = dest;
-    unsigned int* const oend = op + originalSize;
-    bitStream_backward_t bitC;
-    U32 nbStates;
-    U32 state;
+    U32* const ostart = dst;
+    U32* op = ostart;
+    FSE_DStream_t DStream;
+    FSE_DState_t  DState;
 
     // Init
-    iend = FSE_initDecompressionStream(&ip, &bitC, &nbStates);
-    state = FSE_readBits(&bitC, tableLog);
-    FSE_updateBitStream(&bitC, &ip);
+    (void)maxDstSize;
+    FSE_initDStream(&DStream, cSrc, cSrcSize);
+    FSE_initDState(&DState, &DStream, DTable);
 
     // Hot loop
-    while (op<oend)
+    while (FSE_reloadDStream(&DStream)<2)
     {
-        int nbBits = FSE_decodeSymbol(&state, &bitC, DTable, 0);
-        U32 value;
-        FSE_updateBitStream(&bitC, &ip);
-        value = FSE_readBits(&bitC, nbBits);
-        value += 1<<nbBits;
-        *op++ = value;
-        FSE_updateBitStream(&bitC, &ip);
+        int nbBits = FSE_decodeSymbol(&DState, &DStream);
+        bitD_t value;
+        FSE_reloadDStream(&DStream);
+        value = FSE_readBits(&DStream, nbBits);
+        value += (bitD_t)1<<nbBits;
+        *op++ = (U32)value;
     }
 
-    //return FSE_closeDecompressionStream(iend, ip);  // slower
-    return (int) ((const BYTE*)iend- (const BYTE*)compressed);
+    return (int)(op-ostart);
 }
 
 
-int FSED_decompressU32 (U32* dest, int originalSize,
-                       const void* compressed)
+int FSED_decompressU32 (U32* dst, size_t maxDstSize,
+                       const void* cSrc, size_t cSrcSize)
 {
-    const BYTE* const istart = (const BYTE*) compressed;
+    const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short norm[FSED_MAXBITS_U32];
     U32  DTable[1<<FSED_U32_MAXMEMLOG];
-    BYTE headerId;
     unsigned  nbSymbols;
     unsigned  tableLog;
-
-    // headerId early outs
-    headerId = ip[0] & 3;
-    if (headerId==0) return FSED_decompressRawU32 (dest, originalSize, istart);
-    if (headerId==1) return FSED_decompressSingleU32 (dest, originalSize, istart);
+    size_t headerSize;
 
     // normal FSE decoding mode
-    ip += FSE_readHeader (norm, &nbSymbols, &tableLog, istart);
+    headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart, cSrcSize);
+    ip += headerSize;
+    cSrcSize = headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
-    ip += FSED_decompressU32_usingDTable (dest, originalSize, ip, DTable, tableLog);
-
-    return (int) (ip-istart);
+    return FSED_decompressU32_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }
 

@@ -1,7 +1,8 @@
 /* ******************************************************************
    FSEU16 : Finite State Entropy coder for 16-bits input
    header file
-   Copyright (C) 2013-2014, Yann Collet.
+   Copyright (C) 2013-2015, Yann Collet.
+
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -28,6 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
+   - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 #pragma once
@@ -38,16 +40,22 @@ extern "C" {
 
 
 /******************************************
-   Tuning parameters
+*  Tuning parameters
 ******************************************/
-// FSE_MAX_SYMBOL_VALUE :
-// Maximum nb of symbol values authorized.
-// Required for allocation purposes
-#define FSE_MAX_SYMBOL_VALUE 286   // This is just an example, typical value for zlib
+/* FSE_MAX_SYMBOL_VALUE :
+*  Maximum nb of symbol values authorized.
+*  Required for allocation purposes */
+#define FSE_MAX_SYMBOL_VALUE 286   /* This is just an example, typical value for zlib */
 
 
 /******************************************
-   FSE U16 functions
+*  Includes
+******************************************/
+#include <stddef.h>    /* size_t, ptrdiff_t */
+
+
+/******************************************
+*  FSE U16 functions
 ******************************************/
 
 /* same as FSE normal functions,
@@ -55,10 +63,11 @@ extern "C" {
    Useful for alphabet size > 256.
    All symbol values within input table must be <= 'maxSymbolValue'.
    Maximum allowed 'maxSymbolValue' value is controlled by constant FSE_MAX_SYMBOL_VALUE */
-int FSE_compressU16  (void* dest,
-                      const unsigned short* source, unsigned sourceSize, unsigned maxSymbolValue, unsigned tableLog);
-int FSE_decompressU16(unsigned short* dest, unsigned originalSize,
-                      const void* compressed);
+size_t FSE_compressU16(void* dst, size_t maxDstSize,
+       const unsigned short* src, size_t srcSize,
+       unsigned maxSymbolValue, unsigned tableLog);
+
+size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
 
 
 /******************************************

@@ -10,10 +10,16 @@ and [Arithmetic ones](http://en.wikipedia.org/wiki/Arithmetic_coding).
 While huffman is fast but can only represent probabilities in power of 2 (50%, 25%, etc.)
 arithmetic coding can represent probabilities with much better accuracy, but requires multiplications and divisions.
 
-FSE solve this dilemna by providing precise probabilities, like arithmetic does,
+FSE solves this dilemna by providing precise probabilities, like arithmetic does,
 but using only *additions, masks and shifts*.
 
-This makes FSE faster, on par with Huffman speed, and even suitable for low-power CPU environment.
+This makes FSE faster, on par with Huffman speed, and suitable for low-power CPU environment.
+
+|Branch      |Status   |
+|------------|---------|
+|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/fse) |
+|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/fse) |
+
 
 
 Benchmarks
