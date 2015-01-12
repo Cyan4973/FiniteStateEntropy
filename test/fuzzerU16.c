@@ -70,7 +70,7 @@ typedef unsigned long long  U64;
 #define KB *(1<<10)
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
-#define FUZ_NB_TESTS  (16 KB)
+#define FUZ_NB_TESTS  (32 KB)
 #define PROBATABLESIZE (4 KB)
 #define FUZ_UPDATERATE  200
 #define PRIME1   2654435761U
@@ -86,7 +86,7 @@ static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + re
 
 
 /***************************************************
-*  local functions
+*  Local functions
 ***************************************************/
 static int FUZ_GetMilliStart(void)
 {
@@ -145,9 +145,9 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
 
 
 #define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
+                         DISPLAY(" (seed %u, test nb %u)  \n", startSeed, testNb); exit(-1); }
 
-static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
+static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 {
     size_t bufferDstSize = BUFFERSIZE*sizeof(U16) + 64;
     U16* bufferP8    = (U16*) malloc (bufferDstSize);
@@ -156,6 +156,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     unsigned testNb;
     const size_t maxTestSizeMask = 0x1FFFF;
     U32 time = FUZ_GetMilliStart();
+    U32 seed = startSeed;
 
     generateU16 (bufferP8, BUFFERSIZE, 0.08, &seed);
 
@@ -198,7 +199,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 U16 saved = (bufferVerif[sizeOrig] = 1024 + 250);
                 size_t result = FSE_decompressU16 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 CHECK(bufferVerif[sizeOrig] != saved, "\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !", testNb);
-                CHECK(FSE_isError(result), "\r test %5u : FSE_decompressU16 failed : %s ! (origSize = %u, cSize = %u)", testNb, FSE_getErrorName(result), (U32)sizeOrig, (U32)sizeCompressed);
+                CHECK(FSE_isError(result), "\r test %5u : FSE_decompressU16 failed : %s ! (origSize = %u shorts, cSize = %u bytes)", testNb, FSE_getErrorName(result), (U32)sizeOrig, (U32)sizeCompressed);
                 hashEnd = XXH64 (bufferVerif, result * sizeof(U16), 0);
                 CHECK(hashEnd != hashOrig, "\r test %5u : Decompressed data corrupted !!", testNb);
             }
@@ -222,7 +223,7 @@ static void unitTest(void)
 {
     U16  testBuffU16[TBSIZE];
     size_t errorCode;
-    U32 seed=0, testNb=0;
+    U32 startSeed=0, testNb=0;
 
     /* FSE_countU16 */
     {

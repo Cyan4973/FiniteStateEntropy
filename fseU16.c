@@ -42,12 +42,6 @@
 #define FSE_MAX_MEMORY_USAGE 14
 #define FSE_DEFAULT_MEMORY_USAGE 13
 
-/* FSE_ILP :
-*  Determine if the algorithm tries to explicitly exploit ILP
-*  (Instruction Level Parallelism)
-*  Default : Recommended */
-#define FSE_ILP 1
-
 
 /****************************************************************
 *  Includes
@@ -87,13 +81,6 @@ typedef struct
 /*********************************************************
 *  U16 Compression functions
 *********************************************************/
-
-static int FSE_compressRleU16(void* dst, U16 value)
-{
-    *(U16*)dst = value;
-    return 2;
-}
-
 
 void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 {
@@ -193,7 +180,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     /* Scan for stats */
     errorCode = FSE_countU16 (counting, ip, srcSize, &maxSymbolValue);
     if (FSE_isError(errorCode)) return errorCode;
-    if (errorCode == srcSize) return FSE_compressRleU16(ostart, *istart);
+    if (errorCode == srcSize) return 1;   /* Input data is one constant element x srcSize times. Use RLE compression. */
 
     /* Normalize */
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);

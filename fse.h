@@ -59,7 +59,7 @@ FSE_compress():
     Worst case size evaluation is provided by FSE_compressBound().
     return : size of compressed data
     Special values : if result == 0, data is uncompressible => Nothing is stored within cSrc !!
-                     if result == 1, data is RLE.
+                     if result == 1, data is one constant element x srcSize times. Use RLE compression.
                      if FSE_isError(result), it's an error code.
 
 FSE_decompress():

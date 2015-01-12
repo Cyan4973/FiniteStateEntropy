@@ -59,10 +59,13 @@ extern "C" {
 ******************************************/
 
 /* same as FSE normal functions,
-   but data is presented as a table of unsigned short (2 bytes per symbol).
-   Useful for alphabet size > 256.
-   All symbol values within input table must be <= 'maxSymbolValue'.
-   Maximum allowed 'maxSymbolValue' value is controlled by constant FSE_MAX_SYMBOL_VALUE */
+   but data is presented or regenerated as a table of unsigned short (2 bytes per symbol),
+   which is useful for alphabet size > 256.
+   Important ! All symbol values within input table must be <= 'maxSymbolValue'.
+   Maximum allowed 'maxSymbolValue' is controlled by constant FSE_MAX_SYMBOL_VALUE
+   Special values : if result == 0, data is uncompressible => Nothing is stored within cSrc !!
+                    if result == 1, data is one constant element x srcSize times. Use RLE compression.
+                    if FSE_isError(result), it's an error code.*/
 size_t FSE_compressU16(void* dst, size_t maxDstSize,
        const unsigned short* src, size_t srcSize,
        unsigned maxSymbolValue, unsigned tableLog);
@@ -73,16 +76,7 @@ size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize, const void* cSr
 /******************************************
    FSE U16 advanced functions
 ******************************************/
-/*
-FSE_decompressU16_safe():
-    Same as FSE_decompressU16(), but ensures that the decoder never reads beyond compressed + maxCompressedSize.
-    note : you don't have to provide the exact compressed size. If you provide more, it's fine too.
-    This function is safe against malicious data.
-    return : size of compressed data
-             or -1 if there is an error
-*/
-int FSE_decompressU16_safe (unsigned short* dest, unsigned originalSize,
-                            const void* compressed, unsigned maxCompressedSize);
+
 
 
 #if defined (__cplusplus)
