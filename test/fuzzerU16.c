@@ -174,10 +174,10 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
         U32 roundSeed = seed ^ 0xEDA5B371;
         FUZ_rand(&seed);
 
-        DISPLAYLEVEL (4, "\r test %5u  ", testNb);
+        DISPLAYLEVEL (4, "\r test %5u      ", testNb);
         if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
         {
-            DISPLAY ("\r test %5u  ", testNb);
+            DISPLAY ("\r test %5u      ", testNb);
             time = FUZ_GetMilliStart();
         }
 
@@ -189,7 +189,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
             U64 hashOrig;
             bufferTest = bufferP8 + offset;
 
-            DISPLAYLEVEL (4,"%3i ", tag++);;
+            DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
             hashOrig = XXH64 (bufferTest, sizeOrig * sizeof(U16), 0);
             sizeCompressed = FSE_compressU16 (bufferDst, bufferDstSize, bufferTest, sizeOrig, FSE_MAX_SYMBOL_VALUE, 12);
             CHECK(FSE_isError(sizeCompressed), "\r test %5u : FSE_compressU16 failed !", testNb);
@@ -197,11 +197,33 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
             {
                 U64 hashEnd;
                 U16 saved = (bufferVerif[sizeOrig] = 1024 + 250);
-                size_t result = FSE_decompressU16 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                size_t dstSize;
+                size_t result;
+
+                /* basic decompression test : should work */
+                DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
+                result = FSE_decompressU16 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 CHECK(bufferVerif[sizeOrig] != saved, "\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !", testNb);
                 CHECK(FSE_isError(result), "\r test %5u : FSE_decompressU16 failed : %s ! (origSize = %u shorts, cSize = %u bytes)", testNb, FSE_getErrorName(result), (U32)sizeOrig, (U32)sizeCompressed);
                 hashEnd = XXH64 (bufferVerif, result * sizeof(U16), 0);
                 CHECK(hashEnd != hashOrig, "\r test %5u : Decompressed data corrupted !!", testNb);
+
+                /* larger output buffer than necessary : should work */
+                DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
+                result = FSE_decompressU16 (bufferVerif, sizeOrig + (FUZ_rand(&roundSeed) & 31) + 1, bufferDst, sizeCompressed);
+                CHECK(FSE_isError(result), "\r test %5u : FSE_decompressU16 failed : %s ! (origSize = %u shorts, cSize = %u bytes)", testNb, FSE_getErrorName(result), (U32)sizeOrig, (U32)sizeCompressed);
+                hashEnd = XXH64 (bufferVerif, result * sizeof(U16), 0);
+                CHECK(hashEnd != hashOrig, "\r test %5u : Decompressed data corrupted !!", testNb);
+
+                /* smaller output buffer than required : should fail */
+                DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
+                dstSize = (FUZ_rand(&roundSeed) & 31) + 1;
+                if (dstSize >= sizeOrig) dstSize = 1;
+                dstSize = sizeOrig - dstSize;
+                saved = (bufferVerif[dstSize] = 1024 + 250);
+                result = FSE_decompressU16 (bufferVerif, dstSize, bufferDst, sizeCompressed);
+                CHECK(bufferVerif[dstSize] != saved, "\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !", testNb);
+                CHECK(!FSE_isError(result), "\r test %5u : FSE_decompressU16 should have failed ! (origSize = %u shorts, dstSize = %u bytes)", testNb, (U32)sizeOrig, (U32)dstSize);
             }
         }
     }
