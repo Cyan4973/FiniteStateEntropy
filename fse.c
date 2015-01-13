@@ -487,7 +487,7 @@ static void FSE_distribNpts(short* normalizedCounter, int maxSymbolValue, short 
             short reduction = points>>2;
             if (fallback)
             {
-                FSE_emergencyDistrib(normalizedCounter, maxSymbolValue, points);    // Fallback mode
+                FSE_emergencyDistrib(normalizedCounter, maxSymbolValue, points);    /* Fallback mode */
                 return;
             }
             if (reduction < 1) reduction=1;
@@ -521,6 +521,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
     if (tableLog < FSE_MIN_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported size */
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported size */
+    if ((1U<<tableLog) <= maxSymbolValue) return (size_t)-FSE_ERROR_GENERIC;   /* Too small tableLog, compression potentially impossible */
 
     {
         U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
@@ -621,7 +622,7 @@ size_t FSE_buildCTable_rle (void* CTable, BYTE symbolValue)
     U16* tableU16 = ( (U16*) CTable) + 2;
     FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) (tableU16 + tableSize);
 
-    // Init checks
+    /* safety checks */
     if (((size_t)CTable) & 3) return (size_t)-FSE_ERROR_GENERIC;   // Must be allocated of 4 bytes boundaries
 
     // header

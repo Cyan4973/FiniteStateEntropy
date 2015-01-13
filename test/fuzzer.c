@@ -305,26 +305,34 @@ static void unitTest(void)
     BYTE verifBuff[TBSIZE];
     size_t errorCode;
     U32 seed=0, testNb=0, lseed=0;
+    U32 count[256];
 
     /* FSE_count */
     {
-        U32 table[256];
         U32 max, i;
         for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&lseed) & 63) + '0';
         max = '0' + 63;
-        errorCode = FSE_count(table, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
         max -= 1;
-        errorCode = FSE_count(table, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
         CHECK(!FSE_isError(errorCode), "Error : FSE_count() should have failed : value > max");
         max = 65000;
-        errorCode = FSE_count(table, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
+    }
+
+    /* FSE_normalizeCount */
+    {
+        S16 norm[256];
+        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, 256);
+        CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
+        errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 257);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_normalizeCount() should have failed (max > 1<<tableLog)");
     }
 
     /* FSE_writeHeader */
     {
-        U32 count[129];
         S16 norm[129];
         BYTE header[513];
         U32 max, tableLog, i;
