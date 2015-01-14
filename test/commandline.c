@@ -126,8 +126,7 @@ static void waitEnter(void)
 int main(int argc, char** argv)
 {
     int   i,
-          forceCompress=0, decode=0, bench=3, benchLZ4e=0; // default action if no argument
-    int   algoNb = -1;
+          forceCompress=0, decode=0, bench=3; /* default action if no argument */
     int   indexFileNames=0;
     char* input_filename=0;
     char* output_filename=0;
@@ -135,7 +134,7 @@ int main(int argc, char** argv)
     char  extension[] = FSE_EXTENSION;
 
 
-    // Welcome message
+    /* Welcome message */
     programName = argv[0];
     DISPLAY(WELCOME_MESSAGE);
 
@@ -188,14 +187,6 @@ int main(int argc, char** argv)
                 case 'z':
                     bench=1;
                     BMK_SetByteCompressor(3);
-                    break;
-
-                    // Benchmark LZ4 extracted fields (hidden)
-                case 'l': benchLZ4e=1;
-                    algoNb = 0;
-                    while ((argument[1]>='0') && (argument[1]<='9')) { algoNb *= 10; algoNb += argument[1]-'0'; argument++; }
-                    algoNb -= 1;
-                    if (algoNb >= et_final) algoNb = et_final-1;
                     break;
 
                     // Test
@@ -264,9 +255,6 @@ int main(int argc, char** argv)
 
     // Check if input is defined as console; trigger an error in this case
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
-
-    // Check if benchmark is selected
-    if (benchLZ4e) { BMK_benchFilesLZ4E(argv+indexFileNames, argc-indexFileNames, algoNb); goto _end; }
 
     // Check if benchmark is selected
     if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }

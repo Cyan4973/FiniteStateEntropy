@@ -1,6 +1,7 @@
 /* ******************************************************************
    FSEU16 : Finite State Entropy coder for 16-bits input
-   Copyright (C) 2013-2014, Yann Collet.
+   Copyright (C) 2013-2015, Yann Collet.
+
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -56,6 +57,14 @@
 #  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
 #endif
 
+#if defined(__GNUC__)
+#  pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
+#if defined (__clang__)
+#  pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 
 /****************************************************************
   Complex types
@@ -81,7 +90,6 @@ typedef struct
 /*********************************************************
 *  U16 Compression functions
 *********************************************************/
-
 void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 {
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;

@@ -19,6 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
+  - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
   - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -28,23 +29,25 @@
   The license of this library is GPLv2.
 */
 
-//**************************************
-// Compiler Options
-//**************************************
-// Disable some Visual warning messages
-#ifdef _MSC_VER  // Visual Studio
+/**************************************
+*  Compiler Options
+**************************************/
+/* Disable some Visual warning messages */
+#ifdef _MSC_VER
 #  define _CRT_SECURE_NO_WARNINGS
 #  define _CRT_SECURE_NO_DEPRECATE     // VS2005
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+
 #define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
 
-//****************************
-// Includes
-//****************************
+/**************************************
+*  Includes
+**************************************/
 #include <stdio.h>    // fprintf, fopen, fread, _fileno, stdin, stdout
 #include <stdlib.h>   // malloc
 #include <string.h>   // strcmp, strlen
@@ -53,9 +56,9 @@
 #include "xxhash.h"
 
 
-//****************************
-// OS-specific Includes
-//****************************
+/**************************************
+*  OS-specific Includes
+**************************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>    // _O_BINARY
 #  include <io.h>       // _setmode, _isatty
@@ -71,30 +74,10 @@
 #endif
 
 
-//**************************************
-// Compiler-specific functions
-//**************************************
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
-#if defined(_MSC_VER)    // Visual Studio
-#  define swap32 _byteswap_ulong
-#elif GCC_VERSION >= 403
-#  define swap32 __builtin_bswap32
-#else
-  static inline unsigned int swap32(unsigned int x)
-  {
-    return ((x << 24) & 0xff000000 ) |
-           ((x <<  8) & 0x00ff0000 ) |
-           ((x >>  8) & 0x0000ff00 ) |
-           ((x >> 24) & 0x000000ff );
-  }
-#endif
-
-
-//**************************************
-// Basic Types
-//**************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+/**************************************
+*  Basic Types
+**************************************/
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
 typedef uint8_t  BYTE;
 typedef uint16_t U16;
@@ -110,9 +93,9 @@ typedef unsigned long long  U64;
 #endif
 
 
-//****************************
-// Constants
-//****************************
+/**************************************
+*  Constants
+**************************************/
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define GB *(1U<<30)
@@ -132,18 +115,28 @@ typedef unsigned long long  U64;
 #define FSE_CHECKSUM_SEED        0
 
 
-//**************************************
-// Architecture Macros
-//**************************************
-static const int one = 1;
-#define CPU_LITTLE_ENDIAN   (*(char*)(&one))
-#define CPU_BIG_ENDIAN      (!CPU_LITTLE_ENDIAN)
-#define LITTLE_ENDIAN_32(i) (CPU_LITTLE_ENDIAN?(i):swap32(i))
+/**************************************
+*  Memory operations
+**************************************/
+static void FIO_writeLE32(void* memPtr, U32 val32)
+{
+    BYTE* p = memPtr;
+    p[0] = (BYTE)val32;
+    p[1] = (BYTE)(val32>>8);
+    p[2] = (BYTE)(val32>>16);
+    p[3] = (BYTE)(val32>>24);
+}
+
+static U32 FIO_readLE32(const void* memPtr)
+{
+    const BYTE* p = memPtr;
+    return (U32)((U32)p[0] + ((U32)p[1]<<8) + ((U32)p[2]<<16) + ((U32)p[3]<<24));
+}
 
 
-//**************************************
-// Macros
-//**************************************
+/**************************************
+*  Macros
+**************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 
@@ -179,15 +172,15 @@ static int   bufferSizeId = FSE_BUFFERSIZEID_DEFAULT;
 #define DEFAULT_DECOMPRESSOR  FSE_decompress
 
 
-//**************************************
-// Parameters
-//**************************************
+/**************************************
+*  Parameters
+**************************************/
 void FIO_overwriteMode(void) { overwrite=1; }
 
 
-//****************************
-// Functions
-//****************************
+/**************************************
+*  Functions
+**************************************/
 static int          FIO_GetBlockSize_FromBlockId   (int id) { return (1 << id) KB; }
 static int          FIO_GetBufferSize_FromBufferId (int id) { return (1 << (id + 5)) KB; }
 
@@ -292,7 +285,7 @@ int compress_file(char* output_filename, char* input_filename)
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
 
     // Write Archive Header
-    *(U32*)out_buff = LITTLE_ENDIAN_32(FSE_MAGIC_NUMBER);   // Magic Number
+    FIO_writeLE32(out_buff, FSE_MAGIC_NUMBER);
     out_buff[4] = (char)globalBlockSizeId;                  // Block Size descriptor
     sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE+1, foutput);
     if (sizeCheck!=MAGICNUMBER_SIZE+1) EXM_THROW(22, "Write error : cannot write header");
@@ -330,7 +323,8 @@ int compress_file(char* output_filename, char* input_filename)
                 int nbBytes = ((globalBlockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
                 int lastBlockSize = (int)inSize & (inputBlockSize-1);
                 if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
-                *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
+                FIO_writeLE32(op, lastBlockSize);
+                op+= nbBytes;
                 errorCode = (int)compressionFunction(op, oend-op, ip, lastBlockSize);
                 if (errorCode==-1) EXM_THROW(22, "Compression error, last block");
                 op += errorCode;
@@ -348,7 +342,7 @@ int compress_file(char* output_filename, char* input_filename)
     }
 
     // Checksum
-    *(U32*)out_buff = LITTLE_ENDIAN_32(XXH32_digest(&xxhState));
+    FIO_writeLE32(out_buff, XXH32_digest(&xxhState));
     compressedfilesize += 4;
     sizeCheck = fwrite(out_buff, 1, 4, foutput);
     if (sizeCheck!=4) EXM_THROW(24, "Write error : cannot write checksum");
@@ -373,7 +367,8 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
 {
     FILE* finput, *foutput;
     U64   filesize = 0;
-    char  header[HEADERSIZE];
+    U32   header32[(HEADERSIZE+3) >> 2];
+    char* header = (char*)header32;
     char* in_buff;
     char* out_buff;
     char* ip;
@@ -383,13 +378,13 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
     int   blockSizeId;
     size_t sizeCheck;
     U32   magicNumber;
-    U32*  magicNumberP = (U32*) header;
+    U32*  magicNumberP = header32;
     size_t inputBufferSize;
     int nbFullBlocks = 0;
     XXH32_state_t xxhState;
 
 
-    // Init
+    /* Init */
     XXH32_reset(&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
@@ -397,7 +392,7 @@ unsigned long long decompress_file(char* output_filename, char* input_filename)
     sizeCheck = fread(header, (size_t)1, HEADERSIZE, finput);
     if (sizeCheck != HEADERSIZE) EXM_THROW(30, "Read error : cannot read header\n");
 
-    magicNumber = LITTLE_ENDIAN_32(*magicNumberP);
+    magicNumber = FIO_readLE32(magicNumberP);
     if (magicNumber != FSE_MAGIC_NUMBER) EXM_THROW(31, "Wrong file type : unrecognised header\n");
     blockSizeId = header[4];
     if (blockSizeId > 0xF) EXM_THROW(32, "Wrong version : unrecognised header flags\n");
@@ -457,7 +452,7 @@ _lastBlock:
     {
         size_t errorCode;
         int nbBytes = ((blockSizeId+10)/8)+1;   // Nb Bytes to describe last block size
-        U32 lastBlockSize = LITTLE_ENDIAN_32(*(U32*)ip);
+        U32 lastBlockSize = FIO_readLE32(ip);
         U32 mask;
         ip += nbBytes;
         switch(nbBytes)
@@ -479,9 +474,9 @@ _lastBlock:
         XXH32_update(&xxhState, out_buff, lastBlockSize);
     }
 
-    // CRC verification
+    /* CRC verification */
     {
-        U32 CRCsaved = *(U32*)ip;
+        U32 CRCsaved = FIO_readLE32(ip);
         U32 CRCcalculated = XXH32_digest(&xxhState);
         if (CRCsaved != CRCcalculated) EXM_THROW(35, "CRC error : wrong checksum, corrupted data");
     }

@@ -560,41 +560,43 @@ int FSED_compressU32_usingCTable (void* dest, const U32* source, int sourceSize,
 }
 
 
-#define FSED_U32_MAXMEMLOG 11
-int FSED_compressU32 (void* dest, const U32* source, unsigned sourceSize, unsigned memLog)
+#define FSED_U32_MAXTABLELOG 11
+size_t FSED_compressU32 (void* dst, size_t maxDstSize, const U32* src, size_t srcSize, unsigned tableLog)
 {
-    const U32* const istart = (const U32*) source;
+    const U32* const istart = (const U32*) src;
     const U32* ip = istart;
 
-    BYTE* const ostart = (BYTE*) dest;
+    BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
 
     int nbSymbols = FSED_MAXBITS_U32;
     U32 counting[FSED_MAXBITS_U32];
     short norm[FSED_MAXBITS_U32];
-    U32 CTable[2 + FSED_MAXBITS_U32 + (1<<FSED_U32_MAXMEMLOG)];
+    U32 CTable[2 + FSED_MAXBITS_U32 + (1<<FSED_U32_MAXTABLELOG)];
 
 
-    if (memLog > FSED_U32_MAXMEMLOG) return -1;
-    // early out
-    if (sourceSize <= 1) return FSED_noCompressU32 (ostart, source, sourceSize);
+    /* safety checks */
+    (void)maxDstSize;
+    if (tableLog > FSED_U32_MAXTABLELOG) return (size_t)-FSE_ERROR_GENERIC;
+    /* early out */
+    if (srcSize <= 1) return FSED_noCompressU32 (ostart, src, srcSize);
 
-    // Scan for stats
-    nbSymbols = FSED_countU32 (counting, ip, sourceSize);
+    /* Scan for stats */
+    nbSymbols = FSED_countU32 (counting, ip, srcSize);
 
-    // Normalize
-    memLog = (U32)FSE_normalizeCount (norm, memLog, counting, sourceSize, nbSymbols);
-    if (memLog==0) return FSED_writeSingleU32 (ostart, source, sourceSize);
+    /* Normalize */
+    tableLog = (U32)FSE_normalizeCount (norm, tableLog, counting, srcSize, nbSymbols);
+    if (tableLog==0) return FSED_writeSingleU32 (ostart, src, srcSize);
 
-    op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, memLog), norm, nbSymbols, memLog);
+    op += FSE_writeHeader (op, FSE_headerBound(nbSymbols, tableLog), norm, nbSymbols, tableLog);
 
-    // Compress
-    FSE_buildCTable (&CTable, norm, nbSymbols, memLog);
-    op += FSED_compressU32_usingCTable (op, ip, sourceSize, &CTable);
+    /* Compress */
+    FSE_buildCTable (&CTable, norm, nbSymbols, tableLog);
+    op += FSED_compressU32_usingCTable (op, ip, srcSize, &CTable);
 
-    // check compressibility
-    if ( (size_t)(op-ostart) >= (size_t)(sourceSize*4-1) )
-        return FSED_noCompressU32 (ostart, istart, sourceSize);
+    /* check compressibility */
+    if ( (size_t)(op-ostart) >= (size_t)(srcSize*4-1) )
+        return FSED_noCompressU32 (ostart, istart, srcSize);
 
     return (int) (op-ostart);
 }
@@ -659,7 +661,7 @@ int FSED_decompressU32_usingDTable (U32* dst, size_t maxDstSize,
     FSE_DStream_t DStream;
     FSE_DState_t  DState;
 
-    // Init
+    /* Init */
     (void)maxDstSize;
     FSE_initDStream(&DStream, cSrc, cSrcSize);
     FSE_initDState(&DState, &DStream, DTable);
@@ -685,15 +687,14 @@ int FSED_decompressU32 (U32* dst, size_t maxDstSize,
     const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short norm[FSED_MAXBITS_U32];
-    U32  DTable[1<<FSED_U32_MAXMEMLOG];
+    U32  DTable[1<<FSED_U32_MAXTABLELOG];
     unsigned  nbSymbols;
     unsigned  tableLog;
     size_t headerSize;
 
-    // normal FSE decoding mode
     headerSize = FSE_readHeader (norm, &nbSymbols, &tableLog, istart, cSrcSize);
     ip += headerSize;
-    cSrcSize = headerSize;
+    cSrcSize -= headerSize;
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
     return FSED_decompressU32_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }

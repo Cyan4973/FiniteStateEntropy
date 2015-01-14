@@ -58,12 +58,12 @@ extern "C" {
 *  FSE U16 functions
 ******************************************/
 
-/* same as FSE normal functions,
+/* same as FSE functions,
    but data is presented or regenerated as a table of unsigned short (2 bytes per symbol),
    which is useful for alphabet size > 256.
    Important ! All symbol values within input table must be <= 'maxSymbolValue'.
    Maximum allowed 'maxSymbolValue' is controlled by constant FSE_MAX_SYMBOL_VALUE
-   Special values : if result == 0, data is uncompressible => Nothing is stored within cSrc !!
+   Special values : if result == 0, data is not compressible => Nothing is stored within cSrc !!
                     if result == 1, data is one constant element x srcSize times. Use RLE compression.
                     if FSE_isError(result), it's an error code.*/
 size_t FSE_compressU16(void* dst, size_t maxDstSize,
@@ -71,11 +71,6 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
        unsigned maxSymbolValue, unsigned tableLog);
 
 size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
-
-
-/******************************************
-   FSE U16 advanced functions
-******************************************/
 
 
 

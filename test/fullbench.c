@@ -205,7 +205,7 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
 {
     U32 count[8][256+16];
     U64* ptr = (U64*) src;
-    U64* end = (U64*) ((BYTE*)src + (srcSize & (~0x7)));
+    U64* end = ptr + (srcSize >> 3);
     U64 next = *ptr++;
 
     (void)dst; (void)dstSize;
@@ -248,41 +248,44 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
   int i;
   U32 count[256]={0};
   U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
+  const U32* ip32 = (const U32*)src;
+  const U32* const ip32end = ip32 + (srcSize >> 2);
   const BYTE* ip = (const BYTE*)src;
-  const BYTE* const iend = ip + (srcSize&(~(NU-1)));
-  U32 cp = *(U32 *)src;
+  const BYTE* const iend = ip + srcSize;
+  U32 cp = *ip32;
 
   (void)dst; (void)dstSize;
 
-  for(; ip != iend; )
+  for(; ip32 != ip32end; )
   {
-    U32 c = cp; ip += 4; cp = *(U32 *)ip;
+    U32 c = cp; ip32++; cp = *ip32;
     c0[(unsigned char)c      ]++;
     c1[(unsigned char)(c>>8) ]++;
     c2[(unsigned char)(c>>16)]++;
     c3[c>>24                 ]++;
 
-    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+        c = cp; ip32++; cp = *ip32;
     c0[(unsigned char)c      ]++;
     c1[(unsigned char)(c>>8) ]++;
     c2[(unsigned char)(c>>16)]++;
     c3[c>>24                 ]++;
 
       #if NU == 16
-    	     c = cp; ip += 4; cp = *(unsigned *)ip;
+        c = cp; ip32++; cp = *ip32;
     c0[(unsigned char)c      ]++;
     c1[(unsigned char)(c>>8) ]++;
     c2[(unsigned char)(c>>16)]++;
     c3[c>>24                 ]++;
 
-             c = cp; ip += 4; cp = *(unsigned *)ip;
+        c = cp; ip32++; cp = *ip32;
     c0[(unsigned char)c      ]++;
     c1[(unsigned char)(c>>8) ]++;
     c2[(unsigned char)(c>>16)]++;
     c3[c>>24                 ]++;
       #endif
   }
-  while(ip < (const BYTE*)src+srcSize) c0[*ip++]++;
+  ip = (const BYTE*)ip32;
+  while(ip < iend) c0[*ip++]++;
   for(i = 0; i < 256; i++)
     count[i] = c0[i]+c1[i]+c2[i]+c3[i];
 
@@ -293,17 +296,19 @@ static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t sr
 static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
   U32 c0[256]={0},c1[256]={0},c2[256]={0},c3[256]={0};
-  const BYTE* ip = (BYTE*)src;
-  const BYTE* const iend = (const BYTE*)src + srcSize;
-  U32 cp = *(U32*)src;
+  const U32* ip32 = (const U32*)src;
+  const U32* const ip32end = ip32 + (srcSize>>2);
+  const BYTE* ip = (const BYTE*)src;
+  const BYTE* const iend = ip + srcSize;
+  U32 cp = *ip32;
   int i;
 
 
   (void)dst; (void)dstSize;
 
-  while (ip <= iend-16)
+  while (ip32 <= ip32end-4)
   {
-    U32 c = cp,	d = *(U32*)(ip+=4); cp = *(U32*)(ip+=4);
+    U32 c = cp,	d = *(++ip32); cp = *(++ip32);
     c0[(BYTE) c    ]++;
     c1[(BYTE) d    ]++;
     c2[(BYTE)(c>>8)]++; c>>=16;
@@ -313,7 +318,7 @@ static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t 
     c2[ 	  c>>8 ]++;
     c3[ 	  d>>8 ]++;
 
-    c = cp;	d = *(U32*)(ip+=4); cp = *(U32*)(ip+=4);
+    c = cp;	d = *(++ip32); cp = *(++ip32);
     c0[(BYTE) c    ]++;
     c1[(BYTE) d    ]++;
     c2[(BYTE)(c>>8)]++; c>>=16;
@@ -323,6 +328,8 @@ static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t 
     c2[ 	  c>>8 ]++;
     c3[ 	  d>>8 ]++;
   }
+
+  ip = (const BYTE*)ip32;
   while(ip < iend) c0[*ip++]++;
 
   for(i = 0; i < 256; i++) c0[i] += c1[i]+c2[i]+c3[i];
@@ -336,6 +343,8 @@ static int local_hist_4_32v2(void* dst, size_t dstSize, const void* src, size_t 
 static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 c0[256+PAD]={0},c1[256+PAD]={0},c2[256+PAD]={0},c3[256+PAD]={0},c4[256+PAD]={0},c5[256+PAD]={0},c6[256+PAD]={0},c7[256+PAD]={0};
+    const U32* ip32 = (const U32*)src;
+    const U32* const ip32end = ip32 + (srcSize >> 2);
     const BYTE* ip = (BYTE*)src;
     const BYTE* const iend = (const BYTE*)src + srcSize;
     U32 cp = *(U32*)src;
@@ -343,9 +352,9 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
 
     (void)dst; (void)dstSize;
 
-    while( ip <= iend-16 )
+    while( ip32 <= ip32end - 4 )
     {
-        U32 c = cp,	d = *(U32 *)(ip+=4); cp = *(U32 *)(ip+=4);
+        U32 c = cp,	d = *(++ip32); cp = *(++ip32);
         c0[(unsigned char) c ]++;
         c1[(unsigned char) d ]++;
         c2[(unsigned char)(c>>8)]++; c>>=16;
@@ -354,7 +363,7 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
         c5[(unsigned char) d ]++;
         c6[ c>>8 ]++;
         c7[ d>>8 ]++;
-        c = cp;	d = *(unsigned *)(ip+=4); cp = *(unsigned *)(ip+=4);
+        c = cp,	d = *(++ip32); cp = *(++ip32);
         c0[(unsigned char) c ]++;
         c1[(unsigned char) d ]++;
         c2[(unsigned char)(c>>8)]++; c>>=16;
@@ -365,6 +374,7 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
         c7[ d>>8 ]++;
     }
 
+    ip = (const BYTE*) ip32;
     while(ip < iend) c0[*ip++]++;
     for(i = 0; i < 256; i++) c0[i] += c1[i]+c2[i]+c3[i]+c4[i]+c5[i]+c6[i]+c7[i];
 
@@ -388,31 +398,30 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
 #define COUNT_SIZE (256+16)
 static int local_count2x64v2(void* dst, size_t dstSize, const void* src0, size_t srcSize)
 {
+    const U64* src64 = (const U64*)src0;
+    const U64* src64end = src64 + (srcSize>>3);
     const BYTE* src = (const BYTE*)src0;
     U64 remainder = srcSize;
     U64 next0, next1;
 
     U32 count[16][COUNT_SIZE];
-    const BYTE *endSrc;
 
    (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
     if (srcSize < 32) goto handle_remainder;
 
     remainder = srcSize % 16;
-    srcSize -= (size_t)remainder;
-    endSrc = src + srcSize;
-    next0 = *(U64 *)(src + 0);
-    next1 = *(U64 *)(src + 8);
+    next0 = src64[0];
+    next1 = src64[1];
 
-    while (src != endSrc)
+    while (src64 != src64end)
     {
         U64 data0 = next0;
         U64 data1 = next1;
 
-        src += 16;
-        next0 = *(U64 *)(src + 0);
-        next1 = *(U64 *)(src + 8);
+        src64 += 2;
+        next0 = src64[0];
+        next1 = src64[1];
 
         C_INC_TABLES(data0, data1, count, 0);
 
@@ -435,7 +444,7 @@ handle_remainder:
         size_t i;
         for (i = 0; i < remainder; i++)
         {
-            U64 byte = src[i];
+            size_t byte = src[i];
             count[0][byte]++;
         }
 
@@ -485,6 +494,8 @@ handle_remainder:
 #define COUNT_SIZE (256+16)
 static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t srcSize)
 {
+    const U64* src64 = (const U64*)src0;
+    const U64* src64end = src64 + (srcSize >> 3);
     const BYTE* src = (const BYTE*)src0;
     U64 remainder = srcSize;
     if (srcSize < 32) goto handle_remainder;
@@ -496,19 +507,18 @@ static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t s
 
     remainder = srcSize % 16;
     srcSize -= remainder;
-    const BYTE *endSrc = src + srcSize;
-    U64 next0 = *(U64 *)(src + 0);
-    U64 next1 = *(U64 *)(src + 8);
+    U64 next0 = src64[0];
+    U64 next1 = src64[1];
 
-    while (src != endSrc)
+    while (src64 != src64end)
     {
         U64 byte0, byte1;
         U64 data0 = next0;
         U64 data1 = next1;
 
-        src += 16;
-        next0 = *(U64 *)(src + 0);
-        next1 = *(U64 *)(src + 8);
+        src64 += 2;
+        next0 = src64[0];
+        next1 = src64[1];
 
         ASM_INC_TABLES(data0, data1, byte0, byte1, 0, COUNT_SIZE * 4, count, 4);
 
@@ -533,7 +543,7 @@ static int local_count2x64(void* dst, size_t dstSize, const void* src0, size_t s
 
         for (i = 0; i < remainder; i++)
         {
-            U64 byte = src[i];
+            size_t byte = src[i];
             count[0][byte]++;
         }
 
