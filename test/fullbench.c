@@ -137,7 +137,7 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
         DISPLAY("Generating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
     }
 
-    // Build Table
+    /* Build Table */
     while (remaining)
     {
         unsigned n = (unsigned)(remaining * p);
@@ -146,10 +146,11 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
         end = pos + n;
         while (pos<end) table[pos++]=(char)s;
         s++;
+        if (s==255) s=0;   /* for compatibility with count254 test */
         remaining -= n;
     }
 
-    // Fill buffer
+    /* Fill buffer */
     while (op<oend)
     {
         const unsigned r = BMK_rand(&seed) & (PROBATABLESIZE-1);

@@ -453,7 +453,7 @@ static void FSE_emergencyDistrib(short* normalizedCounter, int maxSymbolValue, s
 }
 
 /* fallback distribution (corner case); compression will suffer a bit ; consider increasing table size */
-static void FSE_distribNpts(short* normalizedCounter, int maxSymbolValue, short points)
+void FSE_distribNpts(short* normalizedCounter, int maxSymbolValue, short points)
 {
     int s;
     int rank[5] = {0};
@@ -513,6 +513,54 @@ unsigned FSE_optimalTableLog(unsigned maxTableLog, size_t srcSize, unsigned maxS
 }
 
 
+typedef struct
+{
+    U32 id;
+    U32 count;
+} rank_t;
+
+int FSE_compareRankT(const void* r1, const void* r2)
+{
+    const rank_t* R1 = r1;
+    const rank_t* R2 = r2;
+
+    return 2 * (R1->count < R2->count) - 1;
+}
+
+static void FSE_adjustNormSlow(short* norm, int pointsToRemove, const unsigned* count, U32 maxSymbolValue)
+{
+    rank_t rank[FSE_MAX_SYMBOL_VALUE+1];
+    U32 s;
+
+    /* Init */
+    for (s=0; s<=maxSymbolValue; s++)
+    {
+        rank[s].id = s;
+        rank[s].count = count[s];
+        if (norm[s] <= 1) rank[s].count = 0;
+    }
+
+    /* Sort according to count */
+    qsort(rank, maxSymbolValue+1, sizeof(rank_t), FSE_compareRankT);
+
+    while(pointsToRemove)
+    {
+        int newRank = 1;
+        norm[rank[0].id]--;
+        rank[0].count = (rank[0].count * 3) >> 2;
+        if (norm[rank[0].id] == 1) rank[0].count = 0;
+        while (rank[newRank].count > rank[newRank-1].count)
+        {
+            rank_t r = rank[newRank-1];
+            rank[newRank-1] = rank[newRank];
+            rank[newRank] = r;
+            newRank++;
+        }
+        pointsToRemove--;
+    }
+}
+
+
 size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
                            const unsigned* count, size_t total,
                            unsigned maxSymbolValue)
@@ -565,8 +613,13 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
                 stillToDistribute -= proba;
             }
         }
-        if ((int)normalizedCounter[largest] <= -stillToDistribute+8)   /* largest cant accommodate that amount */
-            FSE_distribNpts(normalizedCounter, maxSymbolValue, (short)(-stillToDistribute));   /* Fallback */
+        //if ((int)normalizedCounter[largest] <= -stillToDistribute+8)
+        if (-stillToDistribute >= (normalizedCounter[largest] >> 1))
+        {
+            /* largest cant accommodate that amount */
+            FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
+            //FSE_distribNpts(normalizedCounter, maxSymbolValue, (short)(-stillToDistribute));   /* Fallback */
+        }
         else normalizedCounter[largest] += (short)stillToDistribute;
     }
 
