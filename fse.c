@@ -946,17 +946,17 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     CTable_max_t CTable;
     size_t errorCode;
 
-    // early out
+    /* early out */
     if (dstSize < FSE_compressBound(srcSize)) return (size_t)-FSE_ERROR_dstSize_tooSmall;
-    if (srcSize <= 1) return srcSize;  // Uncompressed or RLE
+    if (srcSize <= 1) return srcSize;  /* Uncompressed or RLE */
     if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
-    // Scan input and build symbol stats
+    /* Scan input and build symbol stats */
     errorCode = FSE_count (count, ip, srcSize, &maxSymbolValue);
     if (FSE_isError(errorCode)) return errorCode;
     if (errorCode == srcSize) return FSE_compressRLE (ostart, *istart);
-    if (errorCode < ((srcSize * 7) >> 10)) return 0;   // Heuristic : not compressible enough
+    if (errorCode < ((srcSize * 7) >> 10)) return 0;   /* Heuristic : not compressible enough */
 
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
     errorCode = FSE_normalizeCount (norm, tableLog, count, srcSize, maxSymbolValue);
@@ -1243,7 +1243,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
 
     if (op==omax) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* dst buffer is full, but cSrc unfinished */
 
-    return (size_t)-FSE_ERROR_GENERIC;
+    return (size_t)-FSE_ERROR_corruptionDetected;
 }
 
 

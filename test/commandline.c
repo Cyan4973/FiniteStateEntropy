@@ -44,7 +44,6 @@
 #include <string.h>   /* strcmp, strcat */
 #include "bench.h"
 #include "fileio.h"
-#include "lz4hce.h"   /* et_final */
 
 
 /***************************************************
@@ -299,8 +298,8 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)                ) badusage();
 
-    if (decode) decompress_file(output_filename, input_filename);
-    else compress_file(output_filename, input_filename);
+    if (decode) FIO_decompressFilename(output_filename, input_filename);
+    else FIO_compressFilename(output_filename, input_filename);
 
 _end:
     if (fse_pause) waitEnter();

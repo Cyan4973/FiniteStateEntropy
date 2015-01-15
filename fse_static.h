@@ -67,6 +67,7 @@ extern "C" {
         ITEM(FSE_OK_NoError) ITEM(FSE_ERROR_GENERIC) \
         ITEM(FSE_ERROR_tableLog_tooLarge) ITEM(FSE_ERROR_maxSymbolValue_tooLarge) \
         ITEM(FSE_ERROR_dstSize_tooSmall) ITEM(FSE_ERROR_srcSize_wrong)\
+        ITEM(FSE_ERROR_corruptionDetected) \
         ITEM(FSE_ERROR_maxCode)
 
 #define FSE_GENERATE_ENUM(ENUM) ENUM,
