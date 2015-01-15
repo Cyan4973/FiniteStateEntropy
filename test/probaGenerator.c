@@ -55,7 +55,7 @@
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
+static int   displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
 
 /**************************************
@@ -64,9 +64,9 @@ static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + resul
 static char* g_programName;
 
 
-//******************************
-// local functions
-//******************************
+/**************************************
+*  Local functions
+**************************************/
 static unsigned int GEN_rand (unsigned int* seed)
 {
     *seed =  ((*seed) * PRIME1) + PRIME2;
@@ -103,7 +103,7 @@ static void generate(void* buffer, size_t buffSize, double p)
     unsigned seed = 1;
 
     if (p==0.0) p=0.005;
-    DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
+    DISPLAY("Generating %u KB with P=%.2f%%\n", (unsigned)(buffSize >> 10), p*100);
 
     // Build Table
     while (remaining)
@@ -154,7 +154,5 @@ int main(int argc, char** argv)
 
     createSampleFile(filename, proba);
 
-    DISPLAY("Press enter to exit \n");
-    getchar();
     return 0;
 }

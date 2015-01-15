@@ -114,7 +114,7 @@ static unsigned FUZ_rand (unsigned* src)
 }
 
 
-static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
+static void generateU16 (U16* buffer, size_t buffSize, double p, U32 seedSrc)
 {
     U16 tableU16[PROBATABLESIZE];
     U32 remaining = PROBATABLESIZE;
@@ -123,6 +123,7 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
     U16* const oend = op + buffSize;
     U16 val16 = 240;
     U16 max16 = FSE_MAX_SYMBOL_VALUE;
+    U32 seed = seedSrc;
 
     /* Build Symbol Table */
     while (remaining)
@@ -138,7 +139,7 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32* seed)
     /* Fill buffer */
     while (op<oend)
     {
-        const U32 r = FUZ_rand (seed) & (PROBATABLESIZE-1);
+        const U32 r = FUZ_rand(&seed) & (PROBATABLESIZE-1);
         *op++ = tableU16[r];
     }
 }
@@ -158,7 +159,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
     U32 time = FUZ_GetMilliStart();
     U32 seed = startSeed;
 
-    generateU16 (bufferP8, BUFFERSIZE, 0.08, &seed);
+    generateU16 (bufferP8, BUFFERSIZE, 0.08, seed);
 
     if (startTestNb)
     {

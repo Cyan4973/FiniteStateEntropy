@@ -57,6 +57,9 @@ fuzzer32: fuzzer.c xxhash.c ../fse.c
 fuzzerU16: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
+fuzzerU16_32: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
+	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
@@ -67,21 +70,42 @@ probagen: probaGenerator.c
 	$(CC) $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
 	@echo Cleaning completed
 
-test: fullbench fullbench32 fuzzer fuzzer32 fuzzerU16
+test-fse: probagen fse
+	./probagen 20%
+	./fse -f proba.bin -o tmp
+	./fse -df tmp -o result
+	diff proba.bin result
+	rm result
+	rm proba.bin
+	rm tmp
+
+test: test-fse fullbench fuzzer fuzzerU16
 	./fuzzer
 	./fullbench -i1
+	./fuzzerU16
+
+test-fse32: probagen fse32
+	./probagen 20%
+	./fse32 -f proba.bin -o tmp
+	./fse32 -df tmp -o result
+	diff proba.bin result
+	rm result
+	rm tmp
+	rm proba.bin
+
+test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32
 	./fuzzer32
 	./fullbench32 -i1
-	./fuzzerU16
+	./fuzzerU16_32
 
 memtest: fuzzer fullbench
 	valgrind --leak-check=yes ./fuzzer -i256
 	valgrind --leak-check=yes ./fullbench -i1
 	valgrind --leak-check=yes ./fuzzerU16 -i128
 
-test-all: test memtest
+test-all: test test32 memtest
 	@echo test completed
 
