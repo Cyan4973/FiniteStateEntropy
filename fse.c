@@ -61,6 +61,24 @@
 
 
 /****************************************************************
+*  Compiler specifics
+****************************************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#  define FORCE_INLINE static __forceinline
+#  include <intrin.h>                    /* For Visual 2005 */
+#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
+#else
+#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+#  ifdef __GNUC__
+#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  else
+#    define FORCE_INLINE static inline
+#  endif
+#endif
+
+
+/****************************************************************
 *  Includes
 ****************************************************************/
 #include <stdlib.h>     /* malloc, free, qsort */
@@ -203,24 +221,6 @@ static void FSE_writeLEST(void* memPtr, size_t val)
 #define FSE_TABLELOG_ABSOLUTE_MAX 15
 #if FSE_MAX_TABLELOG > FSE_TABLELOG_ABSOLUTE_MAX
 #error "FSE_MAX_TABLELOG > FSE_TABLELOG_ABSOLUTE_MAX is not supported"
-#endif
-
-
-/****************************************************************
-*  Compiler specifics
-****************************************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    /* For Visual 2005 */
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
-#else
-#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  else
-#    define FORCE_INLINE static inline
-#  endif
 #endif
 
 
