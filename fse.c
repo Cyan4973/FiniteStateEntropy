@@ -250,7 +250,7 @@ typedef struct
 /****************************************************************
 *  Internal functions
 ****************************************************************/
-FORCE_INLINE unsigned FSE_highbit (register U32 val)
+FORCE_INLINE unsigned FSE_highbit32 (register U32 val)
 {
 #   if defined(_MSC_VER)   /* Visual */
     unsigned long r;
@@ -602,8 +602,8 @@ unsigned FSE_optimalTableLog(unsigned maxTableLog, size_t srcSize, unsigned maxS
 {
     U32 tableLog = maxTableLog;
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
-    if ((FSE_highbit((U32)(srcSize - 1)) - 2) < tableLog) tableLog = FSE_highbit((U32)(srcSize - 1)) - 2;   /* Accuracy can be reduced */
-    if ((FSE_highbit(maxSymbolValue)+1) > tableLog) tableLog = FSE_highbit(maxSymbolValue)+1;   /* Need a minimum to safely represent all symbol values */
+    if ((FSE_highbit32((U32)(srcSize - 1)) - 2) < tableLog) tableLog = FSE_highbit32((U32)(srcSize - 1)) - 2;   /* Accuracy can be reduced */
+    if ((FSE_highbit32(maxSymbolValue)+1) > tableLog) tableLog = FSE_highbit32(maxSymbolValue)+1;   /* Need a minimum to safely represent all symbol values */
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) tableLog = FSE_MAX_TABLELOG;
     return tableLog;
@@ -733,6 +733,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
 }
 
 
+/* fake CTable, for raw (uncompressed) input */
 size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits)
 {
     const unsigned tableSize = 1 << nbBits;
@@ -766,6 +767,7 @@ size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits)
 }
 
 
+/* fake CTable, for rle (100% always same symbol) input */
 size_t FSE_buildCTable_rle (void* CTable, BYTE symbolValue)
 {
     const unsigned tableSize = 1;
@@ -797,7 +799,7 @@ size_t FSE_buildCTable_rle (void* CTable, BYTE symbolValue)
 void FSE_initCStream(FSE_CStream_t* bitC, void* start)
 {
     bitC->bitContainer = 0;
-    bitC->bitPos = 3;   /* reserved for unusedBits */
+    bitC->bitPos = 0;   /* reserved for unusedBits */
     bitC->startPtr = (char*)start;
     bitC->ptr = bitC->startPtr;
 }
@@ -847,16 +849,12 @@ void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtr)
 size_t FSE_closeCStream(FSE_CStream_t* bitC)
 {
     char* endPtr;
-    U32 unusedBits;
 
+    FSE_addBits(bitC, 1, 1);
     FSE_flushBits(bitC);
 
     endPtr = bitC->ptr;
     endPtr += bitC->bitPos > 0;
-    unusedBits = 8-bitC->bitPos;
-    if (unusedBits==8) unusedBits = 0;
-
-    bitC->startPtr[0] += (BYTE)unusedBits;
 
     return (endPtr - bitC->startPtr);
 }
@@ -1061,13 +1059,17 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
 
     if (srcSize >=  sizeof(bitD_t))
     {
+        U32 contain32;
         bitD->start = (char*)srcBuffer;
         bitD->ptr   = (char*)srcBuffer + srcSize - sizeof(bitD_t);
         bitD->bitContainer = FSE_readLEST(bitD->ptr);
-        bitD->bitsConsumed = *(bitD->start) & 7;
+        contain32 = ((BYTE*)srcBuffer)[srcSize-1];
+        if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
+        bitD->bitsConsumed = 8 - FSE_highbit32(contain32);
     }
     else
     {
+        U32 contain32;
         bitD->start = (char*)srcBuffer;
         bitD->ptr   = bitD->start;
         bitD->bitContainer = *(BYTE*)(bitD->start);
@@ -1081,7 +1083,9 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
             case 2: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[1]) <<  8;
             default:;
         }
-        bitD->bitsConsumed = *(bitD->start) & 7;
+        contain32 = ((BYTE*)srcBuffer)[srcSize-1];
+        if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
+        bitD->bitsConsumed = 8 - FSE_highbit32(contain32);
         bitD->bitsConsumed += (U32)(sizeof(bitD_t) - srcSize)*8;
     }
 
@@ -1120,8 +1124,8 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
     }
     if (bitD->ptr == bitD->start)
     {
-        if (bitD->bitsConsumed < sizeof(bitD_t)*8 - 3) return 1;
-        if (bitD->bitsConsumed == sizeof(bitD_t)*8 - 3) return 2;
+        if (bitD->bitsConsumed < sizeof(bitD_t)*8) return 1;
+        if (bitD->bitsConsumed == sizeof(bitD_t)*8) return 2;
         return 3;
     }
     {
@@ -1475,10 +1479,10 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
                 symbolTT[s].minBitsOut = (BYTE)tableLog;
                 symbolTT[s].deltaFindState = total - 1;
                 total ++;
-                symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   // ensures state <= maxState
+                symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   /* ensures state <= maxState */
                 break;
             default :
-                symbolTT[s].minBitsOut = (BYTE)( (tableLog-1) - FSE_highbit (normalizedCounter[s]-1) );
+                symbolTT[s].minBitsOut = (BYTE)( (tableLog-1) - FSE_highbit32 (normalizedCounter[s]-1) );
                 symbolTT[s].deltaFindState = total - normalizedCounter[s];
                 total +=  normalizedCounter[s];
                 symbolTT[s].maxState = (U16)( (normalizedCounter[s] << (symbolTT[s].minBitsOut+1)) - 1);
@@ -1560,7 +1564,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         {
             FSE_FUNCTION_TYPE symbol = tableDecode[i].symbol;
             U16 nextState = symbolNext[symbol]++;
-            tableDecode[i].nbBits = (BYTE) (tableLog - FSE_highbit (nextState) );
+            tableDecode[i].nbBits = (BYTE) (tableLog - FSE_highbit32 ((U32)nextState) );
             tableDecode[i].newState = (U16) ( (nextState << tableDecode[i].nbBits) - tableSize);
         }
     }

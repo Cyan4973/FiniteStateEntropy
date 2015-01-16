@@ -390,9 +390,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                size_t errorCode = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
-                if (FSE_isError(errorCode)) { DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb); return; }
-                chunkP[chunkNb].compressedSize = errorCode;
+                size_t cBSize = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                if (FSE_isError(cBSize)) { DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb); return; }
+                chunkP[chunkNb].compressedSize = cBSize;
             }
             nbLoops++;
         }
@@ -416,14 +416,23 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                size_t errorCode;
-                if (chunkP[chunkNb].compressedSize == 1)
-                    errorCode = FSE_decompressRLE(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
-                else
-                    errorCode = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
-                if (errorCode != chunkP[chunkNb].origSize)
+                size_t regenSize;
+                switch(chunkP[chunkNb].compressedSize)
                 {
-                    DISPLAY("!!! Error decompressing block %i  !!!!    \n", chunkNb);
+                case 0:
+                    regenSize = chunkP[chunkNb].origSize;
+                    memcpy(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origBuffer, regenSize);
+                    break;
+                case 1:
+                    regenSize = FSE_decompressRLE(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                    break;
+                default:
+                    regenSize = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                }
+
+                if (regenSize != chunkP[chunkNb].origSize)
+                {
+                    DISPLAY("!!! Error decompressing block %i !!!! => (%s)   \n", chunkNb, FSE_getErrorName(regenSize));
                     return;
                 }
             }
