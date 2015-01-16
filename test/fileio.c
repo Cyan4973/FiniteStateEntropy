@@ -438,7 +438,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     /* Main Loop */
     while (1)
     {
-        size_t toReadSize, readSize, bType, rSize, cSize;
+        size_t toReadSize, readSize, bType, rSize=0, cSize;
 
         /* Decode header */
         bType = (ip[0] & (BIT7+BIT6)) >> 6;

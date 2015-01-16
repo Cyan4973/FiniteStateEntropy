@@ -273,10 +273,12 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            const void* rawPtr = chunkP[chunkNb].origBuffer;
-            const U16* U16chunkPtr = (const U16*) rawPtr;
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
+            {
+                const void* rawPtr = chunkP[chunkNb].origBuffer;
+                const U16* U16chunkPtr = (const U16*) rawPtr;
                 chunkP[chunkNb].compressedSize = FSE_compressU16(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize, U16chunkPtr, chunkP[chunkNb].origSize/2, 0, memLog);
+            }
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
