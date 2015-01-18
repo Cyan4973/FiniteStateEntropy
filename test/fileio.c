@@ -1,6 +1,7 @@
 /*
   fileio.c - simple generic file i/o handler
-  Copyright (C) Yann Collet 2013-2014
+  Copyright (C) Yann Collet 2013-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -18,6 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
+  - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
   - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -27,39 +29,37 @@
   The license of this library is GPLv2.
 */
 
-//**************************************
-// Tuning parameters
-//**************************************
-
-
-//**************************************
-// Compiler Options
-//**************************************
-// Disable some Visual warning messages
-#ifdef _MSC_VER  // Visual Studio
+/**************************************
+*  Compiler Options
+**************************************/
+/* Disable some Visual warning messages */
+#ifdef _MSC_VER
 #  define _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_DEPRECATE     // VS2005
-#  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
+#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
+#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #endif
 
-#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
-#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+
+#define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
+#define _POSIX_SOURCE 1        /* enable fileno() within <stdio.h> on unix */
 
 
-//****************************
-// Includes
-//****************************
-#include <stdio.h>    // fprintf, fopen, fread, _fileno, stdin, stdout
-#include <stdlib.h>   // malloc
-#include <string.h>   // strcmp, strlen
+/**************************************
+*  Includes
+**************************************/
+#include <stdio.h>    /* fprintf, fopen, fread, _fileno, stdin, stdout */
+#include <stdlib.h>   /* malloc, free */
+#include <string.h>   /* strcmp, strlen */
+#include <time.h>     /* clock */
 #include "fileio.h"
 #include "fse.h"
 #include "xxhash.h"
 
 
-//****************************
-// OS-specific Includes
-//****************************
+/**************************************
+*  OS-specific Includes
+**************************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>    // _O_BINARY
 #  include <io.h>       // _setmode, _isatty
@@ -75,30 +75,10 @@
 #endif
 
 
-//**************************************
-// Compiler-specific functions
-//**************************************
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
-#if defined(_MSC_VER)    // Visual Studio
-#  define swap32 _byteswap_ulong
-#elif GCC_VERSION >= 403
-#  define swap32 __builtin_bswap32
-#else
-  static inline unsigned int swap32(unsigned int x)
-  {
-    return ((x << 24) & 0xff000000 ) |
-           ((x <<  8) & 0x00ff0000 ) |
-           ((x >>  8) & 0x0000ff00 ) |
-           ((x >> 24) & 0x000000ff );
-  }
-#endif
-
-
-//**************************************
-// Basic Types
-//**************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+/**************************************
+*  Basic Types
+**************************************/
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
 typedef uint8_t  BYTE;
 typedef uint16_t U16;
@@ -114,9 +94,9 @@ typedef unsigned long long  U64;
 #endif
 
 
-//****************************
-// Constants
-//****************************
+/**************************************
+*  Constants
+**************************************/
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define GB *(1U<<30)
@@ -125,45 +105,75 @@ typedef unsigned long long  U64;
 #define _2BITS 0x03
 #define _3BITS 0x07
 #define _4BITS 0x0F
+#define _6BITS 0x3F
 #define _8BITS 0xFF
 
-#define MAGICNUMBER_SIZE   4
-#define FSE_MAGIC_NUMBER   0x183E2307
+#define BIT6  0x40
+#define BIT7  0x80
 
-#define CACHELINE 64
-#define FSE_BLOCKSIZEID_DEFAULT  5
-#define FSE_BUFFERSIZEID_DEFAULT 5
+static const unsigned FIO_magicNumber = 0x183E2308;
+static const unsigned FIO_maxBlockSizeID = 0xB;   /* => 2MB block */
+static const unsigned FIO_blockHeaderSize = 3;
+
+#define FIO_FRAMEHEADERSIZE 5        /* as a define, because needed to allocated table on stack */
+#define FIO_BLOCKSIZEID_DEFAULT  5   /* as a define, because needed to init static g_blockSizeId */
 #define FSE_CHECKSUM_SEED        0
 
-
-//**************************************
-// Architecture Macros
-//**************************************
-static const int one = 1;
-#define CPU_LITTLE_ENDIAN   (*(char*)(&one))
-#define CPU_BIG_ENDIAN      (!CPU_LITTLE_ENDIAN)
-#define LITTLE_ENDIAN_32(i) (CPU_LITTLE_ENDIAN?(i):swap32(i))
+#define CACHELINE 64
 
 
-//**************************************
-// Macros
-//**************************************
+/**************************************
+*  Complex types
+**************************************/
+typedef enum { bt_compressed, bt_raw, bt_rle, bt_crc } bType_t;
+
+
+/**************************************
+*  Memory operations
+**************************************/
+static void FIO_writeLE32(void* memPtr, U32 val32)
+{
+    BYTE* p = memPtr;
+    p[0] = (BYTE)val32;
+    p[1] = (BYTE)(val32>>8);
+    p[2] = (BYTE)(val32>>16);
+    p[3] = (BYTE)(val32>>24);
+}
+
+static U32 FIO_readLE32(const void* memPtr)
+{
+    const BYTE* p = memPtr;
+    return (U32)((U32)p[0] + ((U32)p[1]<<8) + ((U32)p[2]<<16) + ((U32)p[3]<<24));
+}
+
+
+/**************************************
+*  Macros
+**************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
+
+#define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
+            if ((FIO_GetMilliSpan(g_time) > refreshRate) || (g_displayLevel>=4)) \
+            { g_time = clock(); DISPLAY(__VA_ARGS__); \
+            if (g_displayLevel>=4) fflush(stdout); } }
+static const unsigned refreshRate = 150;
+static clock_t g_time = 0;
 
 
-//**************************************
-// Local Parameters
-//**************************************
-static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
-static int   overwrite = 0;
-static int   globalBlockSizeId = FSE_BLOCKSIZEID_DEFAULT;
-static int   bufferSizeId = FSE_BUFFERSIZEID_DEFAULT;
+/**************************************
+*  Local Parameters
+**************************************/
+static U32 g_overwrite = 0;
+static U32 g_blockSizeId = FIO_BLOCKSIZEID_DEFAULT;
+
+void FIO_overwriteMode(void) { g_overwrite=1; }
 
 
-//**************************************
-// Exceptions
-//**************************************
+/**************************************
+*  Exceptions
+**************************************/
 #define DEBUG 0
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
 #define EXM_THROW(error, ...)                                             \
@@ -176,27 +186,27 @@ static int   bufferSizeId = FSE_BUFFERSIZEID_DEFAULT;
 }
 
 
-//**************************************
-// Version modifiers
-//**************************************
+/**************************************
+*  Version modifiers
+**************************************/
 #define DEFAULT_COMPRESSOR    FSE_compress
 #define DEFAULT_DECOMPRESSOR  FSE_decompress
 
 
-//**************************************
-// Parameters
-//**************************************
-void FIO_overwriteMode(void) { overwrite=1; }
+/**************************************
+*  Functions
+**************************************/
+static unsigned FIO_GetMilliSpan(clock_t nPrevious)
+{
+    clock_t nCurrent = clock();
+    unsigned nSpan = (unsigned)(((nCurrent - nPrevious) * 1000) / CLOCKS_PER_SEC);
+    return nSpan;
+}
+
+static int FIO_GetBlockSize_FromBlockId   (int id) { return (1 << id) KB; }
 
 
-//****************************
-// Functions
-//****************************
-static int          FIO_GetBlockSize_FromBlockId   (int id) { return (1 << id) KB; }
-static int          FIO_GetBufferSize_FromBufferId (int id) { return (1 << (id + 5)) KB; }
-
-
-int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, FILE** pfoutput)
+static void get_fileHandle(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
     if (!strcmp (input_filename, stdinmark))
     {
@@ -217,16 +227,17 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
     }
     else
     {
-        // Check if destination file already exists
+        /* Check if destination file already exists */
         *pfoutput=0;
         if (strcmp(output_filename,nulmark)) *pfoutput = fopen( output_filename, "rb" );
         if (*pfoutput!=0)
         {
             fclose(*pfoutput);
-            if (!overwrite)
+            if (!g_overwrite)
             {
                 char ch;
-                if (displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   // No interaction possible
+                if (g_displayLevel <= 1)   /* No interaction possible */
+                    EXM_THROW(11, "Operation aborted : %s already exists", output_filename);
                 DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 DISPLAYLEVEL(2, "Overwrite ? (Y/N) : ");
                 ch = (char)getchar();
@@ -238,36 +249,28 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
 
     if ( *pfinput==0 ) EXM_THROW(12, "Pb opening %s", input_filename);
     if ( *pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
-
-    return 0;
 }
 
 
 /*
-Compression format :
-MAGICNUMBER - STREAMDESCRIPTOR - MULTIBLOCKHEADER - (LASTBLOCKSIZE) - COMPRESSEDBLOCK - STREAMCRC
-MAGICNUMBER - 4 bytes value, 0x183E2301, little endian
+Compressed format :
+MAGICNUMBER - STREAMDESCRIPTOR - BLOCKHEADER - COMPRESSEDBLOCK - STREAMCRC
+MAGICNUMBER - 4 bytes value, 0x183E2308, big endian
 STREAMDESCRIPTOR
     1 byte value :
-    bits 0-3 : block size, 2^value from 0 to 0xF, with 5=>32 KB (0=>1KB, 0xF=>32MB)
-    bits 4-7 = 0 : reserved; All blocks must be full, except last one
-MULTIBLOCKHEADER
-    1 byte value :
-    if 0 : next block is the last, (BLOCKSIZE) will be provided
-    if >0 : the next n blocks are full ones
-(LASTBLOCKSIZE)
-    n bytes value :
-    provided for last block only.
-    gives the uncompressed size of last block; necessarily <= block size
-    the number of bytes required depends on block size (ex : for 32KB blocks, n=2)
+    bits 0-3 : max block size, 2^value from 0 to 0xF, with 5=>32 KB (min 0=>1KB, max 0xA=>1MB)
+    bits 4-7 = 0 : reserved;
+BLOCKHEADER
+    3 bytes value :
+    bits 6-7 : blockType (compressed, raw, rle, crc (end of Frame)
+    rest : big endian : size of compressed block. (note : max is 2^21 == 2 MB) (or original size if rle)
 COMPRESSEDBLOCK
-    the compressed data itself. Note that its size is not provided. Maximum size is Blocksize+1
+    the compressed data itself.
 STREAMCRC
-    4 bytes xxh32() value of the original data.
+    22 bits (xxh32() >> 5) checksum of the original data.
 */
-int compress_file(char* output_filename, char* input_filename)
+unsigned long long FIO_compressFilename(const char* output_filename, const char* input_filename)
 {
-    int (*compressionFunction)(void*, const unsigned char*, unsigned) = DEFAULT_COMPRESSOR;
     U64 filesize = 0;
     U64 compressedfilesize = 0;
     char* in_buff;
@@ -275,220 +278,241 @@ int compress_file(char* output_filename, char* input_filename)
     FILE* finput;
     FILE* foutput;
     size_t sizeCheck;
-    size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(globalBlockSizeId);
-    size_t inputBufferSize = FIO_GetBufferSize_FromBufferId(bufferSizeId);
-    int nbBlocksPerBuffer;
-    int lastBlockDone=0;
-    void* hashCtx = XXH32_init(FSE_CHECKSUM_SEED);
+    size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(g_blockSizeId);
+    XXH32_state_t xxhState;
 
 
-    // Init
+    /* Init */
+    XXH32_reset (&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
-    // Allocate Memory
-    if (inputBufferSize < inputBlockSize) inputBufferSize = inputBlockSize;
-    nbBlocksPerBuffer = (int)((inputBufferSize + (inputBlockSize-1)) / inputBlockSize);
-    in_buff  = (char*)malloc(inputBufferSize);
-    out_buff = (char*)malloc(nbBlocksPerBuffer * FSE_compressBound((int)inputBlockSize) + CACHELINE);
+    /* Allocate Memory */
+    in_buff  = (char*)malloc(inputBlockSize);
+    out_buff = (char*)malloc(FSE_compressBound(inputBlockSize) + FIO_blockHeaderSize);
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
 
-    // Write Archive Header
-    *(U32*)out_buff = LITTLE_ENDIAN_32(FSE_MAGIC_NUMBER);   // Magic Number
-    out_buff[4] = (char)globalBlockSizeId;                  // Block Size descriptor
-    sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE+1, foutput);
-    if (sizeCheck!=MAGICNUMBER_SIZE+1) EXM_THROW(22, "Write error : cannot write header");
-    compressedfilesize += MAGICNUMBER_SIZE+1;
+    /* Write Frame Header */
+    FIO_writeLE32(out_buff, FIO_magicNumber);
+    out_buff[4] = (char)g_blockSizeId;          /* Max Block Size descriptor */
+    sizeCheck = fwrite(out_buff, 1, FIO_FRAMEHEADERSIZE, foutput);
+    if (sizeCheck!=FIO_FRAMEHEADERSIZE) EXM_THROW(22, "Write error : cannot write header");
+    compressedfilesize += FIO_FRAMEHEADERSIZE;
 
-    // Main Loop
+    /* Main compression loop */
     while (1)
     {
-        // Fill input Buffer
-        int outSize;
-        size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBufferSize, finput);
-        if ((inSize==0) && (lastBlockDone)) break;
+        /* Fill input Buffer */
+        size_t cSize;
+        size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBlockSize, finput);
+        if (inSize==0) break;
         filesize += inSize;
-        XXH32_update(hashCtx, in_buff, (int)inSize);
-        DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
+        XXH32_update(&xxhState, in_buff, inSize);
+        DISPLAYUPDATE(2, "\rRead : %u MB   ", (U32)(filesize>>20));
 
-        // Compress Blocks
+        /* Compress Block */
+        cSize = FSE_compress(out_buff + FIO_blockHeaderSize, FSE_compressBound(inputBlockSize), in_buff, inSize);
+        if (FSE_isError(cSize)) EXM_THROW(23, "Compression error : %s ", FSE_getErrorName(cSize));
+
+        /* Write cBlock */
+        switch(cSize)
         {
-            const char* ip = in_buff;
-            char* op = out_buff+1;
-            int nbFullBlocks = (int)(inSize / inputBlockSize);
-            int i;
-            *(BYTE*)out_buff = (BYTE)nbFullBlocks;
-            for (i=0; i<nbFullBlocks; i++)
-            {
-                int errorCode = compressionFunction(op, (unsigned char*)ip, (int)inputBlockSize);
-                if (errorCode==-1) EXM_THROW(22, "Compression error");
-                op += errorCode;
-                ip += inputBlockSize;
-            }
-            if (((nbFullBlocks * inputBlockSize) < inSize) || (!inSize))  // last Block
-            {
-                int errorCode;
-                int nbBytes = ((globalBlockSizeId+10)/8) + 1;   // nb Bytes to describe last block size
-                int lastBlockSize = (int)inSize & (inputBlockSize-1);
-                if (nbFullBlocks) *op++= 0;               // Last block flag, useless if nbFullBlocks==0
-                *(U32*)op = LITTLE_ENDIAN_32((U32)lastBlockSize); op+= nbBytes;
-                errorCode = compressionFunction(op, (unsigned char*)ip, lastBlockSize);
-                if (errorCode==-1) EXM_THROW(22, "Compression error, last block");
-                op += errorCode;
-                ip +=  lastBlockSize;
-                lastBlockDone=1;
-            }
-            outSize = (int)(op - out_buff);
-            compressedfilesize += outSize;
-            DISPLAYLEVEL(3, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        case 0: /* raw */
+            out_buff[2] = (BYTE)inSize;
+            out_buff[1] = (BYTE)(inSize >> 8);
+            out_buff[0] = (BYTE)((inSize >> 16) + (bt_raw << 6));
+            sizeCheck = fwrite(out_buff, 1, FIO_blockHeaderSize, foutput);
+            if (sizeCheck!=(size_t)(FIO_blockHeaderSize)) EXM_THROW(24, "Write error : cannot write block header");
+            sizeCheck = fwrite(in_buff, 1, inSize, foutput);
+            if (sizeCheck!=(size_t)(inSize)) EXM_THROW(25, "Write error : cannot write block");
+            compressedfilesize += inSize + FIO_blockHeaderSize;
+            break;
+        case 1: /* rle */
+            out_buff[2] = (BYTE)inSize;
+            out_buff[1] = (BYTE)(inSize >> 8);
+            out_buff[0] = (BYTE)((inSize >> 16) + (bt_rle << 6));
+            out_buff[3] = in_buff[0];
+            sizeCheck = fwrite(out_buff, 1, FIO_blockHeaderSize+1, foutput);
+            if (sizeCheck!=(size_t)(FIO_blockHeaderSize+1)) EXM_THROW(26, "Write error : cannot write rle block");
+            compressedfilesize += FIO_blockHeaderSize + 1;
+            break;
+        default : /* compressed */
+            out_buff[2] = (BYTE)cSize;
+            out_buff[1] = (BYTE)(cSize >> 8);
+            out_buff[0] = (BYTE)((cSize >> 16) + (bt_compressed << 6));
+            sizeCheck = fwrite(out_buff, 1, FIO_blockHeaderSize+cSize, foutput);
+            if (sizeCheck!=(size_t)(FIO_blockHeaderSize+cSize)) EXM_THROW(27, "Write error : cannot write rle block");
+            compressedfilesize += FIO_blockHeaderSize + cSize;
+            break;
         }
 
-        // Write Block
-        sizeCheck = fwrite(out_buff, 1, outSize, foutput);
-        if (sizeCheck!=(size_t)(outSize)) EXM_THROW(23, "Write error : cannot write compressed block");
+        DISPLAYUPDATE(2, "\rRead : %u MB  ==> %.2f%%   ", (U32)(filesize>>20), (double)compressedfilesize/filesize*100);
     }
 
-    // Checksum
-    *(U32*)out_buff = LITTLE_ENDIAN_32(XXH32_digest(hashCtx));
-    compressedfilesize += 4;
-    sizeCheck = fwrite(out_buff, 1, 4, foutput);
-    if (sizeCheck!=4) EXM_THROW(24, "Write error : cannot write checksum");
+    /* Checksum */
+    {
+        U32 checksum = XXH32_digest(&xxhState);
+        checksum = (checksum >> 5) & ((1U<<22)-1);
+        out_buff[2] = (BYTE)checksum;
+        out_buff[1] = (BYTE)(checksum >> 8);
+        out_buff[0] = (BYTE)((checksum >> 16) + (bt_crc << 6));
+        sizeCheck = fwrite(out_buff, 1, FIO_blockHeaderSize, foutput);
+        if (sizeCheck!=FIO_blockHeaderSize) EXM_THROW(28, "Write error : cannot write checksum");
+        compressedfilesize += FIO_blockHeaderSize;
+    }
 
-    // Status
+    /* Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
 
-    // Close & Free
+    /* clean */
     free(in_buff);
     free(out_buff);
     fclose(finput);
     fclose(foutput);
 
-    return 0;
+    return compressedfilesize;
 }
 
 
-#define HEADERSIZE 5
-unsigned long long decompress_file(char* output_filename, char* input_filename)
+/*
+Compressed format :
+MAGICNUMBER - STREAMDESCRIPTOR - BLOCKHEADER - COMPRESSEDBLOCK - STREAMCRC
+MAGICNUMBER - 4 bytes value, 0x183E2308, big endian
+STREAMDESCRIPTOR
+    1 byte value :
+    bits 0-3 : max block size, 2^value from 0 to 0xF, with 5=>32 KB (min 0=>1KB, max 0xA=>1MB)
+    bits 4-7 = 0 : reserved;
+BLOCKHEADER
+    3 bytes value :
+    bits 6-7 : blockType (compressed, raw, rle, crc (end of Frame)
+    rest : big endian : size of compressed block. (note : max is 2^21 == 2 MB) (or original size if rle)
+COMPRESSEDBLOCK
+    the compressed data itself.
+STREAMCRC
+    22 bits (xxh32() >> 5) checksum of the original data.
+*/
+unsigned long long FIO_decompressFilename(const char* output_filename, const char* input_filename)
 {
     FILE* finput, *foutput;
     U64   filesize = 0;
-    char  header[HEADERSIZE];
-    char* in_buff;
-    char* out_buff;
-    char* ip;
-    char* ifill;
-    char* iend;
+    U32   header32[(FIO_FRAMEHEADERSIZE+3) >> 2];
+    BYTE* header = (BYTE*)header32;
+    BYTE* in_buff;
+    BYTE* out_buff;
+    BYTE* ip;
     U32   blockSize;
-    int   blockSizeId;
+    U32   blockSizeId;
     size_t sizeCheck;
     U32   magicNumber;
-    U32*  magicNumberP = (U32*) header;
+    U32*  magicNumberP = header32;
     size_t inputBufferSize;
-    int nbFullBlocks = 0;
-    void* hashCtx = XXH32_init(FSE_CHECKSUM_SEED);
+    XXH32_state_t xxhState;
 
 
-    // Init
+    /* Init */
+    XXH32_reset(&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
-    // Read and then check header
-    sizeCheck = fread(header, (size_t)1, HEADERSIZE, finput);
-    if (sizeCheck != HEADERSIZE) EXM_THROW(30, "Read error : cannot read header\n");
+    /* check header */
+    sizeCheck = fread(header, (size_t)1, FIO_FRAMEHEADERSIZE, finput);
+    if (sizeCheck != FIO_FRAMEHEADERSIZE) EXM_THROW(30, "Read error : cannot read header\n");
 
-    magicNumber = LITTLE_ENDIAN_32(*magicNumberP);
-    if (magicNumber != FSE_MAGIC_NUMBER) EXM_THROW(31, "Wrong file type : unrecognised header\n");
+    magicNumber = FIO_readLE32(magicNumberP);
+    if (magicNumber != FIO_magicNumber) EXM_THROW(31, "Wrong file type : unknown header\n");
     blockSizeId = header[4];
-    if (blockSizeId > 0xF) EXM_THROW(32, "Wrong version : unrecognised header flags\n");
+    if (blockSizeId > FIO_maxBlockSizeID) EXM_THROW(32, "Wrong version : unknown header flags\n");
     blockSize = FIO_GetBlockSize_FromBlockId(blockSizeId);
 
-    // Allocate Memory
-    inputBufferSize = FIO_GetBufferSize_FromBufferId(bufferSizeId);
-    if (inputBufferSize < 2* blockSize) inputBufferSize = 2*blockSize;   // Minimum input buffer size
-    in_buff  = (char*)malloc(inputBufferSize);
-    out_buff = (char*)malloc(blockSize);
+    /* Allocate Memory */
+    inputBufferSize = blockSize + FIO_blockHeaderSize;
+    in_buff  = malloc(inputBufferSize);
+    out_buff = malloc(blockSize);
     if (!in_buff || !out_buff) EXM_THROW(33, "Allocation error : not enough memory");
     ip = in_buff;
-    ifill = ip;
-    iend = ip + inputBufferSize;
 
-    // Main Loop
+    /* read first bHeader */
+    sizeCheck = fread(in_buff, 1, FIO_blockHeaderSize, finput);
+    if (sizeCheck != FIO_blockHeaderSize) EXM_THROW(34, "Read error : cannot read header\n");
+
+    /* Main Loop */
     while (1)
     {
-        size_t toReadSize, readSize;
+        size_t toReadSize, readSize, bType, rSize=0, cSize;
 
-        // Fill input buffer
-        toReadSize = iend-ifill;
-        readSize = fread(ifill, 1, toReadSize, finput);
-        if ((readSize != toReadSize) && ferror(finput)) EXM_THROW(34, "Read error");
-
-        // Decode while enough data
-        while ((size_t)(iend-ip) > (size_t)FSE_compressBound(blockSize))
+        /* Decode header */
+        bType = (ip[0] & (BIT7+BIT6)) >> 6;
+        if (bType == bt_crc) break;   /* end - frame content CRC */
+        switch(bType)
         {
-            size_t writeSizeCheck;
-            int errorCode;
-            if (nbFullBlocks == 0)
-            {
-                nbFullBlocks = *ip++;
-                if (!nbFullBlocks) goto _lastBlock;   // goto last block
-            }
-            errorCode = FSE_decompress((unsigned char*)out_buff, blockSize, ip);
-            if (errorCode == -1) EXM_THROW(33, "Decoding error : compressed data block corrupted");
-            ip += errorCode;
-            filesize += blockSize;
-            nbFullBlocks--;
-
-            writeSizeCheck = fwrite(out_buff, 1, blockSize, foutput);
-            if (writeSizeCheck != blockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
-            XXH32_update(hashCtx, out_buff, blockSize);
+          case bt_compressed :
+          case bt_raw :
+            cSize = ip[2] + (ip[1]<<8) + ((ip[0] & _6BITS) << 16);
+            break;
+          case bt_rle :
+            cSize = 1;
+            rSize = ip[2] + (ip[1]<<8) + ((ip[0] & _6BITS) << 16);
+            break;
+          default :
+            EXM_THROW(35, "unknown block header");   /* should not happen */
         }
 
-        // move remaining data to beginning of buffer
+        /* Fill input buffer */
+        toReadSize = cSize + FIO_blockHeaderSize;
+        readSize = fread(in_buff, 1, toReadSize, finput);
+        if (readSize != toReadSize) EXM_THROW(36, "Read error");
+        ip = in_buff + cSize;
+
+        /* Decode block */
+        switch(bType)
         {
-            size_t toCopy = iend-ip;
-            memcpy(in_buff, ip, toCopy);
-            ifill = in_buff + toCopy;
-            ip = in_buff;
+          case bt_compressed :
+            rSize = FSE_decompress(out_buff, blockSize, in_buff, cSize);
+            if (FSE_isError(rSize)) EXM_THROW(37, "Decoding error : %s", FSE_getErrorName(rSize));
+            break;
+          case bt_raw :
+            break;
+          case bt_rle :
+            memset(out_buff, in_buff[0], rSize);
+            break;
+          default :
+            EXM_THROW(38, "unknown block header");   /* should not happen */
+        }
+
+        /* Write block */
+        switch(bType)
+        {
+          size_t writeSizeCheck;
+
+          case bt_compressed :
+          case bt_rle :
+            writeSizeCheck = fwrite(out_buff, 1, rSize, foutput);
+            if (writeSizeCheck != rSize) EXM_THROW(39, "Write error : unable to write data block to destination file");
+            XXH32_update(&xxhState, out_buff, rSize);
+            filesize += rSize;
+            break;
+          case bt_raw :
+            writeSizeCheck = fwrite(in_buff, 1, cSize, foutput);
+            if (writeSizeCheck != cSize) EXM_THROW(40, "Write error : unable to write data block to destination file");
+            XXH32_update(&xxhState, in_buff, cSize);
+            filesize += cSize;
+            break;
+          default :
+            EXM_THROW(41, "unknown block header");   /* should not happen */
         }
     }
 
-_lastBlock:
+    /* CRC verification */
     {
-        int errorCode;
-        int nbBytes = ((blockSizeId+10)/8)+1;   // Nb Bytes to describe last block size
-        U32 lastBlockSize = LITTLE_ENDIAN_32(*(U32*)ip);
-        U32 mask;
-        ip += nbBytes;
-        switch(nbBytes)
-        {
-        case 2: mask = 0xFFFF; break;
-        case 3: mask = 0xFFFFFF; break;
-        default:
-        case 4: mask = 0xFFFFFFFF;
-        }
-        lastBlockSize &= mask;
-
-        errorCode = FSE_decompress((unsigned char*)out_buff, lastBlockSize, ip);
-        if (errorCode == -1) EXM_THROW(33, "Decoding error : last block failed");
-        ip += errorCode;
-        filesize += lastBlockSize;
-
-        sizeCheck = fwrite(out_buff, 1, lastBlockSize, foutput);
-        if (sizeCheck != lastBlockSize) EXM_THROW(34, "Write error : unable to write data block to destination file");
-        XXH32_update(hashCtx, out_buff, lastBlockSize);
-    }
-
-    // CRC verification
-    {
-        U32 CRCsaved = *(U32*)ip;
-        U32 CRCcalculated = XXH32_digest(hashCtx);
-        if (CRCsaved != CRCcalculated) EXM_THROW(35, "CRC error : wrong checksum, corrupted data");
+        U32 CRCsaved = ip[2] + (ip[1]<<8) + ((ip[0] & _6BITS) << 16);
+        U32 CRCcalculated = (XXH32_digest(&xxhState) >> 5) & ((1U<<22)-1);
+        if (CRCsaved != CRCcalculated) EXM_THROW(42, "CRC error : wrong checksum, corrupted data");
     }
 
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2,"Decoded %llu bytes\n", (long long unsigned)filesize);
 
-    // Free
+    /* clean */
     free(in_buff);
     free(out_buff);
     fclose(finput);

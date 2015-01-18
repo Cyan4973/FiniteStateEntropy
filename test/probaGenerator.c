@@ -1,43 +1,48 @@
 /*
-ProbaGenerator.c
-Demo program creating sample file with controlled probabilies
-Copyright (C) Yann Collet 2012-2014
-GPL v2 License
+    ProbaGenerator.c
+    Demo program creating sample file with controlled probabilities
+    Copyright (C) Yann Collet 2012-2015
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+    GPL v2 License
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    You can contact the author at :
+    - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
+    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 
-//******************************
-// Compiler options
-//******************************
-#define _CRT_SECURE_NO_WARNINGS   // Visual warning
+/**************************************
+*  Compiler options
+**************************************/
+#define _CRT_SECURE_NO_WARNINGS   /* Visual warning */
 
 
-//******************************
-// Include
-//******************************
-#include <stdlib.h>   // malloc
-#include <stdio.h>    // printf
-#include <string.h>   // memset
-#include <math.h>     // log
+/**************************************
+*  Include
+**************************************/
+#include <stdlib.h>   /* malloc, free */
+#include <stdio.h>    /* printf */
+#include <string.h>   /* memset */
+#include <math.h>     /* log */
 
 
-//******************************
-// Constants
-//******************************
+/**************************************
+*  Constants
+**************************************/
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
 #define PROBATABLESIZE 4096
@@ -45,23 +50,23 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define PRIME2   2246822519U
 
 
-//**************************************
-// Macros
-//**************************************
+/**************************************
+*  Text display
+**************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static int   displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
 
-//***************************************************
-// Local variables
-//***************************************************
-static char* programName;
-static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
+/**************************************
+*  Local variables
+**************************************/
+static char* g_programName;
 
 
-//******************************
-// local functions
-//******************************
+/**************************************
+*  Local functions
+**************************************/
 static unsigned int GEN_rand (unsigned int* seed)
 {
     *seed =  ((*seed) * PRIME1) + PRIME2;
@@ -71,9 +76,9 @@ static unsigned int GEN_rand (unsigned int* seed)
 static int usage(void)
 {
     DISPLAY("Usage :\n");
-    DISPLAY("%s P%%\n", programName);
+    DISPLAY("%s P%%\n", g_programName);
     DISPLAY("Exemple :\n");
-    DISPLAY("%s 70%%\n", programName);
+    DISPLAY("%s 70%%\n", g_programName);
     return 0;
 }
 
@@ -98,7 +103,7 @@ static void generate(void* buffer, size_t buffSize, double p)
     unsigned seed = 1;
 
     if (p==0.0) p=0.005;
-    DISPLAY("\nGenerating %i MB with P=%.2f%%\n", (int)(buffSize >> 20), p*100);
+    DISPLAY("Generating %u KB with P=%.2f%%\n", (unsigned)(buffSize >> 10), p*100);
 
     // Build Table
     while (remaining)
@@ -138,7 +143,7 @@ int main(int argc, char** argv)
     double proba = 0.;
     char  filename[] = "proba.bin";
 
-    programName = argv[0];
+    g_programName = argv[0];
     DISPLAY("Binary file generator\n");
     if (argc<2) badusage();
 
@@ -149,7 +154,5 @@ int main(int argc, char** argv)
 
     createSampleFile(filename, proba);
 
-    DISPLAY("Press enter to exit \n");
-    getchar();
     return 0;
 }

@@ -1,6 +1,7 @@
 /*
-  commandline.c - simple command line interface manager, for FSE
-  Copyright (C) Yann Collet 2013-2014
+  commandline.c - simple command line interface for FSE
+  Copyright (C) Yann Collet 2013-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -22,76 +23,74 @@
 */
 /*
   Note : this is stand-alone program.
-  It is not part of FSE compression library, it is a user program of the FSE library.
+  It is not part of FSE compression library, just a user program of the FSE library.
   The license of FSE library is BSD.
   The license of this program is GPLv2.
 */
 
 
-//***************************************************
-// Compiler instructions
-//***************************************************
-#define _CRT_SECURE_NO_WARNINGS   // Remove warning under visual studio
-#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
-#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
+/***************************************************
+*  Compiler instructions
+****************************************************/
+#define _CRT_SECURE_NO_WARNINGS   /* Remove warning under visual studio */
+#define _POSIX_SOURCE 1           /* get fileno() within <stdio.h> for Unix */
 
 
-//***************************************************
-// Includes
-//***************************************************
-#include <stdlib.h>   // exit
-#include <stdio.h>    // fprintf
-#include <string.h>   // strcmp, strcat
+/***************************************************
+*  Includes
+***************************************************/
+#include <stdlib.h>   /* exit */
+#include <stdio.h>    /* fprintf */
+#include <string.h>   /* strcmp, strcat */
 #include "bench.h"
 #include "fileio.h"
-#include "lz4hce.h"   // et_final
 
 
-//****************************
-// OS-specific Includes
-//****************************
+/***************************************************
+*  OS-specific Includes
+***************************************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <fcntl.h>    // _O_BINARY
-#  include <io.h>       // _setmode, _isatty
+#  include <fcntl.h>    /* _O_BINARY */
+#  include <io.h>       /* _setmode, _isatty */
 #  ifdef __MINGW32__
-   int _fileno(FILE *stream);   // MINGW somehow forgets to include this windows declaration into <stdio.h>
+   int _fileno(FILE *stream);   /* MINGW somehow forgets to include this windows declaration into <stdio.h> */
 #  endif
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
-#  include <unistd.h>   // isatty
+#  include <unistd.h>   /* isatty */
 #  define SET_BINARY_MODE(file)
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #endif
 
 
-//***************************************************
-// Constants
-//***************************************************
+/***************************************************
+*  Constants
+***************************************************/
 #define COMPRESSOR_NAME "FSE : Finite State Entropy"
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "%s, %i-bits demo by %s (%s)\n", COMPRESSOR_NAME, (int)sizeof(void*)*8, AUTHOR, __DATE__
 #define FSE_EXTENSION ".fse"
 
 
-//**************************************
-// Macros
-//**************************************
+/***************************************************
+*  Macros
+***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 
 
-//***************************************************
-// Local variables
-//***************************************************
+/***************************************************
+*  Local variables
+***************************************************/
 static char* programName;
 static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 static int   fse_pause = 0;
 
 
-//***************************************************
-// Functions
-//***************************************************
+/***************************************************
+*  Functions
+***************************************************/
 static int usage(void)
 {
     DISPLAY("Usage :\n");
@@ -126,8 +125,7 @@ static void waitEnter(void)
 int main(int argc, char** argv)
 {
     int   i,
-          forceCompress=0, decode=0, bench=3, benchLZ4e=0; // default action if no argument
-    int   algoNb = -1;
+          forceCompress=0, decode=0, bench=3; /* default action if no argument */
     int   indexFileNames=0;
     char* input_filename=0;
     char* output_filename=0;
@@ -135,7 +133,7 @@ int main(int argc, char** argv)
     char  extension[] = FSE_EXTENSION;
 
 
-    // Welcome message
+    /* Welcome message */
     programName = argv[0];
     DISPLAY(WELCOME_MESSAGE);
 
@@ -188,14 +186,6 @@ int main(int argc, char** argv)
                 case 'z':
                     bench=1;
                     BMK_SetByteCompressor(3);
-                    break;
-
-                    // Benchmark LZ4 extracted fields (hidden)
-                case 'l': benchLZ4e=1;
-                    algoNb = 0;
-                    while ((argument[1]>='0') && (argument[1]<='9')) { algoNb *= 10; algoNb += argument[1]-'0'; argument++; }
-                    algoNb -= 1;
-                    if (algoNb >= et_final) algoNb = et_final-1;
                     break;
 
                     // Test
@@ -266,9 +256,6 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
 
     // Check if benchmark is selected
-    if (benchLZ4e) { BMK_benchFilesLZ4E(argv+indexFileNames, argc-indexFileNames, algoNb); goto _end; }
-
-    // Check if benchmark is selected
     if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
     if (bench==3) { BMK_benchCore_Files(argv+indexFileNames, argc-indexFileNames); goto _end; }
 
@@ -281,7 +268,7 @@ int main(int argc, char** argv)
             size_t l = strlen(input_filename);
             if (!strcmp(input_filename+(l-4), FSE_EXTENSION)) decode=1;
         }
-        if (!decode)   // compression to file
+        if (!decode)   /* compression to file */
         {
             size_t l = strlen(input_filename);
             output_filename = (char*)calloc(1,l+5);
@@ -290,7 +277,7 @@ int main(int argc, char** argv)
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
-        // decompression to file (automatic name will work only if input filename has correct format extension)
+        /* decompression to file (automatic name will work only if input filename has correct format extension) */
         {
             size_t outl;
             size_t inl = strlen(input_filename);
@@ -311,8 +298,8 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)                ) badusage();
 
-    if (decode) decompress_file(output_filename, input_filename);
-    else compress_file(output_filename, input_filename);
+    if (decode) FIO_decompressFilename(output_filename, input_filename);
+    else FIO_compressFilename(output_filename, input_filename);
 
 _end:
     if (fse_pause) waitEnter();

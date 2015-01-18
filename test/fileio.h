@@ -1,6 +1,7 @@
 /*
-  fileio.h - simple generic file i/o handler - header
-  Copyright (C) Yann Collet 2013-2014
+  fileio.h - simple generic file i/o handler
+  Copyright (C) Yann Collet 2013-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -18,6 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
+  - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
   - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 #pragma once
@@ -27,34 +29,38 @@ extern "C" {
 #endif
 
 
-//**************************************
-// Special input/output constants
-//**************************************
+/**************************************
+*  Special i/o constants
+**************************************/
 #define NULL_OUTPUT "null"
 #define stdinmark "stdin"
 #define stdoutmark "stdout"
-//static char stdinmark[] = "stdin";
-//static char stdoutmark[] = "stdout";
 #ifdef _WIN32
-#define nulmark "nul"
-//static char nulmark[] = "nul";
+#  define nulmark "nul"
 #else
-#define nulmark "/dev/null"
-//static char nulmark[] = "/dev/null";
+#  define nulmark "/dev/null"
 #endif
 
 
-//**************************************
-// Parameters
-//**************************************
+/**************************************
+*  Parameters
+**************************************/
 void FIO_overwriteMode(void);
 
 
-//**************************************
-// Stream/File functions
-//**************************************
-int compress_file (char* outfilename, char* infilename);
-unsigned long long decompress_file (char* outfilename, char* infilename);
+/**************************************
+*  Stream/File functions
+**************************************/
+unsigned long long FIO_compressFilename (const char* outfilename, const char* infilename);
+unsigned long long FIO_decompressFilename (const char* outfilename, const char* infilename);
+/*
+FIO_compressFilename :
+    result : size of compressed file
+
+FIO_decompressFilename :
+    result : size of regenerated file
+*/
+
 
 
 #if defined (__cplusplus)
