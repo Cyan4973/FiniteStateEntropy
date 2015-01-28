@@ -63,9 +63,9 @@ typedef unsigned long long  U64;
 #endif
 
 
-//******************************
-// Constants
-//******************************
+/***************************************************
+*  Constants
+***************************************************/
 #define KB *(1<<10)
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
@@ -122,7 +122,7 @@ static void generate (void* buffer, size_t buffSize, double p, U32* seed)
     char* op = (char*) buffer;
     char* oend = op + buffSize;
 
-    // Build Table
+    /* Build Table */
     while (remaining)
     {
         int n = (int) (remaining * p);
@@ -134,7 +134,7 @@ static void generate (void* buffer, size_t buffSize, double p, U32* seed)
         remaining -= n;
     }
 
-    // Fill buffer
+    /* Fill buffer */
     while (op<oend)
     {
         const int r = FUZ_rand (seed) & (PROBATABLESIZE-1);
@@ -322,13 +322,37 @@ static void unitTest(void)
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
     }
 
+    /* FSE_optimalTableLog */
+    {
+        U32 max, i, tableLog=12;
+        size_t testSize = 999;
+        for (i=0; i< testSize; i++) testBuff[i] = (BYTE)FUZ_rand(&lseed);
+        max = 256;
+        FSE_count(count, testBuff, testSize, &max);
+        tableLog = FSE_optimalTableLog(tableLog, testSize, max);
+        CHECK(tableLog<=8, "Too small tableLog");
+    }
+
     /* FSE_normalizeCount */
     {
         S16 norm[256];
-        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, 256);
+        U32 max = 256;
+        FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
-        errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 257);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_normalizeCount() should have failed (max > 1<<tableLog)");
+        errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 256);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_normalizeCount() should have failed (max >= 1<<tableLog)");
+        /* limit corner case */
+        {
+            U32 i;
+            U32 total = 0;
+            for(i=0; i<20; i++) count[i] = 8;
+            for(; i<255; i++) count[i] = 1;
+            count[255] = 0;
+            for (i=0; i<255; i++) total += count[i];
+            errorCode = FSE_normalizeCount(norm, 8, count, total, 254);
+            CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
+        }
     }
 
     /* FSE_writeHeader */
