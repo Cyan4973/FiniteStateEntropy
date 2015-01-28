@@ -624,6 +624,7 @@ int FSE_compareRankT(const void* r1, const void* r2)
     return 2 * (R1->count < R2->count) - 1;
 }
 
+#if 0
 static void FSE_adjustNormSlow(short* norm, int pointsToRemove, const unsigned* count, U32 maxSymbolValue)
 {
     rank_t rank[FSE_MAX_SYMBOL_VALUE+1];
@@ -656,6 +657,48 @@ static void FSE_adjustNormSlow(short* norm, int pointsToRemove, const unsigned* 
         pointsToRemove--;
     }
 }
+
+#else
+
+static size_t FSE_adjustNormSlow(short* norm, int pointsToRemove, const unsigned* count, U32 maxSymbolValue)
+{
+    rank_t rank[FSE_MAX_SYMBOL_VALUE+1];
+    U32 s;
+
+    /* Init */
+    for (s=0; s<=maxSymbolValue; s++)
+    {
+        rank[s].id = s;
+        rank[s].count = count[s];
+        if (norm[s] <= 1) rank[s].count = 0;
+    }
+
+    /* Sort according to count */
+    qsort(rank, maxSymbolValue+1, sizeof(rank_t), FSE_compareRankT);
+
+    while(pointsToRemove)
+    {
+        int newRank = 1;
+        rank_t savedR;
+        if (norm[rank[0].id] == 1)
+            return (size_t)-FSE_ERROR_GENERIC;
+        norm[rank[0].id]--;
+        pointsToRemove--;
+        rank[0].count -= (rank[0].count + 6) >> 3;
+        if (norm[rank[0].id] == 1)
+            rank[0].count=0;
+        savedR = rank[0];
+        while (rank[newRank].count > savedR.count)
+        {
+            rank[newRank-1] = rank[newRank];
+            newRank++;
+        }
+        rank[newRank-1] = savedR;
+    }
+
+    return 0;
+}
+#endif
 
 
 size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
@@ -710,11 +753,13 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
                 stillToDistribute -= proba;
             }
         }
-        //if ((int)normalizedCounter[largest] <= -stillToDistribute+8)
         if (-stillToDistribute >= (normalizedCounter[largest] >> 1))
         {
-            /* largest cant accommodate that amount */
-            FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
+            size_t errorCode;
+            /* corner case, need to converge towards normalization with caution */
+            errorCode = FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
+            if (FSE_isError(errorCode)) return errorCode;
+            //FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
             //FSE_distribNpts(normalizedCounter, maxSymbolValue, (short)(-stillToDistribute));   /* Fallback */
         }
         else normalizedCounter[largest] += (short)stillToDistribute;
@@ -722,9 +767,14 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
 
 #if 0
     {   /* Print Table (debug) */
-        int s;
+        U32 s;
+        U32 nTotal = 0;
         for (s=0; s<=maxSymbolValue; s++)
             printf("%3i: %4i \n", s, normalizedCounter[s]);
+        for (s=0; s<=maxSymbolValue; s++)
+            nTotal += abs(normalizedCounter[s]);
+        if (nTotal != (1U<<tableLog))
+            printf("Warning !!! Total == %u != %u !!!", nTotal, 1U<<tableLog);
         getchar();
     }
 #endif

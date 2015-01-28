@@ -336,10 +336,23 @@ static void unitTest(void)
     /* FSE_normalizeCount */
     {
         S16 norm[256];
-        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, 256);
+        U32 max = 256;
+        FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
         errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 256);
         CHECK(!FSE_isError(errorCode), "Error : FSE_normalizeCount() should have failed (max >= 1<<tableLog)");
+        /* limit corner case */
+        {
+            U32 i;
+            U32 total = 0;
+            for(i=0; i<20; i++) count[i] = 8;
+            for(; i<255; i++) count[i] = 1;
+            count[255] = 0;
+            for (i=0; i<255; i++) total += count[i];
+            errorCode = FSE_normalizeCount(norm, 8, count, total, 254);
+            CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
+        }
     }
 
     /* FSE_writeHeader */
