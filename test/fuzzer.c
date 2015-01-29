@@ -346,8 +346,10 @@ static void unitTest(void)
         {
             U32 i;
             U32 total = 0;
-            for(i=0; i<20; i++) count[i] = 8;
-            for(; i<255; i++) count[i] = 1;
+            count[0] = 12;
+            count[1] = 8;
+            count[2] = 4;
+            for(i=3; i<255; i++) count[i] = 1;
             count[255] = 0;
             for (i=0; i<255; i++) total += count[i];
             errorCode = FSE_normalizeCount(norm, 8, count, total, 254);

@@ -533,70 +533,6 @@ void  FSE_freeCTable (void* CTable)
     free(CTable);
 }
 
-/* Emergency distribution strategy (fallback); compression will suffer a lot ; consider increasing table size */
-static void FSE_emergencyDistrib(short* normalizedCounter, int maxSymbolValue, short points)
-{
-    int s=0;
-    while (points)
-    {
-        if (normalizedCounter[s] > 1)
-        {
-            normalizedCounter[s]--;
-            points--;
-        }
-        s++;
-        if (s>maxSymbolValue) s=0;
-    }
-}
-
-/* fallback distribution (corner case); compression will suffer a bit ; consider increasing table size */
-void FSE_distribNpts(short* normalizedCounter, int maxSymbolValue, short points)
-{
-    int s;
-    int rank[5] = {0};
-    int fallback=0;
-
-    /* Sort 4 largest (they'll absorb normalization rounding) */
-    for (s=1; s<=maxSymbolValue; s++)
-    {
-        int i, b=3;
-        if (b>=s) b=s-1;
-        while ((b>=0) && (normalizedCounter[s]>normalizedCounter[rank[b]])) b--;
-        for (i=3; i>b; i--) rank[i+1] = rank[i];
-        rank[b+1]=s;
-    }
-
-    /* Distribute points */
-    s = 0;
-    while (points)
-    {
-        short limit = normalizedCounter[rank[s+1]]+1;
-        if (normalizedCounter[rank[s]] >= limit + points )
-        {
-            normalizedCounter[rank[s]] -= points;
-            break;
-        }
-        points -= normalizedCounter[rank[s]] - limit;
-        normalizedCounter[rank[s]] = limit;
-        s++;
-        if (s==3)
-        {
-            short reduction = points>>2;
-            if (fallback)
-            {
-                FSE_emergencyDistrib(normalizedCounter, maxSymbolValue, points);    /* Fallback mode */
-                return;
-            }
-            if (reduction < 1) reduction=1;
-            if (reduction >= normalizedCounter[rank[3]]) reduction=normalizedCounter[rank[3]]-1;
-            fallback = (reduction==0);
-            normalizedCounter[rank[3]]-=reduction;
-            points-=reduction;
-            s=0;
-        }
-    }
-}
-
 
 unsigned FSE_optimalTableLog(unsigned maxTableLog, size_t srcSize, unsigned maxSymbolValue)
 {
@@ -760,7 +696,6 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
             errorCode = FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
             if (FSE_isError(errorCode)) return errorCode;
             //FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
-            //FSE_distribNpts(normalizedCounter, maxSymbolValue, (short)(-stillToDistribute));   /* Fallback */
         }
         else normalizedCounter[largest] += (short)stillToDistribute;
     }
