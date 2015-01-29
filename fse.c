@@ -180,7 +180,7 @@ static void FSE_writeLE64(void* memPtr, U64 val64)
     }
     else
     {
-        BYTE* p = (const BYTE*)memPtr;
+        BYTE* p = (BYTE*)memPtr;
         p[0] = (BYTE)val64;
         p[1] = (BYTE)(val64>>8);
         p[2] = (BYTE)(val64>>16);
