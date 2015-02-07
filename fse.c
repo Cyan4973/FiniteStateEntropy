@@ -691,8 +691,8 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
         }
         if (-stillToDistribute >= (normalizedCounter[largest] >> 1))
         {
-            size_t errorCode;
             /* corner case, need to converge towards normalization with caution */
+            size_t errorCode;
             errorCode = FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
             if (FSE_isError(errorCode)) return errorCode;
             //FSE_adjustNormSlow(normalizedCounter, -stillToDistribute, count, maxSymbolValue);
@@ -1247,7 +1247,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     const BYTE* const istart = (const BYTE*)cSrc;
     const BYTE* ip = istart;
     short counting[FSE_MAX_SYMBOL_VALUE+1];
-    FSE_decode_t DTable[FSE_MAX_TABLESIZE];
+    FSE_decode_t DTable[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
     unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     unsigned tableLog;
     size_t errorCode, fastMode;
