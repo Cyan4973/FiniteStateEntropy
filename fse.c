@@ -868,12 +868,6 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
 }
 
 
-static size_t FSE_compressRLE (BYTE *out, BYTE symbol)
-{
-    *out=symbol;
-    return 1;
-}
-
 size_t FSE_compressBound(size_t size) { return FSE_COMPRESSBOUND(size); }
 
 
@@ -900,7 +894,7 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     /* Scan input and build symbol stats */
     errorCode = FSE_count (count, ip, srcSize, &maxSymbolValue);
     if (FSE_isError(errorCode)) return errorCode;
-    if (errorCode == srcSize) return FSE_compressRLE (ostart, *istart);
+    if (errorCode == srcSize) return 1;
     if (errorCode < ((srcSize * 7) >> 10)) return 0;   /* Heuristic : not compressible enough */
 
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
