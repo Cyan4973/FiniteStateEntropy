@@ -496,7 +496,7 @@ int main (int argc, char** argv)
         }
     }
 
-    unitTest();
+    if (startTestNb ==0) unitTest();
 
     DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, totalTest, startTestNb);

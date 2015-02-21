@@ -703,19 +703,18 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         char* orig_buff;
         char* compressedBuffer; size_t compressedBuffSize;
 
-        // Check file existence
+        /* Check file existence */
         inFileName = fileNamesTable[fileIdx++];
         inFile = fopen( inFileName, "rb" );
         if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
-        // Memory allocation & restrictions
+        /* Memory allocation & restrictions */
         inFileSize = BMK_GetFileSize(inFileName);
-        //benchedSize = (sizeof(size_t)==4) ? 256 KB : (32 MB - 1);
         benchedSize = 16 MB;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 
-        // Alloc
+        /* Alloc */
         orig_buff = (char*)malloc(benchedSize);
         nbChunks = 1;
         maxCompressedChunkSize = FSE_compressBound((int)benchedSize);
@@ -731,7 +730,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
             return 12;
         }
 
-        // Fill input buffer
+        /* Fill input buffer */
         DISPLAY("Loading %s...       \r", inFileName);
         readSize = fread(orig_buff, 1, benchedSize, inFile);
         fclose(inFile);
@@ -744,7 +743,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
             return 13;
         }
 
-        // Bench
+        /* Bench */
         BMK_benchCore_Mem(compressedBuffer, orig_buff, (int)benchedSize, 255, BMK_tableLog, inFileName, &totalz, &totalc, &totald);
         totals += benchedSize;
 
