@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - tester Makefile
-# Copyright (C) Yann Collet 2011-2014
+# Copyright (C) Yann Collet 2011-2015
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -23,11 +23,11 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE = v0.2.0
+RELEASE = v0.2.1
 
 DESTDIR?=
 CFLAGS ?= -O3
-CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
+CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes
 CF32    = -m32
 
 # Define *.exe as extension for Windows systems

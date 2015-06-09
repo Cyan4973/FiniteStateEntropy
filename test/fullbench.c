@@ -91,6 +91,26 @@
 static U32 no_prompt = 0;
 
 
+
+/**************************************
+*  Cycle counter
+***************************************/
+/*  Windows */
+#ifdef _WIN32
+#include <intrin.h>
+static U64 rdtsc(){ return __rdtsc(); }
+
+/*  Linux/GCC */
+#else
+static U64 rdtsc(void)
+{
+    U32 lo,hi;
+    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+    return ((U64)hi << 32) | lo;
+}
+#endif
+
+
 /*********************************************************
 *  Private functions
 **********************************************************/
@@ -166,7 +186,7 @@ static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t
 {
 
     U32 count[256] = {0};
-    const BYTE* ip = (BYTE*)src;
+    const BYTE* ip = (const BYTE*)src;
     const BYTE* const end = ip + srcSize;
 
     (void)dst; (void)dstSize;
@@ -179,7 +199,7 @@ static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSi
 {
 #define NBT 8
     U32 count[NBT][256];
-    const BYTE* ip = (BYTE*)src;
+    const BYTE* ip = (const BYTE*)src;
     const BYTE* const end = ip + srcSize - (NBT-1);
 
     (void)dst; (void)dstSize;
@@ -200,12 +220,12 @@ static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSi
 }
 
 
-// U64 version
+/* U64 version */
 static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     U32 count[8][256+16];
-    U64* ptr = (U64*) src;
-    U64* end = ptr + (srcSize >> 3);
+    const U64* ptr = (const U64*) src;
+    const U64* end = ptr + (srcSize >> 3);
     U64 next = *ptr++;
 
     (void)dst; (void)dstSize;
@@ -240,7 +260,7 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
 }
 
 
-// hist_X_Y function from https://github.com/powturbo/turbohist
+/* hist_X_Y function from https://github.com/powturbo/turbohist */
 static int local_hist_4_32(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
 //#define NU 8
@@ -345,9 +365,9 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
     U32 c0[256+PAD]={0},c1[256+PAD]={0},c2[256+PAD]={0},c3[256+PAD]={0},c4[256+PAD]={0},c5[256+PAD]={0},c6[256+PAD]={0},c7[256+PAD]={0};
     const U32* ip32 = (const U32*)src;
     const U32* const ip32end = ip32 + (srcSize >> 2);
-    const BYTE* ip = (BYTE*)src;
+    const BYTE* ip = (const BYTE*)src;
     const BYTE* const iend = (const BYTE*)src + srcSize;
-    U32 cp = *(U32*)src;
+    U32 cp = *(const U32*)src;
     int i;
 
     (void)dst; (void)dstSize;
@@ -382,7 +402,7 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
 }
 
 
-// Modified version of count2x64 by Nathan Kurz, using C instead of assembler
+/* Modified version of count2x64 by Nathan Kurz, using C instead of assembler */
 #define C_INC_TABLES(src0, src1, count, i) \
         { \
             U64 byte0 = src0 & 0xFF;\
@@ -786,7 +806,7 @@ static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 255;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, (const BYTE*)src, (U32)srcSize, &max);
 }
 
 static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -794,7 +814,7 @@ static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, (BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, (const BYTE*)src, (U32)srcSize, &max);
 }
 
 static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -865,16 +885,16 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
     return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
 }
 
-static int local_FSE_decompress_usingDTable(void* cSrc, size_t cSrcSize, const void* dst, size_t maxDstSize)
+static int local_FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    (void)cSrcSize;
-    return (int)FSE_decompress_usingDTable((void*)dst, maxDstSize, (BYTE*)cSrc + g_skip, g_cSize, g_DTable, g_fast);   /* change direction : input is into dst */
+    (void)srcSize;
+    return (int)FSE_decompress_usingDTable(dst, maxDstSize, (const BYTE*)src + g_skip, g_cSize, g_DTable, g_fast);
 }
 
-static int local_FSE_decompress(void* cSrc, size_t cSrcBufferSize, const void* dst, size_t maxDstSize)  /* direction change */
+static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    (void)cSrcBufferSize;
-    return (int)FSE_decompress((void*)dst, maxDstSize, cSrc, g_cSize);
+    (void)srcSize;
+    return (int)FSE_decompress(dst, maxDstSize, src, g_cSize);
 }
 
 
@@ -992,8 +1012,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 13:
         {
             g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
             g_max = 255;
-            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, g_cSize);
+            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, oBuffer, g_cSize);
             g_cSize -= g_skip;
             g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
             funcName = "FSE_decompress_usingDTable";
@@ -1004,6 +1025,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 14:
         {
             g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
             funcName = "FSE_decompress";
             func = local_FSE_decompress;
             break;
@@ -1081,6 +1103,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     DISPLAY("\r%79s\r", "");
     {
         double bestTime = 999.;
+        double bestBpKC = 0;
         U32 benchNb=1;
         size_t errorCode = 0;
         DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
@@ -1089,22 +1112,28 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             U32 milliTime;
             double averageTime;
             U32 loopNb=0;
+            U64 cycleCount;
+            double bytesPerKCycles;
 
             milliTime = BMK_GetMilliStart();
             while(BMK_GetMilliStart() == milliTime);
             milliTime = BMK_GetMilliStart();
+            cycleCount = rdtsc();
             while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
             {
                 errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
                 if (FSE_isError(errorCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(errorCode)); exit(-1); }
                 loopNb++;
             }
+            cycleCount = rdtsc() - cycleCount;
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-26.26s : %8.1f MB/s\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            bytesPerKCycles = ((double)benchedSize * loopNb) * 1000 / cycleCount;
+            if (bytesPerKCycles > bestBpKC) bestBpKC = bytesPerKCycles;
+            DISPLAY("%2u-%-26.26s : %8.1f MB/s   (%.1f)\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., bestBpKC);
         }
-        DISPLAY("%2u#%-26.26s : %8.1f MB/s   (%i)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#%-26.26s : %8.1f MB/s  (%6i) (%.1f)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode, bestBpKC);
     }
 
 _end:

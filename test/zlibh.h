@@ -1,7 +1,7 @@
 /* ******************************************************************
    FSE : Finite State Entropy coder
    header file
-   Copyright (C) 2013, Yann Collet.
+   Copyright (C) 2013-2015, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@ extern "C" {
 
 
 //****************************
-// FSE simple functions
+// zlib simple functions
 //****************************
 int ZLIBH_compress   (char* dest, const char* source, int inputSize);
 int ZLIBH_decompress (char* dest, const char* compressed);

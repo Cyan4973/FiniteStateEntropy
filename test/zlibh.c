@@ -798,9 +798,9 @@ static void build_tree(desc)
 
 int ZLIBH_compress (char* dest, const char* source, int inputSize)
 {
-    unsigned char* ip = (unsigned char*)source;
-    unsigned char* const bsourceend = ip+inputSize;
-    unsigned char* bsource = (unsigned char*)source;
+    const unsigned char* ip = (const unsigned char*)source;
+    const unsigned char* const bsourceend = ip+inputSize;
+    const unsigned char* bsource = (const unsigned char*)source;
     unsigned char* op = (unsigned char*)dest;
     tree_desc ltree;
     ct_data dyn_ltree[ZLIBH_HEAP_SIZE];
@@ -1513,9 +1513,9 @@ when flush is set to Z_FINISH, inflate() cannot return Z_OK.  Instead it
 will return Z_BUF_ERROR if it has not reached the end of the stream.
 */
 
-int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
+int ZLIBH_inflate(unsigned char* dest, const unsigned char* compressed)
 {
-    unsigned char *next = (unsigned char*)compressed;   /* next input */
+    const unsigned char *next = (const unsigned char*)compressed;   /* next input */
     unsigned char *put  = (unsigned char*)dest;         /* next output */
     unsigned hold;              /* bit buffer */
     unsigned bits;              /* bits in bit buffer */
@@ -1691,7 +1691,7 @@ inf_leave:
 
 int ZLIBH_decompress (char* dest, const char* compressed)
 {
-    unsigned char* ip = (unsigned char*)compressed;
+    const unsigned char* ip = (const unsigned char*)compressed;
     unsigned char* op = (unsigned char*)dest;
     int input_used_so_far;
 
