@@ -216,6 +216,11 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     while (!testmem)
     {
         requiredMem -= step;
+        if (requiredMem <= step)
+        {
+            requiredMem = step+64;
+            break;
+        }
         testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
 
@@ -339,10 +344,10 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, char* inFileName, 
 
 
 size_t BMK_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned nbSymbols, unsigned tableLog)
-{ (void)nbSymbols; (void)tableLog; (void)dstSize; return ZLIBH_compress(dst, (const char*)src, (int)srcSize); }
+{ (void)nbSymbols; (void)tableLog; (void)dstSize; return ZLIBH_compress((char*)dst, (const char*)src, (int)srcSize); }
 
 size_t BMK_ZLIBH_decompress(void* dest, size_t originalSize, const void* compressed, size_t cSize)
-{ (void)cSize; ZLIBH_decompress((char*)dest, compressed); return originalSize; }
+{ (void)cSize; ZLIBH_decompress((char*)dest, (const char*)compressed); return originalSize; }
 
 
 void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int benchedSize,
@@ -501,6 +506,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
 
         /* Memory size evaluation */
         inFileSize = BMK_GetFileSize(inFileName);
+        if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
         benchedSize = (size_t) BMK_findMaxMem(inFileSize * 3) / 3;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         if (benchedSize < inFileSize) DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
@@ -710,6 +716,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
 
         /* Memory allocation & restrictions */
         inFileSize = BMK_GetFileSize(inFileName);
+        if (inFileSize==0) { DISPLAY( "%s is empty\n", inFileName); return 11; }
         benchedSize = 16 MB;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));

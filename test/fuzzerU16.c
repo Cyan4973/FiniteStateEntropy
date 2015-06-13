@@ -239,7 +239,8 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 /*****************************************************************
 *  Unitary tests
 *****************************************************************/
-extern size_t FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
+
+extern size_t FSE_countU16(unsigned* count, const unsigned short* source, size_t sourceSize, unsigned* maxSymbolValuePtr);
 
 #define TBSIZE (16 KB)
 static void unitTest(void)

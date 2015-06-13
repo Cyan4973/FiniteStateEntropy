@@ -9,4 +9,6 @@ before_install:
 
 env:
   - TravisCi_FseTest=test-all
-  - TravisCi_FseTest=test-clang
+  - TravisCi_FseTest=clangtest
+  - TravisCi_FseTest=gpptest
+

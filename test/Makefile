@@ -28,7 +28,8 @@ RELEASE   = v0.2.1
 DESTDIR  ?=
 CFLAGS   ?= -O3
 MOREFLAGS?=
-CFLAGS   += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic $(MOREFLAGS)
+CFLAGS   += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+FLAGS     = -I.. $(CFLAGS) $(MOREFLAGS)
 CF32      = -m32
 
 # Define *.exe as extension for Windows systems
@@ -44,31 +45,31 @@ default: fse
 all: fse fse32 fullbench fullbench32 fuzzer fuzzer32 fuzzerU16 probagen
 
 fse: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 fuzzer: fuzzer.c xxhash.c ../fse.c
-	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer32: fuzzer.c xxhash.c ../fse.c
-	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 fuzzerU16: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzerU16_32: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: fullbench.c xxhash.c ../fse.c ../fseU16.c
-	$(CC) $(CFLAGS) $(CF32) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
-	$(CC) $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
 	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)

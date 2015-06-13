@@ -233,11 +233,7 @@ static static_tree_desc  static_bl_desc =
 * when the heap property is re-established (each father smaller than its
 * two sons).
 */
-static void pqdownheap(tree, huf_heap, depth, k)
-    ct_data *tree;  /* the tree to restore */
-int *huf_heap;
-unsigned char *depth;
-int k;               /* node to move down */
+static void pqdownheap(ct_data *tree, int *huf_heap, unsigned char *depth, int k)
 {
     int v = huf_heap[k];
     int j = k << 1;  /* left son of k */
@@ -348,12 +344,7 @@ static long long nbDBlocks = 0;    // debug
 /* ===========================================================================
 * Send the block data compressed using the given Huffman trees
 */
-static void ZLIBH_compress_block(ip, op, ltree, bltree, ip_len)
-const unsigned char* ip;/* input buffer */
-unsigned char* op;      /* output buffer */
-const ct_data *ltree;   /* literal tree */
-const ct_data *bltree;  /* bitlen tree */
-unsigned int ip_len;    /* number of symbols in input buffer */
+static void ZLIBH_compress_block(const unsigned char* ip, unsigned char* op, const ct_data * ltree, const ct_data * bltree, unsigned int ip_len)
 {
     unsigned int bi_buf;    /* bit buffer */
     unsigned int bi_valid;  /* bits used in bit_buf */
@@ -487,9 +478,7 @@ unsigned int ip_len;    /* number of symbols in input buffer */
 * Merge the literal and distance tree and scan the resulting tree to determine
 * the frequencies of the codes in the bit length tree.
 */
-static void feed_bltree(ltree_desc, bltree_desc)
-    tree_desc *ltree_desc;      /* the tree descriptor */
-tree_desc *bltree_desc;     /* the tree descriptor */
+static void feed_bltree(tree_desc * ltree_desc, tree_desc * bltree_desc)
 {
     ct_data *ltree  = ltree_desc->dyn_tree;
     ct_data *bltree = bltree_desc->dyn_tree;
@@ -541,9 +530,7 @@ tree_desc *bltree_desc;     /* the tree descriptor */
 * method would use a table)
 * IN assertion: 1 <= len <= 15
 */
-static unsigned bi_reverse(code, len)
-    unsigned code; /* the value to invert */
-int len;       /* its bit length */
+static unsigned bi_reverse(unsigned code, int len)
 {
     register unsigned res = 0;
     do {
@@ -562,10 +549,7 @@ int len;       /* its bit length */
 * OUT assertion: the field code is set for all tree elements of non
 *     zero code length.
 */
-static void gen_codes(tree, max_code, bl_count)
-    ct_data        *tree;                  /* the tree to decorate */
-unsigned int   max_code;               /* largest code with non zero frequency */
-unsigned short *bl_count;              /* number of codes at each bit length */
+static void gen_codes(ct_data* tree, unsigned int max_code, unsigned short* bl_count)
 {
     unsigned short next_code[ZLIBH_MAX_BITS+1];  /* next code value for each bit length */
     unsigned short code = 0;               /* running code value */
@@ -597,12 +581,7 @@ unsigned short *bl_count;              /* number of codes at each bit length */
 *     The length os_len[0] is updated; os_len[1] is also updated if stree is
 *     not null.
 */
-static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
-    tree_desc *desc;    /* the tree descriptor */
-int *huf_heap;
-int heap_max;
-unsigned short *bl_count;
-
+static void gen_bitlen(tree_desc* desc, int* huf_heap, int heap_max, unsigned short* bl_count)
 {
     ct_data *tree        = desc->dyn_tree;
     int max_code         = desc->max_code;
@@ -688,8 +667,7 @@ unsigned short *bl_count;
 *     and corresponding code. The length os_len[0] is updated; os_len[1] is
 *     also updated if stree is not null. The field max_code is set.
 */
-static void build_tree(desc)
-    tree_desc *desc; /* the tree descriptor */
+static void build_tree(tree_desc* desc)
 {
     ct_data *tree         = desc->dyn_tree;
     const ct_data *stree  = desc->stat_desc->static_tree;
@@ -1021,8 +999,7 @@ struct inflate_state {
     unsigned was;               /* initial length of match */
 };
 
-static void fixedtables(state)
-struct inflate_state *state;
+static void fixedtables(struct inflate_state *state)
 {
     state->lencode = lenfix;
     state->lenbits = 9;
@@ -1155,13 +1132,7 @@ requested root table index bits, and on return it is the actual root
 table index bits.  It will differ if the request is greater than the
 longest code or if it is less than the shortest code.
 */
-int inflate_table(type, lens, codes, table, bits, work)
-    codetype type;
-unsigned short *lens;
-unsigned codes;
-code * *table;
-unsigned *bits;
-unsigned short *work;
+int inflate_table(codetype type, unsigned short * lens, unsigned codes, code * *table, unsigned *bits, unsigned short *work)
 {
     unsigned len;               /* a code's length in bits */
     unsigned sym;               /* index of code symbols */
@@ -1533,8 +1504,6 @@ int ZLIBH_inflate(unsigned char* dest, const unsigned char* compressed)
     unsigned codebits;          /* code bits, operation, was op */
 
     state.mode = TYPEDO;      /* skip check */
-
-    ret = 0;
 
     /* Clear the input bit accumulator */
     hold = 0;

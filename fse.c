@@ -305,6 +305,8 @@ size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
     return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
 }
 
+#ifndef __clang_analyzer__   /* clang static analyzer has difficulties with this function : seems to believe normalizedCounter is uninitialized */
+
 static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
                                        const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
                                        unsigned safeWrite)
@@ -370,7 +372,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
             short count = normalizedCounter[charnum++];
             const short max = (short)((2*threshold-1)-remaining);
             remaining -= FSE_abs(count);
-            if (remaining<0) return (size_t)-FSE_ERROR_GENERIC;
+            if (remaining<1) return (size_t)-FSE_ERROR_GENERIC;
             count++;   /* +1 for extra accuracy */
             if (count>=threshold) count += max;   /* [0..max[ [max..threshold[ (...) [threshold+max 2*threshold[ */
             bitStream += count << bitCount;
@@ -400,6 +402,7 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
 
     return (out-ostart);
 }
+#endif // __clang_analyzer__
 
 
 size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
@@ -1442,6 +1445,8 @@ size_t FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION) (unsigned* count, co
 }
 
 
+#ifndef __clang_analyzer__   /* clang static analyzer doesn't understand that tableSymbol is necessarily entirely initialized */
+
 static U32 FSE_tableStep(U32 tableSize) { return (tableSize>>1) + (tableSize>>3) + 3; }
 
 size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
@@ -1532,6 +1537,8 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 
     return 0;
 }
+
+#endif // __clang_analyzer__
 
 
 #define FSE_DECODE_TYPE FSE_TYPE_NAME(FSE_decode_t, FSE_FUNCTION_EXTENSION)

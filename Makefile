@@ -25,21 +25,29 @@
 
 PROGDIR?= test
 
-.PHONY: clean
+.PHONY: clean test
 
 default: test
 
-all: test-all
+all:
+	@cd $(PROGDIR); $(MAKE) all
 
 test:
 	@cd $(PROGDIR); $(MAKE) test
 
-test-all:
-	@cd $(PROGDIR); $(MAKE) clean; $(MAKE) test
-
 clean:
 	@cd $(PROGDIR); $(MAKE) clean
 
-test-clang: clean
+test-all: clean
+	@cd $(PROGDIR); $(MAKE) test-all
+
+clangtest: clean
 	@cd $(PROGDIR); $(MAKE) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
+
+staticAnalyze: clean
+	@cd $(PROGDIR); scan-build --status-bugs -v $(MAKE) all CFLAGS=-g   # does not work well; too many false positives
+
+gpptest: clean
+	@cd $(PROGDIR); $(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+
 
