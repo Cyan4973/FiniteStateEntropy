@@ -27,7 +27,7 @@ RELEASE = v0.2.1
 
 DESTDIR?=
 CFLAGS ?= -O3
-CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes
+CFLAGS += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
 CF32    = -m32
 
 # Define *.exe as extension for Windows systems

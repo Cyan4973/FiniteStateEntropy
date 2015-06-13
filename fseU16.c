@@ -67,14 +67,14 @@
 
 
 /****************************************************************
-  Complex types
+*  Local type
 ****************************************************************/
 typedef struct
 {
     unsigned short newState;
-    unsigned char  nbBits : 4;
-    unsigned short symbol : 12;
-} FSE_decode_tU16;
+    unsigned nbBits : 4;
+    unsigned symbol : 12;
+} FSE_decode_tU16;    /* Note : the size of this struct should be 4 */
 
 
 /********************************************************************
