@@ -37,17 +37,17 @@ extern "C" {
 #endif
 
 
-//**************************************
-// Compiler Options
-//**************************************
+/**************************************
+*  Compiler Options
+**************************************/
 #if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
 #  define inline __inline           // Visual C is not C99, but supports some kind of inline
 #endif
 
 
-//****************************
-// zlib simple functions
-//****************************
+/****************************
+*  zlib simple functions
+****************************/
 int ZLIBH_compress   (char* dest, const char* source, int inputSize);
 int ZLIBH_decompress (char* dest, const char* compressed);
 /*

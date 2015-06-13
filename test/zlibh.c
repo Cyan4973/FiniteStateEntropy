@@ -31,9 +31,9 @@ You can contact the author at :
 ****************************************************************** */
 
 
-//****************************************************************
-// Tuning parameters
-//****************************************************************
+/****************************************************************
+*  Tuning parameters
+****************************************************************/
 // MEMORY_USAGE :
 // Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
 // Increasing memory usage improves compression ratio
@@ -49,9 +49,10 @@ You can contact the author at :
 // Enable verification code, which checks table construction and state values (munsigned char slower, for debug purpose only)
 #define ZLIBH_DEBUG 0
 
-//****************************************************************
-//* Includes
-//****************************************************************
+
+/****************************************************************
+*  Includes
+****************************************************************/
 #include "zlibh.h"
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
@@ -258,9 +259,10 @@ int k;               /* node to move down */
     huf_heap[k] = v;
 }
 
-//****************************************************************
-//* Basic Types
-//****************************************************************
+
+/****************************************************************
+*  Basic Types
+****************************************************************/
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
 typedef  uint8_t BYTE;
@@ -279,9 +281,9 @@ typedef unsigned long long  U64;
 typedef U32 bitContainer_t;
 
 
-//****************************************************************
-//* Constants
-//****************************************************************
+/****************************************************************
+*  Constants
+****************************************************************/
 #define MAX_NB_SYMBOLS 257
 #define ZLIBH_MAX_TABLELOG  (ZLIBH_MEMORY_USAGE-2)
 #define ZLIBH_MAX_TABLESIZE (1U<<ZLIBH_MAX_TABLELOG)
@@ -303,9 +305,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************************************************
-//* Compiler specifics
-//****************************************************************
+/****************************************************************
+*  Compiler specifics
+****************************************************************/
 #ifdef _MSC_VER    // Visual Studio
 #  define FORCE_INLINE static __forceinline
 #  include <intrin.h>                    // For Visual 2005
@@ -320,9 +322,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************
-// ZLIBH Compression Code
-//****************************
+/****************************
+*  ZLIBH Compression Code
+****************************/
 
 /* If not enough room in bi_buf, use (valid) bits from bi_buf and
 * (16 - bi_valid) bits from value, leaving (width - (16-bi_valid))
@@ -347,7 +349,7 @@ static long long nbDBlocks = 0;    // debug
 * Send the block data compressed using the given Huffman trees
 */
 static void ZLIBH_compress_block(ip, op, ltree, bltree, ip_len)
-    unsigned char* ip;      /* input buffer */
+const unsigned char* ip;/* input buffer */
 unsigned char* op;      /* output buffer */
 const ct_data *ltree;   /* literal tree */
 const ct_data *bltree;  /* bitlen tree */
