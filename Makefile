@@ -41,5 +41,5 @@ clean:
 	@cd $(PROGDIR); $(MAKE) clean
 
 test-clang: clean
-	@cd $(PROGDIR); $(MAKE) all CC=clang
+	@cd $(PROGDIR); $(MAKE) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
 

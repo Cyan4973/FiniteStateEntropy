@@ -576,7 +576,7 @@ unsigned short *bl_count;              /* number of codes at each bit length */
     * without bit reversal.
     */
     for (bits = 1; bits <= ZLIBH_MAX_BITS; bits++) {
-        next_code[bits] = code = (code + bl_count[bits-1]) << 1;
+        next_code[bits] = code = (unsigned short)((code + bl_count[bits-1]) << 1);
     }
 
     for (n = 0;  n <= max_code; n++) {
@@ -857,11 +857,11 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
     if ((bldata_compsize[0]+ldata_compsize[0]) < ldata_compsize[1]) {  /* write bloc using the dynamic tree */
         *op = (unsigned char)(max_blindex+1);
         ZLIBH_compress_block(ip, op, dyn_ltree, dyn_bltree, inputSize);
-        compressed_size = (bldata_compsize[0]+ldata_compsize[0]+8) >> 3;
+        compressed_size = (int)((bldata_compsize[0]+ldata_compsize[0]+8) >> 3);
     }
     else {                                                             /* write bloc using the static tree */
         ZLIBH_compress_block(ip, op, static_ltree, dyn_bltree, inputSize);
-        compressed_size = (ldata_compsize[1]+8) >> 3;
+        compressed_size = (int)((ldata_compsize[1]+8) >> 3);
     }
     return compressed_size;
 }

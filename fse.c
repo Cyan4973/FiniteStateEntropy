@@ -690,7 +690,7 @@ static size_t FSE_normalizeM2(short* norm, U32 tableLog, const unsigned* count, 
                 U32 weight = sEnd - sStart;
                 if (weight < 1)
                     return (size_t)-FSE_ERROR_GENERIC;
-                norm[s] = weight;
+                norm[s] = (short)weight;
                 tmpTotal = end;
             }
         }
@@ -852,7 +852,7 @@ void FSE_initCStream(FSE_CStream_t* bitC, void* start)
 
 void FSE_initCState(FSE_CState_t* statePtr, const void* CTable)
 {
-    const U32 tableLog = ( (U16*) CTable) [0];
+    const U32 tableLog = ( (const U16*) CTable) [0];
     statePtr->value = (ptrdiff_t)1<<tableLog;
     statePtr->stateTable = ((const U16*) CTable) + 2;
     statePtr->symbolTT = (const U32*)CTable + 1 + (tableLog ? (1<<(tableLog-1)) : 1);
@@ -1038,7 +1038,7 @@ size_t FSE_decompressRLE(void* dst, size_t originalSize,
                    const void* cSrc, size_t cSrcSize)
 {
     if (cSrcSize != 1) return (size_t)-FSE_ERROR_srcSize_wrong;
-    memset(dst, *(BYTE*)cSrc, originalSize);
+    memset(dst, *(const BYTE*)cSrc, originalSize);
     return originalSize;
 }
 
@@ -1100,30 +1100,30 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
     if (srcSize >=  sizeof(bitD_t))
     {
         U32 contain32;
-        bitD->start = (char*)srcBuffer;
-        bitD->ptr   = (char*)srcBuffer + srcSize - sizeof(bitD_t);
+        bitD->start = (const char*)srcBuffer;
+        bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(bitD_t);
         bitD->bitContainer = FSE_readLEST(bitD->ptr);
-        contain32 = ((BYTE*)srcBuffer)[srcSize-1];
+        contain32 = ((const BYTE*)srcBuffer)[srcSize-1];
         if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
         bitD->bitsConsumed = 8 - FSE_highbit32(contain32);
     }
     else
     {
         U32 contain32;
-        bitD->start = (char*)srcBuffer;
+        bitD->start = (const char*)srcBuffer;
         bitD->ptr   = bitD->start;
-        bitD->bitContainer = *(BYTE*)(bitD->start);
+        bitD->bitContainer = *(const BYTE*)(bitD->start);
         switch(srcSize)
         {
-            case 7: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[6]) << (sizeof(bitD_t)*8 - 16);
-            case 6: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[5]) << (sizeof(bitD_t)*8 - 24);
-            case 5: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[4]) << (sizeof(bitD_t)*8 - 32);
-            case 4: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[3]) << 24;
-            case 3: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[2]) << 16;
-            case 2: bitD->bitContainer += (bitD_t)(((BYTE*)(bitD->start))[1]) <<  8;
+            case 7: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[6]) << (sizeof(bitD_t)*8 - 16);
+            case 6: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[5]) << (sizeof(bitD_t)*8 - 24);
+            case 5: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[4]) << (sizeof(bitD_t)*8 - 32);
+            case 4: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[3]) << 24;
+            case 3: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[2]) << 16;
+            case 2: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[1]) <<  8;
             default:;
         }
-        contain32 = ((BYTE*)srcBuffer)[srcSize-1];
+        contain32 = ((const BYTE*)srcBuffer)[srcSize-1];
         if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
         bitD->bitsConsumed = 8 - FSE_highbit32(contain32);
         bitD->bitsConsumed += (U32)(sizeof(bitD_t) - srcSize)*8;
@@ -1215,7 +1215,7 @@ BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD)
 {
-    return FSE_reloadDStream((FSE_DStream_t*)bitD)==2;
+    return ((bitD->ptr == bitD->start) && (bitD->bitsConsumed == sizeof(bitD_t)*8));
 }
 
 unsigned FSE_endOfDState(const FSE_DState_t* statePtr)
@@ -1559,7 +1559,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
     U32 position = 0;
     U32 highThreshold = tableSize-1;
-    const S16 largeLimit= 1 << (tableLog-1);
+    const S16 largeLimit= (S16)(1 << (tableLog-1));
     U32 noLarge = 1;
     U32 s;
 
