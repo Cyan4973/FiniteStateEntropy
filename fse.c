@@ -343,9 +343,9 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
             while (charnum >= start+24)
             {
                 start+=24;
-                bitStream += 0xFFFF<<bitCount;
+                bitStream += 0xFFFFU << bitCount;
                 if ((!safeWrite) && (out > oend-2)) return (size_t)-FSE_ERROR_GENERIC;   /* Buffer overflow */
-                out[0] = (BYTE)bitStream;
+                out[0] = (BYTE) bitStream;
                 out[1] = (BYTE)(bitStream>>8);
                 out+=2;
                 bitStream>>=16;
@@ -1138,18 +1138,19 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
 
 /* FSE_readBits
  * Read next n bits from the bitContainer.
- * Use the fast variant *only* if n > 0.
- * Note : for this function to work properly on 32-bits, don't read more than maxNbBits==25
+ * On 32-bits, don't read more than maxNbBits==25
+ * On 64-bits, don't read more than maxNbBits==57
+ * Use the fast variant *only* if n >= 1.
  * return : value extracted.
  */
 bitD_t FSE_readBits(FSE_DStream_t* bitD, U32 nbBits)
 {
-    bitD_t value = ((bitD->bitContainer << bitD->bitsConsumed) >> 1) >> (((sizeof(bitD_t)*8)-1)-nbBits);
+    bitD_t value = ((bitD->bitContainer << (bitD->bitsConsumed & ((sizeof(bitD_t)*8)-1))) >> 1) >> (((sizeof(bitD_t)*8)-1)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-bitD_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 */
+bitD_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 !! */
 {
     bitD_t value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(bitD_t)*8)-nbBits);
     bitD->bitsConsumed += nbBits;
@@ -1267,14 +1268,15 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     }
 
     /* tail */
+    /* note : FSE_reloadDStream(&bitD) >= 1; Ends at exactly 2 */
     while (1)
     {
-        if ( (FSE_reloadDStream(&bitD)>2) || (op==omax) || (FSE_endOfDState(&state1) && FSE_endOfDStream(&bitD)) )
+        if ( (FSE_reloadDStream(&bitD)>2) || (op==omax) || (FSE_endOfDStream(&bitD) && (fast || FSE_endOfDState(&state1))) )
             break;
 
         *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
 
-        if ( (FSE_reloadDStream(&bitD)>2) || (op==omax) || (FSE_endOfDState(&state2) && FSE_endOfDStream(&bitD)) )
+        if ( (FSE_reloadDStream(&bitD)>2) || (op==omax) || (FSE_endOfDStream(&bitD) && (fast || FSE_endOfDState(&state2))) )
             break;
 
         *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);

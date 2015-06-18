@@ -91,26 +91,6 @@
 static U32 no_prompt = 0;
 
 
-
-/**************************************
-*  Cycle counter
-***************************************/
-/*  Windows */
-#ifdef _WIN32
-#include <intrin.h>
-static U64 rdtsc(){ return __rdtsc(); }
-
-/*  Linux/GCC */
-#else
-static U64 rdtsc(void)
-{
-    U32 lo,hi;
-    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-    return ((U64)hi << 32) | lo;
-}
-#endif
-
-
 /*********************************************************
 *  Private functions
 **********************************************************/
@@ -996,7 +976,6 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     DISPLAY("\r%79s\r", "");
     {
         double bestTime = 999.;
-        double bestBpKC = 0;
         U32 benchNb=1;
         size_t errorCode = 0;
         DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
@@ -1005,28 +984,22 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             U32 milliTime;
             double averageTime;
             U32 loopNb=0;
-            U64 cycleCount;
-            double bytesPerKCycles;
 
             milliTime = BMK_GetMilliStart();
             while(BMK_GetMilliStart() == milliTime);
             milliTime = BMK_GetMilliStart();
-            cycleCount = rdtsc();
             while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
             {
                 errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
                 if (FSE_isError(errorCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(errorCode)); exit(-1); }
                 loopNb++;
             }
-            cycleCount = rdtsc() - cycleCount;
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            bytesPerKCycles = ((double)benchedSize * loopNb) * 1000 / cycleCount;
-            if (bytesPerKCycles > bestBpKC) bestBpKC = bytesPerKCycles;
-            DISPLAY("%2u-%-26.26s : %8.1f MB/s   (%.1f)\r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., bestBpKC);
+            DISPLAY("%2u-%-26.26s : %8.1f MB/s \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%2u#%-26.26s : %8.1f MB/s  (%6i) (%.1f)\n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode, bestBpKC);
+        DISPLAY("%2u#%-26.26s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
 _end:

@@ -50,4 +50,7 @@ staticAnalyze: clean
 gpptest: clean
 	@cd $(PROGDIR); $(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
+sanitize: clean
+	@cd $(PROGDIR); $(MAKE) test CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+
 

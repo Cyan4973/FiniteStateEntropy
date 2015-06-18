@@ -23,14 +23,16 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE   = v0.2.1
+RELEASE    = v0.2.1
 
-DESTDIR  ?=
-CFLAGS   ?= -O3
-MOREFLAGS?=
-CFLAGS   += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
-FLAGS     = -I.. $(CFLAGS) $(MOREFLAGS)
-CF32      = -m32
+DESTDIR   ?=
+CFLAGS    ?= -O3
+MOREFLAGS ?=
+CFLAGS    += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+FLAGS      = -I.. $(CFLAGS) $(MOREFLAGS)
+CF32       = -m32
+FSETEST   ?=
+FSEU16TEST?= $(FSETEST)
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -85,9 +87,9 @@ test-fse: probagen fse
 	rm tmp
 
 test: test-fse fullbench fuzzer fuzzerU16
-	./fuzzer
+	./fuzzer $(FSETEST) 
 	./fullbench -i1
-	./fuzzerU16
+	./fuzzerU16 $(FSEU16TEST) 
 
 test-fse32: probagen fse32
 	./probagen 20%

@@ -426,6 +426,15 @@ static void unitTest(void)
 /*****************************************************************
 *  Command line
 *****************************************************************/
+
+int badUsage(const char* exename)
+{
+    (void) exename;
+    DISPLAY("wrong parameter\n");
+    return 1;
+}
+
+
 int main (int argc, char** argv)
 {
     U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
@@ -438,12 +447,12 @@ int main (int argc, char** argv)
         char* argument = argv[argNb];
         if (argument[0]=='-')
         {
-            while (argument[1]!=0)
+            argument++;
+            while (argument[0]!=0)
             {
-                argument ++;
                 switch (argument[0])
                 {
-                // seed setting
+                /* seed setting */
                 case 's':
                     argument++;
                     seed=0;
@@ -455,7 +464,7 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // total tests
+                /* total tests */
                 case 'i':
                     argument++;
                     totalTest=0;
@@ -467,7 +476,7 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // jumpt to test nb
+                /* jump to test nb */
                 case 't':
                     argument++;
                     startTestNb=0;
@@ -479,29 +488,31 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // verbose mode
+                /* verbose mode */
                 case 'v':
+                    argument++;
                     displayLevel=4;
                     break;
 
-                // pause (hidden)
+                /* pause (hidden) */
                 case 'p':
+                    argument++;
                     pause=1;
                     break;
 
                 default:
-                    ;
+                    return badUsage(argv[0]);
                 }
             }
         }
     }
 
-    if (startTestNb ==0) unitTest();
+    if (startTestNb == 0) unitTest();
 
     DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, totalTest, startTestNb);
 
-    DISPLAY ("\rAll tests passed               \n");
+    DISPLAY ("\rAll %u tests passed               \n", totalTest);
     if (pause)
     {
         DISPLAY("press enter ...\n");

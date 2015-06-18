@@ -11,4 +11,5 @@ env:
   - TravisCi_FseTest=test-all
   - TravisCi_FseTest=clangtest
   - TravisCi_FseTest=gpptest
+  - TravisCi_FseTest=sanitize
 

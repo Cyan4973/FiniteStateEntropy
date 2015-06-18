@@ -288,9 +288,9 @@ int main (int argc, char** argv)
         char* argument = argv[argNb];
         if (argument[0]=='-')
         {
-            while (argument[1]!=0)
+            argument++;
+            while (argument[0]!=0)
             {
-                argument ++;
                 switch (argument[0])
                 {
                 /* seed setting */
@@ -331,11 +331,13 @@ int main (int argc, char** argv)
 
                 /* verbose mode */
                 case 'v':
+                    argument++;
                     displayLevel=4;
                     break;
 
                 /* pause (hidden) */
                 case 'p':
+                    argument++;
                     pause=1;
                     break;
 
@@ -351,7 +353,7 @@ int main (int argc, char** argv)
     DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, totalTest, startTestNb);
 
-    DISPLAY ("\rAll tests passed               \n");
+    DISPLAY ("\rAll %u tests passed               \n", totalTest);
     if (pause)
     {
         DISPLAY("press enter ...\n");
