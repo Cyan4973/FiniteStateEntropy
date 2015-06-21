@@ -1034,15 +1034,6 @@ typedef struct
     BYTE nbBits;
 } FSE_decode_t;   /* size == U32 */
 
-/* Specific corner case : RLE compression */
-size_t FSE_decompressRLE(void* dst, size_t originalSize,
-                   const void* cSrc, size_t cSrcSize)
-{
-    if (cSrcSize != 1) return (size_t)-FSE_ERROR_srcSize_wrong;
-    memset(dst, *(const BYTE*)cSrc, originalSize);
-    return originalSize;
-}
-
 
 size_t FSE_buildDTable_rle (void* DTable, BYTE symbolValue)
 {
@@ -1307,7 +1298,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     short counting[FSE_MAX_SYMBOL_VALUE+1];
     DTable_max_t DTable;   /* Static analyzer seems unable to understand this table will be properly initialized later */
     unsigned tableLog;
-    unsigned maxSymbolValue;
+    unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     size_t errorCode, fastMode;
 
     if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   /* too small input size */
