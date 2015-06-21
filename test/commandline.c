@@ -275,6 +275,11 @@ int main(int argc, char** argv)
             size_t l = strlen(input_filename);
             if (tmpFilenameSize < l+6) tmpFilenameSize = l+6;
             tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
+			if (tmpFilenameBuffer==NULL)
+			{
+				DISPLAY("Not enough memory, exiting ... \n");
+				exit(1);
+			}
             strcpy(tmpFilenameBuffer, input_filename);
             strcpy(tmpFilenameBuffer+l, FSE_EXTENSION);
             output_filename = tmpFilenameBuffer;

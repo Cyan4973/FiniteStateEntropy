@@ -120,7 +120,7 @@ static U32 BMK_rand (U32* seed)
 
 static void BMK_genData(void* buffer, size_t buffSize, double p)
 {
-    char table[PROBATABLESIZE];
+    char table[PROBATABLESIZE] = {0};
     int remaining = PROBATABLESIZE;
     unsigned pos = 0;
     unsigned s = 0;
@@ -689,7 +689,7 @@ static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 255;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, (const BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, &max, (const BYTE*)src, (U32)srcSize);
 }
 
 static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -697,7 +697,7 @@ static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, (const BYTE*)src, (U32)srcSize, &max);
+    return (int)FSE_count(count, &max, (const BYTE*)src, (U32)srcSize);
 }
 
 static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -705,7 +705,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return (int)FSE_countFast(count, (const unsigned char*)src, srcSize, &max);
+    return (int)FSE_countFast(count, &max, (const unsigned char*)src, srcSize);
 }
 
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -815,7 +815,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 4:
         {
             U32 max=255;
-            FSE_count(g_countTable, (const unsigned char*)oBuffer, (U32)benchedSize, &max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
@@ -825,7 +825,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 5:
         {
             U32 max=255;
-            FSE_count(g_countTable, (const unsigned char*)oBuffer, (U32)benchedSize, &max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_writeHeader";
@@ -849,7 +849,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 6:
         {
             U32 max=255;
-            FSE_count(g_countTable, (const unsigned char*)oBuffer, (U32)benchedSize, &max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             funcName = "FSE_buildCTable";
@@ -860,7 +860,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, (const unsigned char*)oBuffer, (U32)benchedSize, &max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
             g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";

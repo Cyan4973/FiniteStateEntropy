@@ -429,7 +429,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
                     memcpy(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origBuffer, regenSize);
                     break;
                 case 1:
-                    regenSize = FSE_decompressRLE(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                    regenSize = chunkP[chunkNb].origSize;
+                    memset(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origBuffer[0], chunkP[chunkNb].origSize);
                     break;
                 default:
                     regenSize = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
@@ -602,13 +603,13 @@ static void BMK_benchCore_Mem(char* dst,
     U64 crcOrig;
     U32 count[256];
     short norm[256];
-    void* CTable;
-    void* DTable;
+    CTable_t CTable;
+    DTable_t DTable;
     size_t fastMode;
 
     /* Init */
     crcOrig = XXH64(src, benchedSize,0);
-    FSE_count(count, (BYTE*)src, benchedSize, &nbSymbols);
+    FSE_count(count, &nbSymbols, (BYTE*)src, benchedSize);
     tableLog = (U32)FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
     CTable = FSE_createCTable(tableLog, nbSymbols);
     FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
@@ -652,7 +653,7 @@ static void BMK_benchCore_Mem(char* dst,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            dSize = FSE_decompress_usingDTable((BYTE*)src, benchedSize, dst, cSize, DTable, fastMode);
+            dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, DTable, fastMode);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);

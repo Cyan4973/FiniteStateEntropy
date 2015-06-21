@@ -171,7 +171,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     BYTE* op = ostart;
     BYTE* const omax = ostart + maxDstSize;
 
-    U32   counting[FSE_MAX_SYMBOL_VALUE+1];
+    U32   counting[FSE_MAX_SYMBOL_VALUE+1] = {0};
     S16   norm[FSE_MAX_SYMBOL_VALUE+1];
     CTable_max_t CTable;
 
@@ -186,7 +186,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_tableLog_tooLarge;
 
     /* Scan for stats */
-    errorCode = FSE_countU16 (counting, ip, srcSize, &maxSymbolValue);
+    errorCode = FSE_countU16 (counting, &maxSymbolValue, ip, srcSize);
     if (FSE_isError(errorCode)) return errorCode;
     if (errorCode == srcSize) return 1;   /* Input data is one constant element x srcSize times. Use RLE compression. */
 
@@ -201,9 +201,9 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     op += errorCode;
 
     /* Compress */
-    errorCode = FSE_buildCTableU16 (&CTable, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_buildCTableU16 (CTable, norm, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return errorCode;
-    op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, &CTable);
+    op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, CTable);
 
     /* check compressibility */
     if ( (size_t)(op-ostart) >= (size_t)(srcSize-1)*(sizeof(U16)) )
@@ -224,7 +224,7 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
     bitD_t lowBits;
     const U32 nbBits = DInfo.nbBits;
 
-    symbol = DInfo.symbol;
+    symbol = (U16)(DInfo.symbol);
     lowBits = FSE_readBits(bitD, nbBits);
     DStatePtr->state = DInfo.newState + lowBits;
 
@@ -263,7 +263,7 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     const BYTE* const istart = (const BYTE*) cSrc;
     const BYTE* ip = istart;
     short   counting[FSE_MAX_SYMBOL_VALUE+1];
-    FSE_decode_tU16 DTable[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
+    DTable_max_t DTable;
     unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     unsigned tableLog;
     size_t errorCode;

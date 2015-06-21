@@ -240,7 +240,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 *  Unitary tests
 *****************************************************************/
 
-extern size_t FSE_countU16(unsigned* count, const unsigned short* source, size_t sourceSize, unsigned* maxSymbolValuePtr);
+extern size_t FSE_countU16(unsigned* count, unsigned* maxSymbolValuePtr, const unsigned short* source, size_t sourceSize);
 
 #define TBSIZE (16 KB)
 static void unitTest(void)
@@ -257,15 +257,15 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuffU16[i] = i % (FSE_MAX_SYMBOL_VALUE+1);
 
         max = FSE_MAX_SYMBOL_VALUE;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(FSE_isError(errorCode), "FSE_countU16() should have worked");
 
         max = FSE_MAX_SYMBOL_VALUE+1;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too large");
 
         max = FSE_MAX_SYMBOL_VALUE-1;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too low");
     }
 

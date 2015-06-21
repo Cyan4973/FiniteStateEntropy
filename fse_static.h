@@ -40,24 +40,19 @@ extern "C" {
 
 
 /******************************************
-*  Tool functions
+*  FSE API compatible with DLL
 ******************************************/
-#define FSE_MAX_HEADERSIZE 512
-#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
+#include "fse.h"
 
 
 /******************************************
 *  Static allocation
 ******************************************/
-/* You can statically allocate a CTable as a table of U32 using below macro */
+#define FSE_MAX_HEADERSIZE 512
+#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
+/* You can statically allocate a CTable as a table of unsigned int using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
-#define FSE_DTABLE_SIZE_U32(maxTableLog)                   ((1<<maxTableLog)+1)
-
-
-/******************************************
-*  FSE supported API for DLL
-******************************************/
-#include "fse.h"
+#define FSE_DTABLE_SIZE_U32(maxTableLog)                   (1 + (1<<maxTableLog))
 
 
 /******************************************
@@ -77,17 +72,17 @@ typedef enum { FSE_LIST_ERRORS(FSE_GENERATE_ENUM) } FSE_errorCodes;  /* enum is 
 /******************************************
 *  FSE advanced API
 ******************************************/
-size_t FSE_countFast(unsigned* count, const unsigned char* src, size_t srcSize, unsigned* maxSymbolValuePtr);
-/* same as FSE_count(), but won't check if input really respect that all values within src are <= *maxSymbolValuePtr */
+size_t FSE_countFast(unsigned* count, unsigned* maxSymbolValuePtr, const unsigned char* src, size_t srcSize);
+/* same as FSE_count(), but blindly trust that all values within src are <= maxSymbolValuePtr[0] */
 
 size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits);
-/* create a fake CTable, designed to not compress an input where each element uses nbBits */
+/* create a fake CTable, designed to not compress an input, where each symbol uses nbBits */
 
 size_t FSE_buildCTable_rle (void* CTable, unsigned char symbolValue);
-/* create a fake CTable, designed to compress a single identical value */
+/* create a fake CTable, designed to compress always the same symbolValue */
 
 size_t FSE_buildDTable_raw (void* DTable, unsigned nbBits);
-/* create a fake DTable, designed to read an uncompressed bitstream where each element uses nbBits */
+/* create a fake DTable, designed to read an uncompressed bitstream where each symbol uses nbBits */
 
 size_t FSE_buildDTable_rle (void* DTable, unsigned char symbolValue);
 /* create a fake DTable, designed to always generate the same symbolValue */
