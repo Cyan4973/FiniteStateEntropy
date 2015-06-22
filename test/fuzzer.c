@@ -307,6 +307,15 @@ static void unitTest(void)
     U32 seed=0, testNb=0, lseed=0;
     U32 count[256];
 
+    if ((!testBuff) || (!cBuff) || (!verifBuff))
+    {
+        DISPLAY("Not enough memory, exiting ... \n");
+        free(testBuff);
+        free(cBuff);
+        free(verifBuff);
+        return;
+    }
+
     /* FSE_count */
     {
         U32 max, i;
