@@ -600,18 +600,18 @@ static void BMK_benchCore_Mem(char* dst,
     U64 crcOrig;
     U32 count[256];
     short norm[256];
-    CTable_t CTable;
-    DTable_t DTable;
+    CTable ct;
+    DTable dt;
     size_t fastMode;
 
     /* Init */
     crcOrig = XXH64(src, benchedSize,0);
     FSE_count(count, &nbSymbols, (BYTE*)src, benchedSize);
     tableLog = (U32)FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
-    CTable = FSE_createCTable(tableLog, nbSymbols);
-    FSE_buildCTable(CTable, norm, nbSymbols, tableLog);
-    DTable = FSE_createDTable(tableLog);
-    fastMode = FSE_buildDTable(DTable, norm, nbSymbols, tableLog);
+    ct = FSE_createCTable(tableLog, nbSymbols);
+    FSE_buildCTable(ct, norm, nbSymbols, tableLog);
+    dt = FSE_createDTable(tableLog);
+    fastMode = FSE_buildDTable(dt, norm, nbSymbols, tableLog);
 
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -629,7 +629,7 @@ static void BMK_benchCore_Mem(char* dst,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            cSize = FSE_compress_usingCTable(dst, FSE_compressBound(benchedSize), src, benchedSize, CTable);
+            cSize = FSE_compress_usingCTable(dst, FSE_compressBound(benchedSize), src, benchedSize, ct);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -650,7 +650,7 @@ static void BMK_benchCore_Mem(char* dst,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, DTable, fastMode);
+            dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, dt, fastMode);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -677,8 +677,8 @@ static void BMK_benchCore_Mem(char* dst,
     *totalCompressionTime   += fastestC;
     *totalDecompressionTime += fastestD;
 
-    free(CTable);
-    free(DTable);
+    free(ct);
+    free(dt);
 }
 
 

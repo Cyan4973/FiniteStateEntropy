@@ -164,23 +164,23 @@ size_t FSE_writeHeader (void* headerBuffer, size_t headerBufferSize, const short
 /*
 Constructor and Destructor of type CTable_t
 Not that its size depends on parameters 'tableLog' and 'maxSymbolValue' */
-typedef unsigned* CTable_t;   /* enforce alignment on 4-bytes */
-CTable_t FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
-void     FSE_freeCTable (CTable_t CTable);
+typedef unsigned* CTable;   /* enforce alignment on 4-bytes */
+CTable FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
+void   FSE_freeCTable (CTable ct);
 
 /*
 FSE_buildCTable():
    Builds CTable, which must be already allocated, using FSE_createCTable()
    return : 0
             or an errorCode, which can be tested using FSE_isError() */
-size_t   FSE_buildCTable(CTable_t CTable, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t   FSE_buildCTable(CTable ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_compress_usingCTable():
    Compress 'src' using 'CTable' into 'dst' which must be already allocated
    return : size of compressed data
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const CTable_t CTable);
+size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const CTable ct);
 
 /*
 Tutorial :
@@ -227,14 +227,20 @@ If there is an error, the function will return an ErrorCode (which can be tested
 
 /* *** DECOMPRESSION *** */
 
+/*
+FSE_readHeader():
+   Read compactly saved 'normalizedCounter' from buffer 'headerBuffer' of size 'hbSize'.
+   return : size of the compressed table
+            or an errorCode, which can be tested using FSE_isError()
+            maxSymbolValuePtr[0] and tableLogPtr[0] will also be updated with their respective values */
 size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t hbSize);
 
-typedef unsigned* DTable_t;
-DTable_t FSE_createDTable(unsigned tableLog);
-void     FSE_freeDTable(DTable_t DTable);
-size_t   FSE_buildDTable (DTable_t DTable, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+typedef unsigned* DTable;
+DTable FSE_createDTable(unsigned tableLog);
+void   FSE_freeDTable(DTable dt);
+size_t FSE_buildDTable (DTable dt, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t DTable, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable dt, size_t fastMode);
 
 /*
 Tutorial :
