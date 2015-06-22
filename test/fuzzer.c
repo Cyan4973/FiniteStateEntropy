@@ -300,9 +300,9 @@ extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned 
 #define TBSIZE (16 KB)
 static void unitTest(void)
 {
-    BYTE testBuff[TBSIZE];
-    BYTE cBuff[FSE_COMPRESSBOUND(TBSIZE)];
-    BYTE verifBuff[TBSIZE];
+    BYTE* testBuff = (BYTE*)malloc(TBSIZE);
+    BYTE* cBuff = (BYTE*)malloc(FSE_COMPRESSBOUND(TBSIZE));
+    BYTE* verifBuff = (BYTE*)malloc(TBSIZE);
     size_t errorCode;
     U32 seed=0, testNb=0, lseed=0;
     U32 count[256];
@@ -418,7 +418,9 @@ static void unitTest(void)
         CHECK(crcOrig != crcVerif, "Raw regenerated data is corrupted");
     }
 
-
+    free(testBuff);
+    free(cBuff);
+    free(verifBuff);
     DISPLAY("Unit tests completed\n");
 }
 
