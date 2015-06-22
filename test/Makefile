@@ -75,7 +75,7 @@ probagen: probaGenerator.c
 
 clean:
 	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
-	@rm tmp result proba.bin
+	@rm -f tmp result proba.bin
 	@echo Cleaning completed
 
 test-fse: probagen fse
