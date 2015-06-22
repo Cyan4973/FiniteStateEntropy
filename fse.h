@@ -292,7 +292,7 @@ typedef struct
 } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
-void   FSE_initCState(FSE_CState_t* CStatePtr, const void* CTable);
+void   FSE_initCState(FSE_CState_t* CStatePtr, const CTable ct);
 
 void   FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned char symbol);
 void   FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits);
@@ -365,7 +365,7 @@ typedef struct
 
 
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
-void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const void* DTable);
+void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const DTable dt);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 bitD_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);

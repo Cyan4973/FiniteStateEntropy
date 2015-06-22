@@ -403,8 +403,8 @@ static void unitTest(void)
 
     /* FSE_buildCTable_raw & FSE_buildDTable_raw */
     {
-        U32 CTable[FSE_CTABLE_SIZE_U32(8, 256)];
-        U32 DTable[FSE_DTABLE_SIZE_U32(8)];
+        U32 ct[FSE_CTABLE_SIZE_U32(8, 256)];
+        U32 dt[FSE_DTABLE_SIZE_U32(8)];
         U64 crcOrig, crcVerif;
         size_t cSize, verifSize;
 
@@ -412,15 +412,15 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&seed) & 63) + '0';
         crcOrig = XXH64(testBuff, TBSIZE, 0);
 
-        errorCode = FSE_buildCTable_raw(CTable, 8);
+        errorCode = FSE_buildCTable_raw(ct, 8);
         CHECK(FSE_isError(errorCode), "FSE_buildCTable_raw should have worked");
-        errorCode = FSE_buildDTable_raw(DTable, 8);
+        errorCode = FSE_buildDTable_raw(dt, 8);
         CHECK(FSE_isError(errorCode), "FSE_buildDTable_raw should have worked");
 
-        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, CTable);
+        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, ct);
         CHECK(FSE_isError(cSize), "FSE_compress_usingCTable should have worked using raw CTable");
 
-        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, DTable, 0);
+        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, dt, 0);
         CHECK(FSE_isError(verifSize), "FSE_decompress_usingDTable should have worked using raw DTable");
 
         crcVerif = XXH64(verifBuff, verifSize, 0);
@@ -526,8 +526,10 @@ int main (int argc, char** argv)
     DISPLAY ("\rAll %u tests passed               \n", totalTest);
     if (pause)
     {
+        int unused;
         DISPLAY("press enter ...\n");
-        getchar();
+        unused = getchar();
+        (void)unused;
     }
     return 0;
 }

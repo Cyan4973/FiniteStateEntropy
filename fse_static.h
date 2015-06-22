@@ -75,17 +75,17 @@ typedef enum { FSE_LIST_ERRORS(FSE_GENERATE_ENUM) } FSE_errorCodes;  /* enum is 
 size_t FSE_countFast(unsigned* count, unsigned* maxSymbolValuePtr, const unsigned char* src, size_t srcSize);
 /* same as FSE_count(), but blindly trust that all values within src are <= maxSymbolValuePtr[0] */
 
-size_t FSE_buildCTable_raw (void* CTable, unsigned nbBits);
-/* create a fake CTable, designed to not compress an input, where each symbol uses nbBits */
+size_t FSE_buildCTable_raw (CTable ct, unsigned nbBits);
+/* build a fake CTable, designed to not compress an input, where each symbol uses nbBits */
 
-size_t FSE_buildCTable_rle (void* CTable, unsigned char symbolValue);
-/* create a fake CTable, designed to compress always the same symbolValue */
+size_t FSE_buildCTable_rle (CTable ct, unsigned char symbolValue);
+/* build a fake CTable, designed to compress always the same symbolValue */
 
-size_t FSE_buildDTable_raw (void* DTable, unsigned nbBits);
-/* create a fake DTable, designed to read an uncompressed bitstream where each symbol uses nbBits */
+size_t FSE_buildDTable_raw (DTable dt, unsigned nbBits);
+/* build a fake DTable, designed to read an uncompressed bitstream where each symbol uses nbBits */
 
-size_t FSE_buildDTable_rle (void* DTable, unsigned char symbolValue);
-/* create a fake DTable, designed to always generate the same symbolValue */
+size_t FSE_buildDTable_rle (DTable dt, unsigned char symbolValue);
+/* build a fake DTable, designed to always generate the same symbolValue */
 
 
 /******************************************
