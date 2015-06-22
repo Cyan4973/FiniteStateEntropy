@@ -118,8 +118,9 @@ static int badusage(void)
 
 static void waitEnter(void)
 {
+    int unused;
     DISPLAY("Press enter to continue...\n");
-    int unused = getchar();
+    unused = getchar();
     (void)unused;
 }
 
