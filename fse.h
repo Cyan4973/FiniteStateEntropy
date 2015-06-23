@@ -295,29 +295,12 @@ If there is an error, the function will return an error code, which can be teste
    This API consists of small unitary functions, which highly benefit from being inlined.
    Some compilers seem unable to properly inline functions from another *.c (GCC, clang)
    while others have no such issue (Visual).
-   If you find yourself in the first situation, you might want to include "fse.c",
+   If you find yourself in the first situation, you might want to include "fse.c" directly,
    to improve the likelyhood of inlining these functions, which is key to their performance.
 */
 
-
-/* Note :
-   It is tempting to make below types opaque, since users should never access their member.
-   But it's also necessary to let user allocate such structures on stack,
-   because it's significantly good for performance and memory management.
-   A simple way is to let the struct definition here, in the .h.
-   Alternately, it could be possible to publish a "generic struct" with good size and alignment (like xxhash and lz4).
-   A downside is a need to constantly cast to proper internal type within the .c. */
-
-typedef struct { size_t space[4]; } FSE_CStream_t;
-
-typedef struct
-{
-    ptrdiff_t   value;
-    const void* stateTable;
-    const void* symbolTT;
-    unsigned    stateLog;
-} FSE_CState_t;
-
+typedef struct { size_t space1[4]; } FSE_CStream_t;
+typedef struct { size_t space2[4]; } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
 void   FSE_initCState(FSE_CState_t* CStatePtr, const CTable ct);

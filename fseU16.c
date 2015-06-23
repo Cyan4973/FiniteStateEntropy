@@ -90,8 +90,9 @@ typedef struct
 /*********************************************************
 *  U16 Compression functions
 *********************************************************/
-void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
+void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, U16 symbol)
 {
+    CState_i* statePtr = (CState_i*) statePtrExt;
     const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
     const U16* const stateTable = (const U16*) statePtr->stateTable;
     int nbBitsOut  = symbolTT[symbol].minBitsOut;
