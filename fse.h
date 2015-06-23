@@ -162,25 +162,25 @@ size_t FSE_writeHeader (void* headerBuffer, size_t headerBufferSize, const short
 
 
 /*
-Constructor and Destructor of type CTable
+Constructor and Destructor of type FSE_CTable
 Not that its size depends on parameters 'tableLog' and 'maxSymbolValue' */
-typedef unsigned* CTable;   /* enforce alignment on 4-bytes */
-CTable FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
-void   FSE_freeCTable (CTable ct);
+typedef unsigned* FSE_CTable;   /* enforce alignment on 4-bytes */
+FSE_CTable FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
+void   FSE_freeCTable (FSE_CTable ct);
 
 /*
 FSE_buildCTable():
-   Builds CTable, which must be already allocated, using FSE_createCTable()
+   Builds 'ct', which must be already allocated, using FSE_createCTable()
    return : 0
             or an errorCode, which can be tested using FSE_isError() */
-size_t   FSE_buildCTable(CTable ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t   FSE_buildCTable(FSE_CTable ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_compress_usingCTable():
-   Compress 'src' using 'CTable' into 'dst' which must be already allocated
+   Compress 'src' using 'ct' into 'dst' which must be already allocated
    return : size of compressed data
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const CTable ct);
+size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const FSE_CTable ct);
 
 /*
 Tutorial :
@@ -236,27 +236,27 @@ FSE_readHeader():
 size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t hbSize);
 
 /*
-Constructor and Destructor of type DTable
+Constructor and Destructor of type FSE_DTable
 Not that its size depends on parameters 'tableLog'*/
-typedef unsigned* DTable;
-DTable FSE_createDTable(unsigned tableLog);
-void   FSE_freeDTable(DTable dt);
+typedef unsigned* FSE_DTable;
+FSE_DTable FSE_createDTable(unsigned tableLog);
+void       FSE_freeDTable(FSE_DTable dt);
 
 /*
 FSE_buildDTable():
-   Builds DTable, which must be already allocated, using FSE_createDTable()
-   return : 1 is DTable is compatible with fast mode, 0 otherwise,
+   Builds 'dt', which must be already allocated, using FSE_createDTable()
+   return : 1 if 'dt' is compatible with fast mode, 0 otherwise,
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_buildDTable (DTable dt, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_buildDTable (FSE_DTable dt, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_decompress_usingDTable():
    Decompress compressed source 'cSrc' of size 'cSrcSize'
-   using 'DTable' into 'dst' which must be already allocated.
+   using 'dt' into 'dst' which must be already allocated.
    Use fastMode==1 only if authorized by result of FSE_buildDTable().
    return : size of regenerated data (necessarily <= maxDstSize)
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable dt, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable dt, size_t fastMode);
 
 /*
 Tutorial :
@@ -274,13 +274,13 @@ FSE_readHeader will provide 'tableLog' and 'maxSymbolValue' stored into the head
 The result of FSE_readHeader() is the number of bytes read from 'header'.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
-The next step is to create the decompression tables 'DTable' from 'normalizedCounter'.
+The next step is to create the decompression tables 'FSE_DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
-The space required by 'DTable' must be already allocated using FSE_createDTable().
-The function will return 1 if DTable is compatible with fastMode, 0 otherwise.
+The space required by 'FSE_DTable' must be already allocated using FSE_createDTable().
+The function will return 1 if FSE_DTable is compatible with fastMode, 0 otherwise.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
-'DTable' can then be used to decompress 'cSrc', with FSE_decompress_usingDTable().
+'FSE_DTable' can then be used to decompress 'cSrc', with FSE_decompress_usingDTable().
 Only trigger fastMode if it was authorized by the result of FSE_buildDTable(), otherwise decompression will fail.
 cSrcSize must be correct, otherwise decompression will fail.
 FSE_decompress_usingDTable() result will tell how many bytes were regenerated.
@@ -299,11 +299,11 @@ If there is an error, the function will return an error code, which can be teste
    to improve the likelyhood of inlining these functions, which is key to their performance.
 */
 
-typedef struct { size_t space1[4]; } FSE_CStream_t;
-typedef struct { size_t space2[4]; } FSE_CState_t;
+typedef struct { size_t space[4]; } FSE_CStream_t;
+typedef struct { size_t space[4]; } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
-void   FSE_initCState(FSE_CState_t* CStatePtr, const CTable ct);
+void   FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable ct);
 
 void   FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned char symbol);
 void   FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits);
@@ -321,7 +321,7 @@ So the first symbol you will encode is the last you will decode, like a LIFO sta
 
 You will need a few variables to track your CStream. They are :
 
-CTable ct;            // Provided by FSE_buildCTable()
+FSE_CTable ct;        // Provided by FSE_buildCTable()
 FSE_CStream_t bitC;   // bitStream tracking structure
 FSE_CState_t state;   // State tracking structure (can have several)
 
@@ -375,7 +375,7 @@ typedef struct
 
 
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
-void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const DTable dt);
+void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable dt);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 bitD_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
@@ -393,14 +393,14 @@ You will need a few variables to track your bitStream. They are :
 
 FSE_DStream_t DStream;  // Stream context
 FSE_DState_t DState;    // State context. Multiple ones are possible
-DTable dt;              // Decoding table, provided by FSE_buildDTable()
+FSE_DTable dt;          // Decoding table, provided by FSE_buildDTable()
 U32 tableLog;           // Provided by FSE_readHeader()
 
 The first thing to do is to init the bitStream.
     errorCode = FSE_initDStream(&DStream, &optionalId, srcBuffer, srcSize);
 
 You should then retrieve your initial state(s) :
-    errorCode = FSE_initDState(&DState, &DStream, DTable, tableLog);
+    errorCode = FSE_initDState(&DState, &DStream, dt, tableLog);
 
 You can then decode your data, symbol after symbol.
 For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.

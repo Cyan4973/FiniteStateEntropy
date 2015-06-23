@@ -600,8 +600,8 @@ static void BMK_benchCore_Mem(char* dst,
     U64 crcOrig;
     U32 count[256];
     short norm[256];
-    CTable ct;
-    DTable dt;
+    FSE_CTable ct;
+    FSE_DTable dt;
     size_t fastMode;
 
     /* Init */
