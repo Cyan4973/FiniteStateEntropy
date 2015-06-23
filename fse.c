@@ -247,6 +247,24 @@ typedef struct
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
+struct FSE_CStream_s
+{
+    size_t bitContainer;
+    int    bitPos;
+    char*  startPtr;
+    char*  ptr;
+};
+
+typedef struct FSE_CStream_s* CStream_i;
+
+struct FSE_CState_s
+{
+    ptrdiff_t   value;
+    const void* stateTable;
+    const void* symbolTT;
+    unsigned    stateLog;
+};
+
 
 /****************************************************************
 *  Internal functions
@@ -839,8 +857,10 @@ size_t FSE_buildCTable_rle (CTable ct, BYTE symbolValue)
 }
 
 
-void FSE_initCStream(FSE_CStream_t* bitC, void* start)
+void FSE_initCStream(FSE_CStream_t* bitCext, void* start)
 {
+    CStream_i bitC = (CStream_i) bitCext;
+    FSE_STATIC_ASSERT(sizeof(FSE_CStream_t) >= sizeof(CStream_i));   /* An error here means FSE_CStream_t size must be increased */
     bitC->bitContainer = 0;
     bitC->bitPos = 0;   /* reserved for unusedBits */
     bitC->startPtr = (char*)start;
@@ -856,9 +876,10 @@ void FSE_initCState(FSE_CState_t* statePtr, const CTable ct)
     statePtr->stateLog = tableLog;
 }
 
-void FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits)
+void FSE_addBits(FSE_CStream_t* bitCext, size_t value, unsigned nbBits)
 {
     static const unsigned mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   /* up to 25 bits */
+    CStream_i bitC = (CStream_i)bitCext;
     bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
     bitC->bitPos += nbBits;
 }
@@ -873,8 +894,9 @@ void FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* statePtr, BYTE symbol)
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
 }
 
-void FSE_flushBits(FSE_CStream_t* bitC)
+void FSE_flushBits(FSE_CStream_t* bitCext)
 {
+    CStream_i bitC = (CStream_i)bitCext;
     size_t nbBytes = bitC->bitPos >> 3;
     FSE_writeLEST(bitC->ptr, bitC->bitContainer);
     bitC->bitPos &= 7;
@@ -889,12 +911,13 @@ void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtr)
 }
 
 
-size_t FSE_closeCStream(FSE_CStream_t* bitC)
+size_t FSE_closeCStream(FSE_CStream_t* bitCext)
 {
+    CStream_i bitC = (CStream_i)bitCext;
     char* endPtr;
 
-    FSE_addBits(bitC, 1, 1);
-    FSE_flushBits(bitC);
+    FSE_addBits(bitCext, 1, 1);
+    FSE_flushBits(bitCext);
 
     endPtr = bitC->ptr;
     endPtr += bitC->bitPos > 0;
