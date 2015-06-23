@@ -263,6 +263,20 @@ typedef struct
     unsigned    stateLog;
 } CState_i;
 
+typedef struct
+{
+    size_t   bitContainer;
+    unsigned bitsConsumed;
+    const char* ptr;
+    const char* start;
+} DStream_i;
+
+typedef struct
+{
+    size_t      state;
+    const void* table;
+} DState_i;
+
 
 /****************************************************************
 *  Internal functions
@@ -869,6 +883,7 @@ void FSE_initCState(FSE_CState_t* statePtrExt, const FSE_CTable ct)
 {
     const U32 tableLog = ( (const U16*) ct) [0];
     CState_i* statePtr = (CState_i*) statePtrExt;
+    FSE_STATIC_ASSERT(sizeof(FSE_CState_t) >= sizeof(CState_i));
     statePtr->value = (ptrdiff_t)1<<tableLog;
     statePtr->stateTable = ((const U16*) ct) + 2;
     statePtr->symbolTT = (const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1);
@@ -1101,15 +1116,18 @@ size_t FSE_buildDTable_raw (FSE_DTable dt, unsigned nbBits)
  * The function result is the size of the FSE_block (== srcSize).
  * If srcSize is too small, the function will return an errorCode;
  */
-size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize)
+size_t FSE_initDStream(FSE_DStream_t* bitDext, const void* srcBuffer, size_t srcSize)
 {
+    DStream_i* bitD = (DStream_i*)bitDext;
+
+    FSE_STATIC_ASSERT(sizeof(FSE_DStream_t) >= sizeof(DStream_i));
     if (srcSize < 1) return (size_t)-FSE_ERROR_srcSize_wrong;
 
-    if (srcSize >=  sizeof(bitD_t))
+    if (srcSize >=  sizeof(size_t))
     {
         U32 contain32;
         bitD->start = (const char*)srcBuffer;
-        bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(bitD_t);
+        bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(size_t);
         bitD->bitContainer = FSE_readLEST(bitD->ptr);
         contain32 = ((const BYTE*)srcBuffer)[srcSize-1];
         if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
@@ -1123,18 +1141,18 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
         bitD->bitContainer = *(const BYTE*)(bitD->start);
         switch(srcSize)
         {
-            case 7: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[6]) << (sizeof(bitD_t)*8 - 16);
-            case 6: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[5]) << (sizeof(bitD_t)*8 - 24);
-            case 5: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[4]) << (sizeof(bitD_t)*8 - 32);
-            case 4: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[3]) << 24;
-            case 3: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[2]) << 16;
-            case 2: bitD->bitContainer += (bitD_t)(((const BYTE*)(bitD->start))[1]) <<  8;
+            case 7: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[6]) << (sizeof(size_t)*8 - 16);
+            case 6: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[5]) << (sizeof(size_t)*8 - 24);
+            case 5: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[4]) << (sizeof(size_t)*8 - 32);
+            case 4: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[3]) << 24;
+            case 3: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[2]) << 16;
+            case 2: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[1]) <<  8;
             default:;
         }
         contain32 = ((const BYTE*)srcBuffer)[srcSize-1];
         if (contain32 == 0) return (size_t)-FSE_ERROR_GENERIC;   /* stop bit not present */
         bitD->bitsConsumed = 8 - FSE_highbit32(contain32);
-        bitD->bitsConsumed += (U32)(sizeof(bitD_t) - srcSize)*8;
+        bitD->bitsConsumed += (U32)(sizeof(size_t) - srcSize)*8;
     }
 
     return srcSize;
@@ -1148,23 +1166,26 @@ size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSiz
  * Use the fast variant *only* if n >= 1.
  * return : value extracted.
  */
-bitD_t FSE_readBits(FSE_DStream_t* bitD, U32 nbBits)
+size_t FSE_readBits(FSE_DStream_t* bitDext, U32 nbBits)
 {
-    bitD_t value = ((bitD->bitContainer << (bitD->bitsConsumed & ((sizeof(bitD_t)*8)-1))) >> 1) >> (((sizeof(bitD_t)*8)-1)-nbBits);
+    DStream_i* bitD = (DStream_i*)bitDext;
+    size_t value = ((bitD->bitContainer << (bitD->bitsConsumed & ((sizeof(size_t)*8)-1))) >> 1) >> (((sizeof(size_t)*8)-1)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-bitD_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 !! */
+size_t FSE_readBitsFast(FSE_DStream_t* bitDext, U32 nbBits)   /* only if nbBits >= 1 !! */
 {
-    bitD_t value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(bitD_t)*8)-nbBits);
+    DStream_i* bitD = (DStream_i*)bitDext;
+    size_t value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(size_t)*8)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
+unsigned FSE_reloadDStream(FSE_DStream_t* bitDext)
 {
-    if (bitD->ptr >= bitD->start + sizeof(bitD_t))
+    DStream_i* bitD = (DStream_i*)bitDext;
+    if (bitD->ptr >= bitD->start + sizeof(size_t))
     {
         bitD->ptr -= bitD->bitsConsumed >> 3;
         bitD->bitsConsumed &= 7;
@@ -1173,8 +1194,8 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
     }
     if (bitD->ptr == bitD->start)
     {
-        if (bitD->bitsConsumed < sizeof(bitD_t)*8) return 1;
-        if (bitD->bitsConsumed == sizeof(bitD_t)*8) return 2;
+        if (bitD->bitsConsumed < sizeof(size_t)*8) return 1;
+        if (bitD->bitsConsumed == sizeof(size_t)*8) return 2;
         return 3;
     }
     {
@@ -1189,31 +1210,35 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
 }
 
 
-void FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable dt)
+void FSE_initDState(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD, const FSE_DTable dt)
 {
     const U32* const base32 = (const U32*)dt;
+    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
+    FSE_STATIC_ASSERT(sizeof(FSE_DState_t) >= sizeof(DState_i));
     DStatePtr->state = FSE_readBits(bitD, base32[0]);
     FSE_reloadDStream(bitD);
     DStatePtr->table = base32 + 1;
 }
 
-BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
+BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
 {
+    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32  nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
-    bitD_t lowBits = FSE_readBits(bitD, nbBits);
+    size_t lowBits = FSE_readBits(bitD, nbBits);
 
     DStatePtr->state = DInfo.newState + lowBits;
     return symbol;
 }
 
-BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
+BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
 {
+    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32 nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
-    bitD_t lowBits = FSE_readBitsFast(bitD, nbBits);
+    size_t lowBits = FSE_readBitsFast(bitD, nbBits);
 
     DStatePtr->state = DInfo.newState + lowBits;
     return symbol;
@@ -1222,14 +1247,16 @@ BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 /* FSE_endOfDStream
    Tells if bitD has reached end of bitStream or not */
 
-unsigned FSE_endOfDStream(const FSE_DStream_t* bitD)
+unsigned FSE_endOfDStream(const FSE_DStream_t* bitDext)
 {
-    return ((bitD->ptr == bitD->start) && (bitD->bitsConsumed == sizeof(bitD_t)*8));
+    const DStream_i* bitD = (const DStream_i*)bitDext;
+    return ((bitD->ptr == bitD->start) && (bitD->bitsConsumed == sizeof(size_t)*8));
 }
 
-unsigned FSE_endOfDState(const FSE_DState_t* statePtr)
+unsigned FSE_endOfDState(const FSE_DState_t* statePtrExt)
 {
-    return statePtr->state == 0;
+    const DState_i* DStatePtr = (const DState_i*)statePtrExt;
+    return DStatePtr->state == 0;
 }
 
 
@@ -1260,12 +1287,12 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     {
         *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
 
-        if (FSE_MAX_TABLELOG*2+7 > sizeof(bitD_t)*8)    /* This test must be static */
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(size_t)*8)    /* This test must be static */
             FSE_reloadDStream(&bitD);
 
         *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
 
-        if (FSE_MAX_TABLELOG*4+7 < sizeof(bitD_t)*8)    /* This test must be static */
+        if (FSE_MAX_TABLELOG*4+7 < sizeof(size_t)*8)    /* This test must be static */
         {
             *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
             *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);

@@ -218,11 +218,12 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 *  U16 Decompression functions
 *********************************************************/
 
-U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
+U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
 {
+    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_tU16 DInfo = ((const FSE_decode_tU16*)(DStatePtr->table))[DStatePtr->state];
     U16 symbol;
-    bitD_t lowBits;
+    size_t lowBits;
     const U32 nbBits = DInfo.nbBits;
 
     symbol = (U16)(DInfo.symbol);

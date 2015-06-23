@@ -357,35 +357,22 @@ If there is an error, it returns an errorCode (which can be tested using FSE_isE
 /******************************************
 *  FSE symbol decompression API
 ******************************************/
-typedef size_t bitD_t;
-
-typedef struct
-{
-    bitD_t   bitContainer;
-    unsigned bitsConsumed;
-    const char* ptr;
-    const char* start;
-} FSE_DStream_t;
-
-typedef struct
-{
-    bitD_t      state;
-    const void* table;
-} FSE_DState_t;
+typedef struct { size_t space[4]; } FSE_DStream_t;
+typedef struct { size_t space[2]; } FSE_DState_t;
 
 
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
 void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable dt);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
-bitD_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
+size_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);
 unsigned int  FSE_reloadDStream(FSE_DStream_t* bitD);
 
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
 /*
-Let's now decompose FSE_decompress_usingDTable() into its unitary elements.
+Let's now decompose FSE_decompress_usingDTable() into its unitary components.
 You will decode FSE-encoded symbols from the bitStream,
 and also any other bitFields you put in, **in reverse order**.
 
