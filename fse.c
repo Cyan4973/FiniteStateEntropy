@@ -258,8 +258,8 @@ typedef struct
 typedef struct
 {
     ptrdiff_t   value;
-    const void* stateTable;
-    const void* symbolTT;
+    const U16* stateTable;
+    const FSE_symbolCompressionTransform * symbolTT;
     unsigned    stateLog;
 } CState_i;
 
@@ -274,7 +274,7 @@ typedef struct
 typedef struct
 {
     size_t      state;
-    const void* table;
+    const void* table;   /* precise table may vary, depending on U16 */
 } DState_i;
 
 
@@ -886,7 +886,7 @@ void FSE_initCState(FSE_CState_t* statePtrExt, const FSE_CTable ct)
     FSE_STATIC_ASSERT(sizeof(FSE_CState_t) >= sizeof(CState_i));
     statePtr->value = (ptrdiff_t)1<<tableLog;
     statePtr->stateTable = ((const U16*) ct) + 2;
-    statePtr->symbolTT = (const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1);
+    statePtr->symbolTT = (const FSE_symbolCompressionTransform*)((const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1));
     statePtr->stateLog = tableLog;
 }
 
@@ -898,15 +898,15 @@ void FSE_addBits(FSE_CStream_t* bitCext, size_t value, unsigned nbBits)
     bitC->bitPos += nbBits;
 }
 
-void FSE_encodeByte(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, BYTE symbol)
+void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, BYTE symbol)
 {
     CState_i* statePtr = (CState_i*) statePtrExt;
-    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
-    const U16* const stateTable = (const U16*) statePtr->stateTable;
-    int nbBitsOut  = symbolTT[symbol].minBitsOut;
-    nbBitsOut -= (int)((symbolTT[symbol].maxState - statePtr->value) >> 31);
+    const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
+    const U16* const stateTable = statePtr->stateTable;
+    int nbBitsOut  = symbolTT.minBitsOut;
+    nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
-    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
+    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
 }
 
 void FSE_flushBits(FSE_CStream_t* bitCext)
@@ -965,32 +965,32 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
     /* join to even */
     if (srcSize & 1)
     {
-        FSE_encodeByte(&bitC, &CState1, *--ip);
+        FSE_encodeSymbol(&bitC, &CState1, *--ip);
         FSE_flushBits(&bitC);
     }
 
     /* join to mod 4 */
     if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (srcSize & 2))   /* test bit 2 */
     {
-        FSE_encodeByte(&bitC, &CState2, *--ip);
-        FSE_encodeByte(&bitC, &CState1, *--ip);
+        FSE_encodeSymbol(&bitC, &CState2, *--ip);
+        FSE_encodeSymbol(&bitC, &CState1, *--ip);
         FSE_flushBits(&bitC);
     }
 
     /* 2 or 4 encoding per loop */
     while (ip>istart)
     {
-        FSE_encodeByte(&bitC, &CState2, *--ip);
+        FSE_encodeSymbol(&bitC, &CState2, *--ip);
 
         if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* this test must be static */
             FSE_flushBits(&bitC);
 
-        FSE_encodeByte(&bitC, &CState1, *--ip);
+        FSE_encodeSymbol(&bitC, &CState1, *--ip);
 
         if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   /* this test must be static */
         {
-            FSE_encodeByte(&bitC, &CState2, *--ip);
-            FSE_encodeByte(&bitC, &CState1, *--ip);
+            FSE_encodeSymbol(&bitC, &CState2, *--ip);
+            FSE_encodeSymbol(&bitC, &CState1, *--ip);
         }
 
         FSE_flushBits(&bitC);

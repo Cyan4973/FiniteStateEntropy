@@ -93,12 +93,12 @@ typedef struct
 void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, U16 symbol)
 {
     CState_i* statePtr = (CState_i*) statePtrExt;
-    const FSE_symbolCompressionTransform* const symbolTT = (const FSE_symbolCompressionTransform*) statePtr->symbolTT;
-    const U16* const stateTable = (const U16*) statePtr->stateTable;
-    int nbBitsOut  = symbolTT[symbol].minBitsOut;
-    nbBitsOut -= (int)((symbolTT[symbol].maxState - statePtr->value) >> 31);
+    const FSE_symbolCompressionTransform symbolTT = (statePtr->symbolTT)[symbol];
+    const U16* const stateTable = statePtr->stateTable;
+    int nbBitsOut  = symbolTT.minBitsOut;
+    nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
-    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT[symbol].deltaFindState];
+    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
 }
 
 
