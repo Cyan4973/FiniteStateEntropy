@@ -44,7 +44,11 @@ endif
 
 default: fse
 
-all: fse fse32 fullbench fullbench32 fuzzer fuzzer32 fuzzerU16 probagen
+all: allNative all32
+
+all32: fse32 fullbench32 fuzzer32
+
+allNative: fse fullbench fuzzer fuzzerU16 probagen
 
 fse: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)

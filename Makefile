@@ -41,16 +41,24 @@ clean:
 test-all: clean
 	@cd $(PROGDIR); $(MAKE) test-all
 
+gpptest: clean
+	@echo ---- test g++ compilation ----
+	@cd $(PROGDIR); $(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+
+armtest: clean
+	@echo ---- test ARM compilation ----
+	@cd $(PROGDIR); $(MAKE) allNative CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
+
 clangtest: clean
+	@echo ---- test clang compilation ----
 	@cd $(PROGDIR); $(MAKE) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
 
 staticAnalyze: clean
+	@echo ---- static analyzer - scan-build ----
 	@cd $(PROGDIR); scan-build --status-bugs -v $(MAKE) all CFLAGS=-g   # does not work well; too many false positives
 
-gpptest: clean
-	@cd $(PROGDIR); $(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-
 sanitize: clean
+	@echo ---- check undefined behavior - sanitize ----
 	@cd $(PROGDIR); $(MAKE) test CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
 
 
