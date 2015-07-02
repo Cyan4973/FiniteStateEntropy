@@ -293,10 +293,9 @@ If there is an error, the function will return an error code, which can be teste
 ******************************************/
 /*
    This API consists of small unitary functions, which highly benefit from being inlined.
-   Some compilers seem unable to properly inline functions from another *.c (GCC, clang)
-   while others have no such issue (Visual).
-   If you find yourself in the first situation, you might want to include "fse.c" directly,
-   to improve the likelyhood of inlining these functions, which is key to their performance.
+   You will want to enable link-time-optimization to ensure these functions are properly inlined in your binary.
+   Visual seems to do it automatically.
+   For gcc or clang, you'll need to add -flto flag at compilation and linking stages.
 */
 
 typedef struct { size_t space[4]; } FSE_CStream_t;

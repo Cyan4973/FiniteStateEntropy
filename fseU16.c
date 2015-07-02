@@ -245,6 +245,7 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     FSE_DState_t state;
 
     /* Init */
+    memset(&bitD, 0, sizeof(bitD));
     FSE_initDStream(&bitD, cSrc, cSrcSize);
     FSE_initDState(&state, &bitD, dt);
 

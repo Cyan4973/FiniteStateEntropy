@@ -29,7 +29,8 @@ DESTDIR   ?=
 CFLAGS    ?= -O3
 MOREFLAGS ?=
 CFLAGS    += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
-FLAGS      = -I.. $(CFLAGS) $(MOREFLAGS)
+LDFLAGS    = -I..
+FLAGS      = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(MOREFLAGS)
 CF32       = -m32
 FSETEST   ?=
 FSEU16TEST?= $(FSETEST)
@@ -52,6 +53,12 @@ allNative: fse fullbench fuzzer fuzzerU16 probagen
 
 fse: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+fse_opt:
+	$(MAKE) fse MOREFLAGS=-flto
+
+fse_safe:
+	CFLAGS=-O2 $(MAKE) fse
 
 fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
