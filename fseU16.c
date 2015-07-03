@@ -90,11 +90,10 @@ typedef struct
 /*********************************************************
 *  U16 Compression functions
 *********************************************************/
-void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, U16 symbol)
+void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 {
-    CState_i* statePtr = (CState_i*) statePtrExt;
-    const FSE_symbolCompressionTransform symbolTT = (statePtr->symbolTT)[symbol];
-    const U16* const stateTable = statePtr->stateTable;
+    const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
+    const U16* const stateTable = (const U16*)statePtr->stateTable;
     int nbBitsOut  = symbolTT.minBitsOut;
     nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
@@ -218,9 +217,8 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 *  U16 Decompression functions
 *********************************************************/
 
-U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
+U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
-    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_tU16 DInfo = ((const FSE_decode_tU16*)(DStatePtr->table))[DStatePtr->state];
     U16 symbol;
     size_t lowBits;

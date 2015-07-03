@@ -247,37 +247,6 @@ typedef struct
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
-typedef struct
-{
-    size_t bitContainer;
-    int    bitPos;
-    char*  startPtr;
-    char*  ptr;
-} CStream_i;
-
-typedef struct
-{
-    ptrdiff_t   value;
-    const U16* stateTable;
-    const FSE_symbolCompressionTransform * symbolTT;
-    unsigned    stateLog;
-} CState_i;
-
-typedef struct
-{
-    size_t   bitContainer;
-    unsigned bitsConsumed;
-    const char* ptr;
-    const char* start;
-} DStream_i;
-
-typedef struct
-{
-    size_t      state;
-    const void* table;   /* precise table may vary, depending on U16 */
-} DState_i;
-
-
 /****************************************************************
 *  Internal functions
 ****************************************************************/
@@ -869,49 +838,42 @@ size_t FSE_buildCTable_rle (FSE_CTable ct, BYTE symbolValue)
 }
 
 
-void FSE_initCStream(FSE_CStream_t* bitCext, void* start)
+void FSE_initCStream(FSE_CStream_t* bitC, void* start)
 {
-    CStream_i* bitC = (CStream_i*) bitCext;
-    FSE_STATIC_ASSERT(sizeof(FSE_CStream_t) >= sizeof(CStream_i));   /* An error here means FSE_CStream_t size must be increased */
     bitC->bitContainer = 0;
     bitC->bitPos = 0;   /* reserved for unusedBits */
     bitC->startPtr = (char*)start;
     bitC->ptr = bitC->startPtr;
 }
 
-void FSE_initCState(FSE_CState_t* statePtrExt, const FSE_CTable ct)
+void FSE_initCState(FSE_CState_t* statePtr, const FSE_CTable ct)
 {
     const U32 tableLog = ( (const U16*) ct) [0];
-    CState_i* statePtr = (CState_i*) statePtrExt;
-    FSE_STATIC_ASSERT(sizeof(FSE_CState_t) >= sizeof(CState_i));
     statePtr->value = (ptrdiff_t)1<<tableLog;
     statePtr->stateTable = ((const U16*) ct) + 2;
     statePtr->symbolTT = (const FSE_symbolCompressionTransform*)((const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1));
     statePtr->stateLog = tableLog;
 }
 
-void FSE_addBits(FSE_CStream_t* bitCext, size_t value, unsigned nbBits)
+void FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits)
 {
     static const unsigned mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   /* up to 25 bits */
-    CStream_i* bitC = (CStream_i*) bitCext;
     bitC->bitContainer |= (value & mask[nbBits]) << bitC->bitPos;
     bitC->bitPos += nbBits;
 }
 
-void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtrExt, BYTE symbol)
+void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtr, BYTE symbol)
 {
-    CState_i* statePtr = (CState_i*) statePtrExt;
     const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
-    const U16* const stateTable = statePtr->stateTable;
+    const U16* const stateTable = (const U16*)(statePtr->stateTable);
     int nbBitsOut  = symbolTT.minBitsOut;
     nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
 }
 
-void FSE_flushBits(FSE_CStream_t* bitCext)
+void FSE_flushBits(FSE_CStream_t* bitC)
 {
-    CStream_i* bitC = (CStream_i*) bitCext;
     size_t nbBytes = bitC->bitPos >> 3;
     FSE_writeLEST(bitC->ptr, bitC->bitContainer);
     bitC->bitPos &= 7;
@@ -919,21 +881,19 @@ void FSE_flushBits(FSE_CStream_t* bitCext)
     bitC->bitContainer >>= nbBytes*8;
 }
 
-void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtrExt)
+void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtr)
 {
-    const CState_i* statePtr = (const CState_i*) statePtrExt;
     FSE_addBits(bitC, statePtr->value, statePtr->stateLog);
     FSE_flushBits(bitC);
 }
 
 
-size_t FSE_closeCStream(FSE_CStream_t* bitCext)
+size_t FSE_closeCStream(FSE_CStream_t* bitC)
 {
-    CStream_i* bitC = (CStream_i*) bitCext;
     char* endPtr;
 
-    FSE_addBits(bitCext, 1, 1);
-    FSE_flushBits(bitCext);
+    FSE_addBits(bitC, 1, 1);
+    FSE_flushBits(bitC);
 
     endPtr = bitC->ptr;
     endPtr += bitC->bitPos > 0;
@@ -1116,11 +1076,8 @@ size_t FSE_buildDTable_raw (FSE_DTable dt, unsigned nbBits)
  * The function result is the size of the FSE_block (== srcSize).
  * If srcSize is too small, the function will return an errorCode;
  */
-size_t FSE_initDStream(FSE_DStream_t* bitDext, const void* srcBuffer, size_t srcSize)
+size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize)
 {
-    DStream_i* bitD = (DStream_i*)bitDext;
-
-    FSE_STATIC_ASSERT(sizeof(FSE_DStream_t) >= sizeof(DStream_i));
     if (srcSize < 1) return (size_t)-FSE_ERROR_srcSize_wrong;
 
     if (srcSize >=  sizeof(size_t))
@@ -1166,25 +1123,22 @@ size_t FSE_initDStream(FSE_DStream_t* bitDext, const void* srcBuffer, size_t src
  * Use the fast variant *only* if n >= 1.
  * return : value extracted.
  */
-size_t FSE_readBits(FSE_DStream_t* bitDext, U32 nbBits)
+size_t FSE_readBits(FSE_DStream_t* bitD, U32 nbBits)
 {
-    DStream_i* bitD = (DStream_i*)bitDext;
     size_t value = ((bitD->bitContainer << (bitD->bitsConsumed & ((sizeof(size_t)*8)-1))) >> 1) >> (((sizeof(size_t)*8)-1)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-size_t FSE_readBitsFast(FSE_DStream_t* bitDext, U32 nbBits)   /* only if nbBits >= 1 !! */
+size_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 !! */
 {
-    DStream_i* bitD = (DStream_i*)bitDext;
     size_t value = (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(size_t)*8)-nbBits);
     bitD->bitsConsumed += nbBits;
     return value;
 }
 
-unsigned FSE_reloadDStream(FSE_DStream_t* bitDext)
+unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
 {
-    DStream_i* bitD = (DStream_i*)bitDext;
     if (bitD->ptr >= bitD->start + sizeof(size_t))
     {
         bitD->ptr -= bitD->bitsConsumed >> 3;
@@ -1210,19 +1164,16 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitDext)
 }
 
 
-void FSE_initDState(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD, const FSE_DTable dt)
+void FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable dt)
 {
     const U32* const base32 = (const U32*)dt;
-    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
-    FSE_STATIC_ASSERT(sizeof(FSE_DState_t) >= sizeof(DState_i));
     DStatePtr->state = FSE_readBits(bitD, base32[0]);
     FSE_reloadDStream(bitD);
     DStatePtr->table = base32 + 1;
 }
 
-BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
+BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
-    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32  nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
@@ -1232,9 +1183,8 @@ BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
     return symbol;
 }
 
-BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
+BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 {
-    DState_i* DStatePtr = (DState_i*)DStatePtrExt;
     const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
     const U32 nbBits = DInfo.nbBits;
     BYTE symbol = DInfo.symbol;
@@ -1247,15 +1197,13 @@ BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtrExt, FSE_DStream_t* bitD)
 /* FSE_endOfDStream
    Tells if bitD has reached end of bitStream or not */
 
-unsigned FSE_endOfDStream(const FSE_DStream_t* bitDext)
+unsigned FSE_endOfDStream(const FSE_DStream_t* bitD)
 {
-    const DStream_i* bitD = (const DStream_i*)bitDext;
     return ((bitD->ptr == bitD->start) && (bitD->bitsConsumed == sizeof(size_t)*8));
 }
 
-unsigned FSE_endOfDState(const FSE_DState_t* statePtrExt)
+unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr)
 {
-    const DState_i* DStatePtr = (const DState_i*)statePtrExt;
     return DStatePtr->state == 0;
 }
 
