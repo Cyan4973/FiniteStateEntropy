@@ -418,6 +418,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
                  const void* headerBuffer, size_t hbSize)
 {
     const BYTE* const istart = (const BYTE*) headerBuffer;
+    const BYTE* const iend = istart + hbSize;
     const BYTE* ip = istart;
     int nbBits;
     int remaining;
@@ -427,6 +428,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     unsigned charnum = 0;
     int previous0 = 0;
 
+    if (hbSize < 4) return (size_t)-FSE_ERROR_srcSize_wrong;
     bitStream = FSE_readLE32(ip);
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   /* extract tableLog */
     if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return (size_t)-FSE_ERROR_tableLog_tooLarge;
@@ -456,7 +458,7 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             }
             n0 += bitStream & 3;
             bitCount += 2;
-            if (n0 > *maxSVPtr) return (size_t)-FSE_ERROR_GENERIC;
+            if (n0 > *maxSVPtr) return (size_t)-FSE_ERROR_maxSymbolValue_tooSmall;
             while (charnum < n0) normalizedCounter[charnum++] = 0;
             ip += bitCount>>3;
             bitCount &= 7;
@@ -488,16 +490,28 @@ size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
                 threshold >>= 1;
             }
 
-            ip += bitCount>>3;
-            bitCount &= 7;
-            bitStream = FSE_readLE32(ip) >> bitCount;
+            {
+                const BYTE* itarget = ip + (bitCount>>3);
+                if (itarget > iend - 4)
+                {
+                    //if (itarget > iend) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
+                    ip = iend - 4;
+                    bitCount -= 8 * (iend - 4 - ip);
+                }
+                else
+                {
+                    ip = itarget;
+                    bitCount &= 7;
+                }
+                bitStream = FSE_readLE32(ip) >> (bitCount & 31);
+            }
         }
     }
     if (remaining != 1) return (size_t)-FSE_ERROR_GENERIC;
     *maxSVPtr = charnum-1;
 
-    ip += bitCount>0;
-    if ((size_t)(ip-istart) >= hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
+    ip += (bitCount+7)>>3;
+    if ((size_t)(ip-istart) > hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
     return ip-istart;
 }
 

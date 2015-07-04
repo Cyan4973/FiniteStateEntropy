@@ -233,7 +233,7 @@ FSE_readHeader():
    return : size of the compressed table
             or an errorCode, which can be tested using FSE_isError()
             maxSymbolValuePtr[0] and tableLogPtr[0] will also be updated with their respective values */
-size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t hbSize);
+size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t headerSize);
 
 /*
 Constructor and Destructor of type FSE_DTable
@@ -272,6 +272,7 @@ In practice, that means it's necessary to know 'maxSymbolValue' beforehand,
 or size the table to handle worst case situations (typically 256).
 FSE_readHeader will provide 'tableLog' and 'maxSymbolValue' stored into the header.
 The result of FSE_readHeader() is the number of bytes read from 'header'.
+Note that 'headerSize' must be at least 4 bytes, even if useful information is less than that.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
 The next step is to create the decompression tables 'FSE_DTable' from 'normalizedCounter'.

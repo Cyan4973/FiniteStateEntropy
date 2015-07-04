@@ -259,6 +259,8 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 check = FUZ_checkCount (count, tableLog, maxSV);
                 if (check==-1)
                     DISPLAY ("\r test %5u : symbol distribution corrupted !\n", testNb);
+                if (result > FSE_MAX_HEADERSIZE)
+                    DISPLAY ("\r test %5u : FSE_readHeader() reads too far !\n", testNb);
             }
         }
 
@@ -376,11 +378,12 @@ static void unitTest(void)
         }
     }
 
-    /* FSE_writeHeader */
+    /* FSE_writeHeader, FSE_readHeader */
     {
         S16 norm[129];
         BYTE header[513];
         U32 max, tableLog, i;
+        size_t headerSize;
 
         for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
         max = 128;
@@ -390,14 +393,38 @@ static void unitTest(void)
         errorCode = FSE_normalizeCount(norm, tableLog, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
-        errorCode = FSE_writeHeader(header, 513, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
+        headerSize = FSE_writeHeader(header, 513, norm, max, tableLog);
+        CHECK(FSE_isError(headerSize), "Error : FSE_writeHeader() should have worked");
 
-        errorCode = FSE_writeHeader(header, errorCode+1, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
-
-        errorCode = FSE_writeHeader(header, errorCode-1, norm, max, tableLog);
+        header[headerSize-1] = 0;
+        errorCode = FSE_writeHeader(header, headerSize-1, norm, max, tableLog);
         CHECK(!FSE_isError(errorCode), "Error : FSE_writeHeader() should have failed");
+        CHECK (header[headerSize-1] != 0, "Error : FSE_writeHeader() buffer overwrite");
+
+        errorCode = FSE_writeHeader(header, headerSize+1, norm, max, tableLog);
+        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
+
+        max = 129;
+        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize);
+        CHECK(FSE_isError(errorCode), "Error : FSE_readHeader() should have worked : (error %s)", FSE_getErrorName(errorCode));
+
+        max = 64;
+        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (max too small)");
+
+        max = 129;
+        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize-1);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (size too small)");
+
+        {
+            void* smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
+            CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readHeader unit test)");
+            memcpy(smallBuffer, header, headerSize-1);
+            max = 129;
+            errorCode = FSE_readHeader(norm, &max, &tableLog, smallBuffer, headerSize-1);
+            CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (size too small)");
+            free(smallBuffer);
+        }
     }
 
 
