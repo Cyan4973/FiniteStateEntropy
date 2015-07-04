@@ -494,9 +494,8 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
                 const BYTE* itarget = ip + (bitCount>>3);
                 if (itarget > iend - 4)
                 {
-                    //if (itarget > iend) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
                     ip = iend - 4;
-                    bitCount -= 8 * (iend - 4 - ip);
+                    bitCount -= (int)(8 * (iend - 4 - ip));
                 }
                 else
                 {
@@ -511,7 +510,7 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     *maxSVPtr = charnum-1;
 
     ip += (bitCount+7)>>3;
-    if ((size_t)(ip-istart) > hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* arguably a bit late , tbd */
+    if ((size_t)(ip-istart) > hbSize) return (size_t)-FSE_ERROR_srcSize_wrong;
     return ip-istart;
 }
 
@@ -1549,7 +1548,7 @@ void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (FSE_DTable* dt)
 
 
 size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
-(FSE_DTable* dt, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+(FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     U32* const base32 = (U32*)dt;
     FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (base32+1);
