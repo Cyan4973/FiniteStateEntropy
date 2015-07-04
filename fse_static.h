@@ -75,16 +75,16 @@ typedef enum { FSE_LIST_ERRORS(FSE_GENERATE_ENUM) } FSE_errorCodes;  /* enum is 
 size_t FSE_countFast(unsigned* count, unsigned* maxSymbolValuePtr, const unsigned char* src, size_t srcSize);
 /* same as FSE_count(), but blindly trust that all values within src are <= maxSymbolValuePtr[0] */
 
-size_t FSE_buildCTable_raw (FSE_CTable ct, unsigned nbBits);
+size_t FSE_buildCTable_raw (FSE_CTable* ct, unsigned nbBits);
 /* build a fake FSE_CTable, designed to not compress an input, where each symbol uses nbBits */
 
-size_t FSE_buildCTable_rle (FSE_CTable ct, unsigned char symbolValue);
+size_t FSE_buildCTable_rle (FSE_CTable* ct, unsigned char symbolValue);
 /* build a fake FSE_CTable, designed to compress always the same symbolValue */
 
-size_t FSE_buildDTable_raw (FSE_DTable dt, unsigned nbBits);
+size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits);
 /* build a fake FSE_DTable, designed to read an uncompressed bitstream where each symbol uses nbBits */
 
-size_t FSE_buildDTable_rle (FSE_DTable dt, unsigned char symbolValue);
+size_t FSE_buildDTable_rle (FSE_DTable* dt, unsigned char symbolValue);
 /* build a fake FSE_DTable, designed to always generate the same symbolValue */
 
 
@@ -115,7 +115,7 @@ typedef struct
 } FSE_CState_t;
 
 void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
-void   FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable ct);
+void   FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable* ct);
 
 void   FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned char symbol);
 void   FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits);
@@ -185,7 +185,7 @@ typedef struct
 
 
 size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t srcSize);
-void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable dt);
+void   FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable* dt);
 
 unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
 size_t        FSE_readBits(FSE_DStream_t* bitD, unsigned nbBits);

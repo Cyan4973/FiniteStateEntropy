@@ -103,7 +103,7 @@ void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
 
 size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
                               const U16*  src, size_t srcSize,
-                              const FSE_CTable ct)
+                              const FSE_CTable* ct)
 {
     const U16* const istart = src;
     const U16* ip;
@@ -234,7 +234,7 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
 
 size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
                                const void* cSrc, size_t cSrcSize,
-                               const FSE_DTable dt)
+                               const FSE_DTable* dt)
 {
     U16* const ostart = dst;
     U16* op = ostart;

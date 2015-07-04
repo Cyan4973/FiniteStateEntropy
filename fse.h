@@ -164,23 +164,23 @@ size_t FSE_writeNCount (void* buffer, size_t bufferSize, const short* normalized
 /*
 Constructor and Destructor of type FSE_CTable
 Not that its size depends on parameters 'tableLog' and 'maxSymbolValue' */
-typedef unsigned* FSE_CTable;   /* enforce alignment on 4-bytes */
-FSE_CTable FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
-void   FSE_freeCTable (FSE_CTable ct);
+typedef unsigned FSE_CTable;   /* don't allocate that. It's just a way to be more restrictive than void */
+FSE_CTable* FSE_createCTable (unsigned tableLog, unsigned maxSymbolValue);
+void        FSE_freeCTable (FSE_CTable* ct);
 
 /*
 FSE_buildCTable():
    Builds 'ct', which must be already allocated, using FSE_createCTable()
    return : 0
             or an errorCode, which can be tested using FSE_isError() */
-size_t   FSE_buildCTable(FSE_CTable ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t   FSE_buildCTable(FSE_CTable* ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_compress_usingCTable():
    Compress 'src' using 'ct' into 'dst' which must be already allocated
    return : size of compressed data
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const FSE_CTable ct);
+size_t FSE_compress_usingCTable (void* dst, size_t dstSize, const void* src, size_t srcSize, const FSE_CTable* ct);
 
 /*
 Tutorial :
@@ -238,16 +238,16 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSymbolValuePtr, un
 /*
 Constructor and Destructor of type FSE_DTable
 Note that its size depends on parameters 'tableLog' */
-typedef unsigned* FSE_DTable;
-FSE_DTable FSE_createDTable(unsigned tableLog);
-void       FSE_freeDTable(FSE_DTable dt);
+typedef unsigned FSE_DTable;   /* don't allocate that. It's just a way to be more restrictive than void */
+FSE_DTable* FSE_createDTable(unsigned tableLog);
+void        FSE_freeDTable(FSE_DTable* dt);
 
 /*
 FSE_buildDTable():
    Builds 'dt', which must be already allocated, using FSE_createDTable()
    return : 1 if 'dt' is compatible with fast mode, 0 otherwise,
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_buildDTable (FSE_DTable dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_buildDTable (FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_decompress_usingDTable():
@@ -256,7 +256,7 @@ FSE_decompress_usingDTable():
    Use fastMode==1 only if authorized by result of FSE_buildDTable().
    return : size of regenerated data (necessarily <= maxDstSize)
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable dt, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable* dt, size_t fastMode);
 
 /*
 Tutorial :
