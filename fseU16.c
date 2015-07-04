@@ -196,7 +196,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     if (FSE_isError(errorCode)) return errorCode;
 
     /* Write table description header */
-    errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeNCount (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
@@ -273,7 +273,7 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   /* specific corner cases (uncompressed & rle) */
 
     /* normal FSE decoding mode */
-    errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
+    errorCode = FSE_readNCount (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
     if (FSE_isError(errorCode)) return errorCode;
     ip += errorCode;
     cSrcSize -= errorCode;

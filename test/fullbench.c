@@ -730,10 +730,10 @@ static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, 
     return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, (U32)srcSize, 255);
 }
 
-static int local_FSE_writeHeader(void* dst, size_t dstSize, const void* src, size_t srcSize)
+static int local_FSE_writeNCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return (int)FSE_writeHeader(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
+    return (int)FSE_writeNCount(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
 }
 
 /*
@@ -755,11 +755,11 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
-static int local_FSE_readHeader(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
+static int local_FSE_readNCount(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
 {
     short norm[256];
     (void)initialBuffer; (void)initialBufferSize;
-    return (int)FSE_readHeader(norm, &g_max, &g_tableLog, src, srcSize);
+    return (int)FSE_readNCount(norm, &g_max, &g_tableLog, src, srcSize);
 }
 
 static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -828,8 +828,8 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
-            funcName = "FSE_writeHeader";
-            func = local_FSE_writeHeader;
+            funcName = "FSE_writeNCount";
+            func = local_FSE_writeNCount;
             break;
         }
 
@@ -877,8 +877,8 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             g_max = 255;
-            funcName = "FSE_readHeader";
-            func = local_FSE_readHeader;
+            funcName = "FSE_readNCount";
+            func = local_FSE_readNCount;
             break;
         }
 
@@ -886,7 +886,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         {
             FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             g_max = 255;
-            FSE_readHeader(g_normTable, &g_max, &g_tableLog, cBuffer, benchedSize);
+            FSE_readNCount(g_normTable, &g_max, &g_tableLog, cBuffer, benchedSize);
             funcName = "FSE_buildDTable";
             func = local_FSE_buildDTable;
             break;
@@ -897,7 +897,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             g_cSize = FSE_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             memcpy(oBuffer, cBuffer, g_cSize);
             g_max = 255;
-            g_skip = FSE_readHeader(g_normTable, &g_max, &g_tableLog, oBuffer, g_cSize);
+            g_skip = FSE_readNCount(g_normTable, &g_max, &g_tableLog, oBuffer, g_cSize);
             g_cSize -= g_skip;
             g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
             funcName = "FSE_decompress_usingDTable";

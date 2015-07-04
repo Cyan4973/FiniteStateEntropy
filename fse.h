@@ -148,17 +148,17 @@ FSE_normalizeCount():
 size_t FSE_normalizeCount(short* normalizedCounter, unsigned tableLog, const unsigned* count, size_t srcSize, unsigned maxSymbolValue);
 
 /*
-FSE_headerBound():
-   Provides the maximum possible size of an FSE header, given 'maxSymbolValue' and 'tableLog'
-   Useful for allocation purpose */
-size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog);
+FSE_NCountWriteBound():
+   Provides the maximum possible size of an FSE normalized table, given 'maxSymbolValue' and 'tableLog'
+   Typically useful for allocation purpose. */
+size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog);
 
 /*
-FSE_writeHeader():
-   Compactly save 'normalizedCounter' into buffer 'headerBuffer' of size 'headerBufferSize'.
+FSE_writeNCount():
+   Compactly save 'normalizedCounter' into 'buffer'.
    return : size of the compressed table
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_writeHeader (void* headerBuffer, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_writeNCount (void* buffer, size_t bufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 
 /*
@@ -228,16 +228,16 @@ If there is an error, the function will return an ErrorCode (which can be tested
 /* *** DECOMPRESSION *** */
 
 /*
-FSE_readHeader():
-   Read compactly saved 'normalizedCounter' from buffer 'headerBuffer' of size 'hbSize'.
-   return : size of the compressed table
+FSE_readNCount():
+   Read compactly saved 'normalizedCounter' from 'rBuffer'.
+   return : size read from 'rBuffer'
             or an errorCode, which can be tested using FSE_isError()
             maxSymbolValuePtr[0] and tableLogPtr[0] will also be updated with their respective values */
-size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* headerBuffer, size_t headerSize);
+size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSymbolValuePtr, unsigned* tableLogPtr, const void* rBuffer, size_t rBuffSize);
 
 /*
 Constructor and Destructor of type FSE_DTable
-Not that its size depends on parameters 'tableLog'*/
+Note that its size depends on parameters 'tableLog' */
 typedef unsigned* FSE_DTable;
 FSE_DTable FSE_createDTable(unsigned tableLog);
 void       FSE_freeDTable(FSE_DTable dt);
@@ -247,7 +247,7 @@ FSE_buildDTable():
    Builds 'dt', which must be already allocated, using FSE_createDTable()
    return : 1 if 'dt' is compatible with fast mode, 0 otherwise,
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_buildDTable (FSE_DTable dt, const short* const normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
+size_t FSE_buildDTable (FSE_DTable dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
 /*
 FSE_decompress_usingDTable():

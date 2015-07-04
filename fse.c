@@ -296,7 +296,7 @@ static short FSE_abs(short a)
 /****************************************************************
 *  Header bitstream management
 ****************************************************************/
-size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
+size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog)
 {
     size_t maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1;
     return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
@@ -304,7 +304,7 @@ size_t FSE_headerBound(unsigned maxSymbolValue, unsigned tableLog)
 
 #ifndef __clang_analyzer__   /* clang static analyzer has difficulties with this function : seems to believe normalizedCounter is uninitialized */
 
-static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
+static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
                                        const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
                                        unsigned safeWrite)
 {
@@ -402,19 +402,19 @@ static size_t FSE_writeHeader_generic (void* header, size_t headerBufferSize,
 #endif // __clang_analyzer__
 
 
-size_t FSE_writeHeader (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+size_t FSE_writeNCount (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported */
     if (tableLog < FSE_MIN_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported */
 
-    if (headerBufferSize < FSE_headerBound(maxSymbolValue, tableLog))
-        return FSE_writeHeader_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
+    if (headerBufferSize < FSE_NCountWriteBound(maxSymbolValue, tableLog))
+        return FSE_writeNCount_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
 
-    return FSE_writeHeader_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 1);
+    return FSE_writeNCount_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 1);
 }
 
 
-size_t FSE_readHeader (short* normalizedCounter, unsigned* maxSVPtr, unsigned* tableLogPtr,
+size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* tableLogPtr,
                  const void* headerBuffer, size_t hbSize)
 {
     const BYTE* const istart = (const BYTE*) headerBuffer;
@@ -1010,7 +1010,7 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     if (FSE_isError(errorCode)) return errorCode;
 
     /* Write table description header */
-    errorCode = FSE_writeHeader (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeNCount (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
@@ -1309,7 +1309,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   /* too small input size */
 
     /* normal FSE decoding mode */
-    errorCode = FSE_readHeader (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
+    errorCode = FSE_readNCount (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
     if (FSE_isError(errorCode)) return errorCode;
     if (errorCode >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;   /* too small input size */
     ip += errorCode;

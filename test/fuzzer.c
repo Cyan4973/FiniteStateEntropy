@@ -250,7 +250,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
             maxSV = 255;
-            result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
+            result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
             if (!FSE_isError(result))
             {
                 int check;
@@ -378,7 +378,7 @@ static void unitTest(void)
         }
     }
 
-    /* FSE_writeHeader, FSE_readHeader */
+    /* FSE_writeNCount, FSE_readNCount */
     {
         S16 norm[129];
         BYTE header[513];
@@ -393,36 +393,38 @@ static void unitTest(void)
         errorCode = FSE_normalizeCount(norm, tableLog, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
-        headerSize = FSE_writeHeader(header, 513, norm, max, tableLog);
-        CHECK(FSE_isError(headerSize), "Error : FSE_writeHeader() should have worked");
+        headerSize = FSE_NCountWriteBound(max, tableLog);
+
+        headerSize = FSE_writeNCount(header, 513, norm, max, tableLog);
+        CHECK(FSE_isError(headerSize), "Error : FSE_writeNCount() should have worked");
 
         header[headerSize-1] = 0;
-        errorCode = FSE_writeHeader(header, headerSize-1, norm, max, tableLog);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_writeHeader() should have failed");
-        CHECK (header[headerSize-1] != 0, "Error : FSE_writeHeader() buffer overwrite");
+        errorCode = FSE_writeNCount(header, headerSize-1, norm, max, tableLog);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_writeNCount() should have failed");
+        CHECK (header[headerSize-1] != 0, "Error : FSE_writeNCount() buffer overwrite");
 
-        errorCode = FSE_writeHeader(header, headerSize+1, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
+        errorCode = FSE_writeNCount(header, headerSize+1, norm, max, tableLog);
+        CHECK(FSE_isError(errorCode), "Error : FSE_writeNCount() should have worked");
 
         max = 129;
-        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize);
-        CHECK(FSE_isError(errorCode), "Error : FSE_readHeader() should have worked : (error %s)", FSE_getErrorName(errorCode));
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
+        CHECK(FSE_isError(errorCode), "Error : FSE_readNCount() should have worked : (error %s)", FSE_getErrorName(errorCode));
 
         max = 64;
-        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (max too small)");
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (max too small)");
 
         max = 129;
-        errorCode = FSE_readHeader(norm, &max, &tableLog, header, headerSize-1);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (size too small)");
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize-1);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
 
         {
             void* smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
-            CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readHeader unit test)");
+            CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readNCount unit test)");
             memcpy(smallBuffer, header, headerSize-1);
             max = 129;
-            errorCode = FSE_readHeader(norm, &max, &tableLog, smallBuffer, headerSize-1);
-            CHECK(!FSE_isError(errorCode), "Error : FSE_readHeader() should have failed (size too small)");
+            errorCode = FSE_readNCount(norm, &max, &tableLog, smallBuffer, headerSize-1);
+            CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
             free(smallBuffer);
         }
     }
