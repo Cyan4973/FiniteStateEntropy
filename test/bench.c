@@ -391,19 +391,22 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliStart() == milliTime);
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
+        //while(BMK_GetMilliStart() == milliTime)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
-                size_t cBSize = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize), chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
+                size_t cBSize = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize),
+                                           chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
                 if (FSE_isError(cBSize)) { DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb); return; }
                 chunkP[chunkNb].compressedSize = cBSize;
             }
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
+        milliTime += !milliTime;
 
         if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
-        cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
+        cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize ? chunkP[chunkNb].compressedSize : chunkP[chunkNb].origSize;
         ratio = (double)cSize/(double)benchedSize*100.;
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
@@ -417,22 +420,24 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliStart() == milliTime);
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
+        //while(BMK_GetMilliStart() == milliTime)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {
                 size_t regenSize;
                 switch(chunkP[chunkNb].compressedSize)
                 {
-                case 0:
+                case 0:   /* not compressed block; just memcpy() it */
                     regenSize = chunkP[chunkNb].origSize;
                     memcpy(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origBuffer, regenSize);
                     break;
-                case 1:
+                case 1:   /* single value byte; just memset() it */
                     regenSize = chunkP[chunkNb].origSize;
                     memset(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origBuffer[0], chunkP[chunkNb].origSize);
                     break;
                 default:
-                    regenSize = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
+                    regenSize = decompressor(chunkP[chunkNb].destBuffer, chunkP[chunkNb].origSize,
+                                             chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
                 }
 
                 if (regenSize != chunkP[chunkNb].origSize)
@@ -715,7 +720,7 @@ int BMK_benchCore_Files(char** fileNamesTable, int nbFiles)
         /* Memory allocation & restrictions */
         inFileSize = BMK_GetFileSize(inFileName);
         if (inFileSize==0) { DISPLAY( "%s is empty\n", inFileName); return 11; }
-        benchedSize = 16 MB;
+        benchedSize = 256 MB;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
         else DISPLAY("FSE Core Loop speed evaluation, testing %i KB ...\n", (int)(benchedSize>>10));
 
