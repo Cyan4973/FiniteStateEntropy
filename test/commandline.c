@@ -118,8 +118,10 @@ static int badusage(void)
 
 static void waitEnter(void)
 {
+    int unused;
     DISPLAY("Press enter to continue...\n");
-    getchar();
+    unused = getchar();
+    (void)unused;
 }
 
 int main(int argc, char** argv)
@@ -127,8 +129,10 @@ int main(int argc, char** argv)
     int   i,
           forceCompress=0, decode=0, bench=3; /* default action if no argument */
     int   indexFileNames=0;
-    char* input_filename=0;
-    char* output_filename=0;
+    const char* input_filename = NULL;
+    const char* output_filename= NULL;
+    char*  tmpFilenameBuffer   = NULL;
+    size_t tmpFilenameSize     = 0;
     int   nextNameIsOutput = 0;
     char  extension[] = FSE_EXTENSION;
 
@@ -271,9 +275,16 @@ int main(int argc, char** argv)
         if (!decode)   /* compression to file */
         {
             size_t l = strlen(input_filename);
-            output_filename = (char*)calloc(1,l+5);
-            strcpy(output_filename, input_filename);
-            strcpy(output_filename+l, FSE_EXTENSION);
+            if (tmpFilenameSize < l+6) tmpFilenameSize = l+6;
+            tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
+			if (tmpFilenameBuffer==NULL)
+			{
+				DISPLAY("Not enough memory, exiting ... \n");
+				exit(1);
+			}
+            strcpy(tmpFilenameBuffer, input_filename);
+            strcpy(tmpFilenameBuffer+l, FSE_EXTENSION);
+            output_filename = tmpFilenameBuffer;
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
@@ -281,27 +292,30 @@ int main(int argc, char** argv)
         {
             size_t outl;
             size_t inl = strlen(input_filename);
-            output_filename = (char*)calloc(1,inl+1);
-            strcpy(output_filename, input_filename);
+            if (tmpFilenameSize < inl+2) tmpFilenameSize = inl+2;
+            tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
+            strcpy(tmpFilenameBuffer, input_filename);
             outl = inl;
             if (inl>4)
-                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
+                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) tmpFilenameBuffer[outl--]=0;
             if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(); }
+            output_filename = tmpFilenameBuffer;
             DISPLAYLEVEL(2, "Decoding into filename : %s \n", output_filename);
         }
     }
 
-    // No warning message in pure pipe mode (stdin + stdout)
+    /* No warning message in pure pipe mode (stdin + stdout) */
     if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
 
-    // Check if input or output are defined as console; trigger an error in this case
-    if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
-    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)                ) badusage();
+    /* Check if input or output are defined as console; trigger an error in this case */
+    if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin) ) badusage();
+    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)) badusage();
 
     if (decode) FIO_decompressFilename(output_filename, input_filename);
     else FIO_compressFilename(output_filename, input_filename);
 
 _end:
     if (fse_pause) waitEnter();
+    free(tmpFilenameBuffer);
     return 0;
 }

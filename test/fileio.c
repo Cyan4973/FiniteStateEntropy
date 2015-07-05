@@ -133,7 +133,7 @@ typedef enum { bt_compressed, bt_raw, bt_rle, bt_crc } bType_t;
 **************************************/
 static void FIO_writeLE32(void* memPtr, U32 val32)
 {
-    BYTE* p = memPtr;
+    BYTE* p = (BYTE*)memPtr;
     p[0] = (BYTE)val32;
     p[1] = (BYTE)(val32>>8);
     p[2] = (BYTE)(val32>>16);
@@ -142,7 +142,7 @@ static void FIO_writeLE32(void* memPtr, U32 val32)
 
 static U32 FIO_readLE32(const void* memPtr)
 {
-    const BYTE* p = memPtr;
+    const BYTE* p = (const BYTE*)memPtr;
     return (U32)((U32)p[0] + ((U32)p[1]<<8) + ((U32)p[2]<<16) + ((U32)p[3]<<24));
 }
 
@@ -426,8 +426,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
 
     /* Allocate Memory */
     inputBufferSize = blockSize + FIO_blockHeaderSize;
-    in_buff  = malloc(inputBufferSize);
-    out_buff = malloc(blockSize);
+    in_buff  = (BYTE*)malloc(inputBufferSize);
+    out_buff = (BYTE*)malloc(blockSize);
     if (!in_buff || !out_buff) EXM_THROW(33, "Allocation error : not enough memory");
     ip = in_buff;
 

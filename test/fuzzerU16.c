@@ -239,7 +239,8 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 /*****************************************************************
 *  Unitary tests
 *****************************************************************/
-extern size_t FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
+
+extern size_t FSE_countU16(unsigned* count, unsigned* maxSymbolValuePtr, const unsigned short* source, size_t sourceSize);
 
 #define TBSIZE (16 KB)
 static void unitTest(void)
@@ -256,15 +257,15 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuffU16[i] = i % (FSE_MAX_SYMBOL_VALUE+1);
 
         max = FSE_MAX_SYMBOL_VALUE;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(FSE_isError(errorCode), "FSE_countU16() should have worked");
 
         max = FSE_MAX_SYMBOL_VALUE+1;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too large");
 
         max = FSE_MAX_SYMBOL_VALUE-1;
-        errorCode = FSE_countU16(table, testBuffU16, TBSIZE, &max);
+        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too low");
     }
 
@@ -287,9 +288,9 @@ int main (int argc, char** argv)
         char* argument = argv[argNb];
         if (argument[0]=='-')
         {
-            while (argument[1]!=0)
+            argument++;
+            while (argument[0]!=0)
             {
-                argument ++;
                 switch (argument[0])
                 {
                 /* seed setting */
@@ -330,11 +331,13 @@ int main (int argc, char** argv)
 
                 /* verbose mode */
                 case 'v':
+                    argument++;
                     displayLevel=4;
                     break;
 
                 /* pause (hidden) */
                 case 'p':
+                    argument++;
                     pause=1;
                     break;
 
@@ -350,7 +353,7 @@ int main (int argc, char** argv)
     DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, totalTest, startTestNb);
 
-    DISPLAY ("\rAll tests passed               \n");
+    DISPLAY ("\rAll %u tests passed               \n", totalTest);
     if (pause)
     {
         DISPLAY("press enter ...\n");

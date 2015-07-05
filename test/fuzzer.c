@@ -115,7 +115,7 @@ static unsigned FUZ_rand (unsigned* src)
 
 static void generate (void* buffer, size_t buffSize, double p, U32* seed)
 {
-    char table[PROBATABLESIZE];
+    char table[PROBATABLESIZE] = {0};
     int remaining = PROBATABLESIZE;
     int pos = 0;
     int s = 0;
@@ -250,7 +250,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
             maxSV = 255;
-            result = FSE_readHeader (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
+            result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
             if (!FSE_isError(result))
             {
                 int check;
@@ -259,6 +259,8 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 check = FUZ_checkCount (count, tableLog, maxSV);
                 if (check==-1)
                     DISPLAY ("\r test %5u : symbol distribution corrupted !\n", testNb);
+                if (result > FSE_MAX_HEADERSIZE)
+                    DISPLAY ("\r test %5u : FSE_readHeader() reads too far !\n", testNb);
             }
         }
 
@@ -300,25 +302,34 @@ extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned 
 #define TBSIZE (16 KB)
 static void unitTest(void)
 {
-    BYTE testBuff[TBSIZE];
-    BYTE cBuff[FSE_COMPRESSBOUND(TBSIZE)];
-    BYTE verifBuff[TBSIZE];
+    BYTE* testBuff = (BYTE*)malloc(TBSIZE);
+    BYTE* cBuff = (BYTE*)malloc(FSE_COMPRESSBOUND(TBSIZE));
+    BYTE* verifBuff = (BYTE*)malloc(TBSIZE);
     size_t errorCode;
     U32 seed=0, testNb=0, lseed=0;
     U32 count[256];
+
+    if ((!testBuff) || (!cBuff) || (!verifBuff))
+    {
+        DISPLAY("Not enough memory, exiting ... \n");
+        free(testBuff);
+        free(cBuff);
+        free(verifBuff);
+        return;
+    }
 
     /* FSE_count */
     {
         U32 max, i;
         for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&lseed) & 63) + '0';
         max = '0' + 63;
-        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
         max -= 1;
-        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
         CHECK(!FSE_isError(errorCode), "Error : FSE_count() should have failed : value > max");
         max = 65000;
-        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
     }
 
@@ -328,7 +339,7 @@ static void unitTest(void)
         size_t testSize = 999;
         for (i=0; i< testSize; i++) testBuff[i] = (BYTE)FUZ_rand(&lseed);
         max = 256;
-        FSE_count(count, testBuff, testSize, &max);
+        FSE_count(count, &max, testBuff, testSize);
         tableLog = FSE_optimalTableLog(tableLog, testSize, max);
         CHECK(tableLog<=8, "Too small tableLog");
     }
@@ -337,7 +348,7 @@ static void unitTest(void)
     {
         S16 norm[256];
         U32 max = 256;
-        FSE_count(count, testBuff, TBSIZE, &max);
+        FSE_count(count, &max, testBuff, TBSIZE);
         errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
         errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 256);
@@ -367,35 +378,62 @@ static void unitTest(void)
         }
     }
 
-    /* FSE_writeHeader */
+    /* FSE_writeNCount, FSE_readNCount */
     {
         S16 norm[129];
         BYTE header[513];
         U32 max, tableLog, i;
+        size_t headerSize;
 
         for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
         max = 128;
-        errorCode = FSE_count(count, testBuff, TBSIZE, &max);
+        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
         CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
         tableLog = FSE_optimalTableLog(0, TBSIZE, max);
         errorCode = FSE_normalizeCount(norm, tableLog, count, TBSIZE, max);
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
-        errorCode = FSE_writeHeader(header, 513, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
+        headerSize = FSE_NCountWriteBound(max, tableLog);
 
-        errorCode = FSE_writeHeader(header, errorCode+1, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeHeader() should have worked");
+        headerSize = FSE_writeNCount(header, 513, norm, max, tableLog);
+        CHECK(FSE_isError(headerSize), "Error : FSE_writeNCount() should have worked");
 
-        errorCode = FSE_writeHeader(header, errorCode-1, norm, max, tableLog);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_writeHeader() should have failed");
+        header[headerSize-1] = 0;
+        errorCode = FSE_writeNCount(header, headerSize-1, norm, max, tableLog);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_writeNCount() should have failed");
+        CHECK (header[headerSize-1] != 0, "Error : FSE_writeNCount() buffer overwrite");
+
+        errorCode = FSE_writeNCount(header, headerSize+1, norm, max, tableLog);
+        CHECK(FSE_isError(errorCode), "Error : FSE_writeNCount() should have worked");
+
+        max = 129;
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
+        CHECK(FSE_isError(errorCode), "Error : FSE_readNCount() should have worked : (error %s)", FSE_getErrorName(errorCode));
+
+        max = 64;
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (max too small)");
+
+        max = 129;
+        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize-1);
+        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
+
+        {
+            void* smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
+            CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readNCount unit test)");
+            memcpy(smallBuffer, header, headerSize-1);
+            max = 129;
+            errorCode = FSE_readNCount(norm, &max, &tableLog, smallBuffer, headerSize-1);
+            CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
+            free(smallBuffer);
+        }
     }
 
 
     /* FSE_buildCTable_raw & FSE_buildDTable_raw */
     {
-        U32 CTable[FSE_CTABLE_SIZE_U32(8, 256)];
-        U32 DTable[FSE_DTABLE_SIZE_U32(8)];
+        U32 ct[FSE_CTABLE_SIZE_U32(8, 256)];
+        U32 dt[FSE_DTABLE_SIZE_U32(8)];
         U64 crcOrig, crcVerif;
         size_t cSize, verifSize;
 
@@ -403,22 +441,24 @@ static void unitTest(void)
         for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&seed) & 63) + '0';
         crcOrig = XXH64(testBuff, TBSIZE, 0);
 
-        errorCode = FSE_buildCTable_raw(CTable, 8);
+        errorCode = FSE_buildCTable_raw(ct, 8);
         CHECK(FSE_isError(errorCode), "FSE_buildCTable_raw should have worked");
-        errorCode = FSE_buildDTable_raw(DTable, 8);
+        errorCode = FSE_buildDTable_raw(dt, 8);
         CHECK(FSE_isError(errorCode), "FSE_buildDTable_raw should have worked");
 
-        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, CTable);
+        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, ct);
         CHECK(FSE_isError(cSize), "FSE_compress_usingCTable should have worked using raw CTable");
 
-        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, DTable, 0);
+        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, dt, 0);
         CHECK(FSE_isError(verifSize), "FSE_decompress_usingDTable should have worked using raw DTable");
 
         crcVerif = XXH64(verifBuff, verifSize, 0);
         CHECK(crcOrig != crcVerif, "Raw regenerated data is corrupted");
     }
 
-
+    free(testBuff);
+    free(cBuff);
+    free(verifBuff);
     DISPLAY("Unit tests completed\n");
 }
 
@@ -426,6 +466,15 @@ static void unitTest(void)
 /*****************************************************************
 *  Command line
 *****************************************************************/
+
+int badUsage(const char* exename)
+{
+    (void) exename;
+    DISPLAY("wrong parameter\n");
+    return 1;
+}
+
+
 int main (int argc, char** argv)
 {
     U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
@@ -438,12 +487,12 @@ int main (int argc, char** argv)
         char* argument = argv[argNb];
         if (argument[0]=='-')
         {
-            while (argument[1]!=0)
+            argument++;
+            while (argument[0]!=0)
             {
-                argument ++;
                 switch (argument[0])
                 {
-                // seed setting
+                /* seed setting */
                 case 's':
                     argument++;
                     seed=0;
@@ -455,7 +504,7 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // total tests
+                /* total tests */
                 case 'i':
                     argument++;
                     totalTest=0;
@@ -467,7 +516,7 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // jumpt to test nb
+                /* jump to test nb */
                 case 't':
                     argument++;
                     startTestNb=0;
@@ -479,33 +528,37 @@ int main (int argc, char** argv)
                     }
                     break;
 
-                // verbose mode
+                /* verbose mode */
                 case 'v':
+                    argument++;
                     displayLevel=4;
                     break;
 
-                // pause (hidden)
+                /* pause (hidden) */
                 case 'p':
+                    argument++;
                     pause=1;
                     break;
 
                 default:
-                    ;
+                    return badUsage(argv[0]);
                 }
             }
         }
     }
 
-    unitTest();
+    if (startTestNb == 0) unitTest();
 
     DISPLAY("Fuzzer seed : %u \n", seed);
     FUZ_tests (seed, totalTest, startTestNb);
 
-    DISPLAY ("\rAll tests passed               \n");
+    DISPLAY ("\rAll %u tests passed               \n", totalTest);
     if (pause)
     {
+        int unused;
         DISPLAY("press enter ...\n");
-        getchar();
+        unused = getchar();
+        (void)unused;
     }
     return 0;
 }

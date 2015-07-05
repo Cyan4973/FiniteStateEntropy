@@ -1,8 +1,18 @@
 language: c
 compiler: gcc
-script: cd test && make test-all
+script: make $TravisCi_FseTest
 before_install:
-  - sudo apt-get update -qq
+  - sudo apt-get update  -qq
+  - sudo apt-get install -qq gcc-arm-linux-gnueabi
+  - sudo apt-get install -qq clang
+  - sudo apt-get install -qq g++-multilib
   - sudo apt-get install -qq gcc-multilib
   - sudo apt-get install -qq valgrind
+
+env:
+  - TravisCi_FseTest=test-all
+  - TravisCi_FseTest=gpptest
+  - TravisCi_FseTest=armtest
+  - TravisCi_FseTest=clangtest
+  - TravisCi_FseTest=sanitize
 

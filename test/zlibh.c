@@ -31,9 +31,9 @@ You can contact the author at :
 ****************************************************************** */
 
 
-//****************************************************************
-// Tuning parameters
-//****************************************************************
+/****************************************************************
+*  Tuning parameters
+****************************************************************/
 // MEMORY_USAGE :
 // Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
 // Increasing memory usage improves compression ratio
@@ -49,9 +49,10 @@ You can contact the author at :
 // Enable verification code, which checks table construction and state values (munsigned char slower, for debug purpose only)
 #define ZLIBH_DEBUG 0
 
-//****************************************************************
-//* Includes
-//****************************************************************
+
+/****************************************************************
+*  Includes
+****************************************************************/
 #include "zlibh.h"
 #include <string.h>    // memcpy, memset
 #include <stdio.h>     // printf (debug)
@@ -232,11 +233,7 @@ static static_tree_desc  static_bl_desc =
 * when the heap property is re-established (each father smaller than its
 * two sons).
 */
-static void pqdownheap(tree, huf_heap, depth, k)
-    ct_data *tree;  /* the tree to restore */
-int *huf_heap;
-unsigned char *depth;
-int k;               /* node to move down */
+static void pqdownheap(ct_data *tree, int *huf_heap, unsigned char *depth, int k)
 {
     int v = huf_heap[k];
     int j = k << 1;  /* left son of k */
@@ -258,9 +255,10 @@ int k;               /* node to move down */
     huf_heap[k] = v;
 }
 
-//****************************************************************
-//* Basic Types
-//****************************************************************
+
+/****************************************************************
+*  Basic Types
+****************************************************************/
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
 typedef  uint8_t BYTE;
@@ -279,9 +277,9 @@ typedef unsigned long long  U64;
 typedef U32 bitContainer_t;
 
 
-//****************************************************************
-//* Constants
-//****************************************************************
+/****************************************************************
+*  Constants
+****************************************************************/
 #define MAX_NB_SYMBOLS 257
 #define ZLIBH_MAX_TABLELOG  (ZLIBH_MEMORY_USAGE-2)
 #define ZLIBH_MAX_TABLESIZE (1U<<ZLIBH_MAX_TABLELOG)
@@ -303,9 +301,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************************************************
-//* Compiler specifics
-//****************************************************************
+/****************************************************************
+*  Compiler specifics
+****************************************************************/
 #ifdef _MSC_VER    // Visual Studio
 #  define FORCE_INLINE static __forceinline
 #  include <intrin.h>                    // For Visual 2005
@@ -320,9 +318,9 @@ static long long nbDBlocks = 0;    // debug
 #endif
 
 
-//****************************
-// ZLIBH Compression Code
-//****************************
+/****************************
+*  ZLIBH Compression Code
+****************************/
 
 /* If not enough room in bi_buf, use (valid) bits from bi_buf and
 * (16 - bi_valid) bits from value, leaving (width - (16-bi_valid))
@@ -346,12 +344,7 @@ static long long nbDBlocks = 0;    // debug
 /* ===========================================================================
 * Send the block data compressed using the given Huffman trees
 */
-static void ZLIBH_compress_block(ip, op, ltree, bltree, ip_len)
-    unsigned char* ip;      /* input buffer */
-unsigned char* op;      /* output buffer */
-const ct_data *ltree;   /* literal tree */
-const ct_data *bltree;  /* bitlen tree */
-unsigned int ip_len;    /* number of symbols in input buffer */
+static void ZLIBH_compress_block(const unsigned char* ip, unsigned char* op, const ct_data * ltree, const ct_data * bltree, unsigned int ip_len)
 {
     unsigned int bi_buf;    /* bit buffer */
     unsigned int bi_valid;  /* bits used in bit_buf */
@@ -485,9 +478,7 @@ unsigned int ip_len;    /* number of symbols in input buffer */
 * Merge the literal and distance tree and scan the resulting tree to determine
 * the frequencies of the codes in the bit length tree.
 */
-static void feed_bltree(ltree_desc, bltree_desc)
-    tree_desc *ltree_desc;      /* the tree descriptor */
-tree_desc *bltree_desc;     /* the tree descriptor */
+static void feed_bltree(tree_desc * ltree_desc, tree_desc * bltree_desc)
 {
     ct_data *ltree  = ltree_desc->dyn_tree;
     ct_data *bltree = bltree_desc->dyn_tree;
@@ -539,9 +530,7 @@ tree_desc *bltree_desc;     /* the tree descriptor */
 * method would use a table)
 * IN assertion: 1 <= len <= 15
 */
-static unsigned bi_reverse(code, len)
-    unsigned code; /* the value to invert */
-int len;       /* its bit length */
+static unsigned bi_reverse(unsigned code, int len)
 {
     register unsigned res = 0;
     do {
@@ -560,10 +549,7 @@ int len;       /* its bit length */
 * OUT assertion: the field code is set for all tree elements of non
 *     zero code length.
 */
-static void gen_codes(tree, max_code, bl_count)
-    ct_data        *tree;                  /* the tree to decorate */
-unsigned int   max_code;               /* largest code with non zero frequency */
-unsigned short *bl_count;              /* number of codes at each bit length */
+static void gen_codes(ct_data* tree, unsigned int max_code, unsigned short* bl_count)
 {
     unsigned short next_code[ZLIBH_MAX_BITS+1];  /* next code value for each bit length */
     unsigned short code = 0;               /* running code value */
@@ -574,7 +560,7 @@ unsigned short *bl_count;              /* number of codes at each bit length */
     * without bit reversal.
     */
     for (bits = 1; bits <= ZLIBH_MAX_BITS; bits++) {
-        next_code[bits] = code = (code + bl_count[bits-1]) << 1;
+        next_code[bits] = code = (unsigned short)((code + bl_count[bits-1]) << 1);
     }
 
     for (n = 0;  n <= max_code; n++) {
@@ -595,12 +581,7 @@ unsigned short *bl_count;              /* number of codes at each bit length */
 *     The length os_len[0] is updated; os_len[1] is also updated if stree is
 *     not null.
 */
-static void gen_bitlen(desc, huf_heap, heap_max, bl_count)
-    tree_desc *desc;    /* the tree descriptor */
-int *huf_heap;
-int heap_max;
-unsigned short *bl_count;
-
+static void gen_bitlen(tree_desc* desc, int* huf_heap, int heap_max, unsigned short* bl_count)
 {
     ct_data *tree        = desc->dyn_tree;
     int max_code         = desc->max_code;
@@ -686,8 +667,7 @@ unsigned short *bl_count;
 *     and corresponding code. The length os_len[0] is updated; os_len[1] is
 *     also updated if stree is not null. The field max_code is set.
 */
-static void build_tree(desc)
-    tree_desc *desc; /* the tree descriptor */
+static void build_tree(tree_desc* desc)
 {
     ct_data *tree         = desc->dyn_tree;
     const ct_data *stree  = desc->stat_desc->static_tree;
@@ -798,9 +778,9 @@ static void build_tree(desc)
 
 int ZLIBH_compress (char* dest, const char* source, int inputSize)
 {
-    unsigned char* ip = (unsigned char*)source;
-    unsigned char* const bsourceend = ip+inputSize;
-    unsigned char* bsource = (unsigned char*)source;
+    const unsigned char* ip = (const unsigned char*)source;
+    const unsigned char* const bsourceend = ip+inputSize;
+    const unsigned char* bsource = (const unsigned char*)source;
     unsigned char* op = (unsigned char*)dest;
     tree_desc ltree;
     ct_data dyn_ltree[ZLIBH_HEAP_SIZE];
@@ -855,11 +835,11 @@ int ZLIBH_compress (char* dest, const char* source, int inputSize)
     if ((bldata_compsize[0]+ldata_compsize[0]) < ldata_compsize[1]) {  /* write bloc using the dynamic tree */
         *op = (unsigned char)(max_blindex+1);
         ZLIBH_compress_block(ip, op, dyn_ltree, dyn_bltree, inputSize);
-        compressed_size = (bldata_compsize[0]+ldata_compsize[0]+8) >> 3;
+        compressed_size = (int)((bldata_compsize[0]+ldata_compsize[0]+8) >> 3);
     }
     else {                                                             /* write bloc using the static tree */
         ZLIBH_compress_block(ip, op, static_ltree, dyn_bltree, inputSize);
-        compressed_size = (ldata_compsize[1]+8) >> 3;
+        compressed_size = (int)((ldata_compsize[1]+8) >> 3);
     }
     return compressed_size;
 }
@@ -1019,8 +999,7 @@ struct inflate_state {
     unsigned was;               /* initial length of match */
 };
 
-static void fixedtables(state)
-struct inflate_state *state;
+static void fixedtables(struct inflate_state *state)
 {
     state->lencode = lenfix;
     state->lenbits = 9;
@@ -1153,13 +1132,7 @@ requested root table index bits, and on return it is the actual root
 table index bits.  It will differ if the request is greater than the
 longest code or if it is less than the shortest code.
 */
-int inflate_table(type, lens, codes, table, bits, work)
-    codetype type;
-unsigned short *lens;
-unsigned codes;
-code * *table;
-unsigned *bits;
-unsigned short *work;
+int inflate_table(codetype type, unsigned short * lens, unsigned codes, code * *table, unsigned *bits, unsigned short *work)
 {
     unsigned len;               /* a code's length in bits */
     unsigned sym;               /* index of code symbols */
@@ -1513,9 +1486,9 @@ when flush is set to Z_FINISH, inflate() cannot return Z_OK.  Instead it
 will return Z_BUF_ERROR if it has not reached the end of the stream.
 */
 
-int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
+int ZLIBH_inflate(unsigned char* dest, const unsigned char* compressed)
 {
-    unsigned char *next = (unsigned char*)compressed;   /* next input */
+    const unsigned char *next = (const unsigned char*)compressed;   /* next input */
     unsigned char *put  = (unsigned char*)dest;         /* next output */
     unsigned hold;              /* bit buffer */
     unsigned bits;              /* bits in bit buffer */
@@ -1531,8 +1504,6 @@ int ZLIBH_inflate(unsigned char* dest, unsigned char* compressed)
     unsigned codebits;          /* code bits, operation, was op */
 
     state.mode = TYPEDO;      /* skip check */
-
-    ret = 0;
 
     /* Clear the input bit accumulator */
     hold = 0;
@@ -1691,7 +1662,7 @@ inf_leave:
 
 int ZLIBH_decompress (char* dest, const char* compressed)
 {
-    unsigned char* ip = (unsigned char*)compressed;
+    const unsigned char* ip = (const unsigned char*)compressed;
     unsigned char* op = (unsigned char*)dest;
     int input_used_so_far;
 

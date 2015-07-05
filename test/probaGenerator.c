@@ -94,7 +94,7 @@ static int badusage(void)
 
 static void generate(void* buffer, size_t buffSize, double p)
 {
-    char table[PROBATABLESIZE];
+    char table[PROBATABLESIZE] = { 0 };
     int remaining = PROBATABLESIZE;
     unsigned pos = 0;
     unsigned s = 0;
@@ -105,7 +105,7 @@ static void generate(void* buffer, size_t buffSize, double p)
     if (p==0.0) p=0.005;
     DISPLAY("Generating %u KB with P=%.2f%%\n", (unsigned)(buffSize >> 10), p*100);
 
-    // Build Table
+    /* Build Table */
     while (remaining)
     {
         unsigned n = (unsigned)(remaining * p);
@@ -117,7 +117,7 @@ static void generate(void* buffer, size_t buffSize, double p)
         remaining -= n;
     }
 
-    // Fill buffer
+    /* Fill buffer */
     while (op<oend)
     {
         const unsigned r = GEN_rand(&seed) & (PROBATABLESIZE-1);
