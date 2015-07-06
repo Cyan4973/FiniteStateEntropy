@@ -302,8 +302,6 @@ size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog)
     return maxSymbolValue ? maxHeaderSize : FSE_MAX_HEADERSIZE;
 }
 
-#ifndef __clang_analyzer__   /* clang static analyzer has difficulties with this function : seems to believe normalizedCounter is uninitialized */
-
 static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
                                        const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
                                        unsigned safeWrite)
@@ -395,11 +393,10 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
     out[1] = (BYTE)(bitStream>>8);
     out+= (bitCount+7) /8;
 
-    if (charnum > maxSymbolValue + 1) return (size_t)-FSE_ERROR_GENERIC;   /* Too many symbols written (a bit too late?) */
+    if (charnum > maxSymbolValue + 1) return (size_t)-FSE_ERROR_GENERIC;
 
     return (out-ostart);
 }
-#endif // __clang_analyzer__
 
 
 size_t FSE_writeNCount (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
