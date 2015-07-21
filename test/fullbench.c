@@ -74,7 +74,7 @@
 
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
-#define DEFAULT_BLOCKSIZE (48 KB)
+#define DEFAULT_BLOCKSIZE (32 KB)
 #define DEFAULT_PROBA 20
 
 
@@ -710,9 +710,18 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
 
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    (void)dstSize;
     return (int)FSE_compress(dst, dstSize, src, srcSize);
 }
+
+static int local_HUF_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    return (int)HUF_compress(dst, dstSize, src, srcSize);
+}
+
+typedef struct HUF_CElt_s HUF_CElt;
+size_t HUF_buildTree (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
+static U32 fakeTree[256];
+static HUF_CElt* g_tree = (HUF_CElt*)fakeTree;
 
 static short  g_normTable[256];
 static U32    g_countTable[256];
@@ -723,6 +732,13 @@ static U32    g_max;
 static size_t g_skip;
 static size_t g_fast;
 static size_t g_cSize;
+
+static int local_HUF_buildTree(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)HUF_buildTree(g_tree, g_countTable, 255, 13);
+}
+
 
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -833,19 +849,6 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
-/*
-    case 6:
-        {
-            U32 max=255;
-            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
-            funcName = "FSE_writeHeader(small)";
-            func = local_FSE_writeHeader_small;
-            break;
-        }
-*/
-
     case 6:
         {
             U32 max=255;
@@ -914,6 +917,19 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
+    case 20:
+        funcName = "HUF_compress";
+        func = local_HUF_compress;
+        break;
+
+    case 21:
+        {
+            U32 max=255;
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            funcName = "HUF_buildTree";
+            func = local_HUF_buildTree;
+            break;
+        }
 
     /* Specific test functions */
     case 100:

@@ -96,14 +96,14 @@ static int usage(void)
     DISPLAY("Usage :\n");
     DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
     DISPLAY("Arguments :\n");
-    DISPLAY("(default): core loop timing tests\n");
-    DISPLAY(" -b : benchmark full mode\n");
-    DISPLAY(" -m : benchmark lowMem mode\n");
+    DISPLAY("(default): fse core loop timing tests\n");
+    DISPLAY(" -b : benchmark using fse\n");
+    DISPLAY(" -h : benchmark using huff0\n");
     DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
     DISPLAY(" -o : force compression\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
-    DISPLAY(" -h/-H : display help/long help and exit\n");
+    DISPLAY(" -H : display help/long help and exit\n");
     return 0;
 }
 
@@ -168,7 +168,6 @@ int main(int argc, char** argv)
                 {
                     // Display help
                 case 'V': DISPLAY(WELCOME_MESSAGE); return 0;   // Version
-                case 'h':
                 case 'H': usage(); return 0;
 
                     // compression
@@ -181,7 +180,7 @@ int main(int argc, char** argv)
                 case 'b': bench=1; break;
 
                     // Benchmark full mode
-                case 'm': DISPLAY("benchmark using experimental lowMem mode\n");
+                case 'h':
                     bench=1;
                     BMK_SetByteCompressor(2);
                     break;

@@ -50,9 +50,15 @@ extern "C" {
 ******************************************/
 #define FSE_MAX_HEADERSIZE 512
 #define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
-/* You can statically allocate a CTable as a table of unsigned int using below macro */
+
+/* You can statically allocate CTable/DTable as a table of unsigned using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
 #define FSE_DTABLE_SIZE_U32(maxTableLog)                   (1 + (1<<maxTableLog))
+
+/* You can statically allocate a Huff0 DTable as a table of unsigned char using below macro */
+#define HUF_DTABLE_SIZE_BYTE(maxTableLog, maxSymbolValue)   (2 + (maxSymbolValue+1) + (1<<maxTableLog))
+#define HUF_CREATE_STATIC_DTABLE(DTable, maxTableLog, maxSymbolValue) \
+        unsigned char DTable[HUF_DTABLE_SIZE_BYTE(maxTableLog, maxSymbolValue)] = { maxSymbolValue, maxTableLog }
 
 
 /******************************************

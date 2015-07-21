@@ -367,13 +367,19 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
     switch(BMK_byteCompressor)
     {
+    default:
+    case 1:
+        compressor = FSE_compress2;
+        decompressor = FSE_decompress;
+        break;
+    case 2:
+        compressor = HUF_compress2;
+        decompressor = HUF_decompress;
+        break;
     case 3:
         compressor = BMK_ZLIBH_compress;
         decompressor = BMK_ZLIBH_decompress;
         break;
-    default:
-        compressor = FSE_compress2;
-        decompressor = FSE_decompress;
     }
 
     DISPLAY("\r%79s\r", "");
@@ -411,7 +417,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
 
-        /* if (loopNb == nbIterations) DISPLAY("\n"); continue;   *//* skip decompression */
+        //if (loopNb == nbIterations) DISPLAY("\n"); continue;   /* skip decompression */
         /* Decompression */
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     /* zeroing area, for CRC checking */
 
@@ -440,6 +446,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
                                              chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
                 }
 
+                if (0)
                 if (regenSize != chunkP[chunkNb].origSize)
                 {
                     DISPLAY("!!! Error decompressing block %i !!!! => (%s)   \n", chunkNb, FSE_getErrorName(regenSize));
@@ -454,7 +461,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         /* CRC Checking */
-        crcCheck = XXH32(chunkP[0].destBuffer, benchedSize,0);
+        crcCheck = XXH32(chunkP[0].destBuffer, benchedSize, 0);
+        if (0)
         if (crcOrig!=crcCheck)
         {
             const char* src = chunkP[0].origBuffer;
