@@ -1168,6 +1168,12 @@ void FSE_initCState(FSE_CState_t* statePtr, const FSE_CTable* ct)
     statePtr->stateLog = tableLog;
 }
 
+void FSE_addBitsFast(FSE_CStream_t* bitC, size_t value, unsigned nbBits)   /* only use if upper bits are clean 0 */
+{
+    bitC->bitContainer |= value << bitC->bitPos;
+    bitC->bitPos += nbBits;
+}
+
 void FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits)
 {
     static const unsigned mask[] = { 0, 1, 3, 7, 0xF, 0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF, 0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF, 0x1FFFFF, 0x3FFFFF, 0x7FFFFF,  0xFFFFFF, 0x1FFFFFF };   /* up to 25 bits */
@@ -1847,7 +1853,7 @@ size_t HUF_buildCTree (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32
 }
 
 
-static size_t HUF_compress_usingCTree(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* tree)
+static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable)
 {
     const BYTE* ip = (const BYTE*) src;
     size_t n;
@@ -1860,9 +1866,9 @@ static size_t HUF_compress_usingCTree(void* dst, size_t dstSize, const void* src
     n = srcSize & ~3;  // mod 4
     switch (srcSize & 3)
     {
-        case 3 : FSE_addBits(&bitC, tree[ip[n+2]].val, tree[ip[n+2]].nbBits);
-        case 2 : FSE_addBits(&bitC, tree[ip[n+1]].val, tree[ip[n+1]].nbBits);
-        case 1 : FSE_addBits(&bitC, tree[ip[n+0]].val, tree[ip[n+0]].nbBits);
+        case 3 : FSE_addBitsFast(&bitC, CTable[ip[n+2]].val, CTable[ip[n+2]].nbBits);
+        case 2 : FSE_addBitsFast(&bitC, CTable[ip[n+1]].val, CTable[ip[n+1]].nbBits);
+        case 1 : FSE_addBitsFast(&bitC, CTable[ip[n+0]].val, CTable[ip[n+0]].nbBits);
                  FSE_flushBits(&bitC);
         case 0 :
         default: ;
@@ -1870,10 +1876,10 @@ static size_t HUF_compress_usingCTree(void* dst, size_t dstSize, const void* src
 
     for (; n>0; n-=4)
     {
-        FSE_addBits(&bitC, tree[ip[n-1]].val, tree[ip[n-1]].nbBits);
-        FSE_addBits(&bitC, tree[ip[n-2]].val, tree[ip[n-2]].nbBits);
-        FSE_addBits(&bitC, tree[ip[n-3]].val, tree[ip[n-3]].nbBits);
-        FSE_addBits(&bitC, tree[ip[n-4]].val, tree[ip[n-4]].nbBits);
+        FSE_addBitsFast(&bitC, CTable[ip[n-1]].val, CTable[ip[n-1]].nbBits);
+        FSE_addBitsFast(&bitC, CTable[ip[n-2]].val, CTable[ip[n-2]].nbBits);
+        FSE_addBitsFast(&bitC, CTable[ip[n-3]].val, CTable[ip[n-3]].nbBits);
+        FSE_addBitsFast(&bitC, CTable[ip[n-4]].val, CTable[ip[n-4]].nbBits);
         FSE_flushBits(&bitC);
     }
 
