@@ -1331,7 +1331,6 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     return op-ostart;
 }
 
-
 size_t FSE_compress (void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return FSE_compress2(dst, dstSize, src, (U32)srcSize, FSE_MAX_SYMBOL_VALUE, FSE_DEFAULT_TABLELOG);
@@ -1667,21 +1666,21 @@ typedef struct nodeElt_s {
 
 
 #define HUF_HEADERLOG 8
-size_t HUF_writeCTree (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 treeSize, U32 huffLog)
+size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog)
 {
-    BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1] = {0};
+    BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
     U32 n;
     BYTE* op = (BYTE*)dst;
     size_t size;
 
     // check conditions
-    if (treeSize > HUF_MAX_SYMBOL_VALUE + 1)
+    if (maxSymbolValue > HUF_MAX_SYMBOL_VALUE + 1)
         return (size_t)-FSE_ERROR_GENERIC;
 
-    for (n=0; n<treeSize; n++)
+    for (n=0; n<maxSymbolValue; n++)
         huffWeight[n] = tree[n].nbBits ? (BYTE)(huffLog + 1 - tree[n].nbBits) : 0;
 
-    size = FSE_compress(op+1, maxDstSize, huffWeight, treeSize);
+    size = FSE_compress(op+1, maxDstSize-1, huffWeight, maxSymbolValue);   // don't need last symbol stat : implied
     if (FSE_isError(size)) return size;
     if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;
     if (size <= 1) return (size_t)-FSE_ERROR_GENERIC;   // special case, not implemented
@@ -1750,6 +1749,7 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
     return maxNbBits;
 }
 
+
 typedef struct {
     U32 base;
     U32 current;
@@ -1779,8 +1779,9 @@ static void HUF_sort(nodeElt* huffNode, const U32* count, U32 maxSymbolValue)
     }
 }
 
+
 #define STARTNODE (HUF_MAX_SYMBOL_VALUE+1)
-size_t HUF_buildCTree (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits)
+size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits)
 {
     nodeElt huffNode0[2*HUF_MAX_SYMBOL_VALUE+1 +1];
     nodeElt* huffNode = huffNode0 + 1;
@@ -1897,7 +1898,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     BYTE* const oend = ostart + dstSize;
 
     U32 count[HUF_MAX_SYMBOL_VALUE+1];
-    HUF_CElt tree[HUF_MAX_SYMBOL_VALUE+1];
+    HUF_CElt CTable[HUF_MAX_SYMBOL_VALUE+1];
     size_t errorCode;
 
     /* early out */
@@ -1914,17 +1915,17 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     if (errorCode < (srcSize >> 7)) return 0;   /* Heuristic : not compressible enough */
 
     /* Build Huffman Tree */
-    errorCode = HUF_buildCTree (tree, count, maxSymbolValue, huffLog);
+    errorCode = HUF_buildCTable (CTable, count, maxSymbolValue, huffLog);
     if (FSE_isError(errorCode)) return errorCode;
     huffLog = (U32)errorCode;
 
     /* Write table description header */
-    errorCode = HUF_writeCTree (op, dstSize, tree, maxSymbolValue, huffLog);  // don't write last symbol, implied
+    errorCode = HUF_writeCTable (op, dstSize, CTable, maxSymbolValue, huffLog);  // don't write last symbol, implied
     if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
     /* Compress */
-    op += HUF_compress_usingCTree(op, oend - op, ip, srcSize, tree);
+    op += HUF_compress_usingCTable(op, oend - op, ip, srcSize, CTable);
 
     /* check compressibility */
     if ( (size_t)(op-ostart) >= srcSize-1 )
@@ -1932,7 +1933,6 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
 
     return op-ostart;
 }
-
 
 size_t HUF_compress (void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
