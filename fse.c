@@ -2052,6 +2052,7 @@ static size_t HUF_decompress_usingDTable(
     /* 4 symbols per loop */
     while (!FSE_reloadDStream(&bitD) && (op<olimit))
     {
+#if 1
         bitD.bitContainer <<= bitD.bitsConsumed;
 
         size_t val = bitD.bitContainer >> (64-dtLog);
@@ -2059,32 +2060,34 @@ static size_t HUF_decompress_usingDTable(
         U32 skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
-        *op++ = c;
+        op[0] = c;
 
         val = bitD.bitContainer >> (64-dtLog);
         c = dt[val].byte;
         skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
-        *op++ = c;
+        op[1] = c;
 
         val = bitD.bitContainer >> (64-dtLog);
         c = dt[val].byte;
         skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
-        *op++ = c;
+        op[2] = c;
 
         val = bitD.bitContainer >> (64-dtLog);
         c = dt[val].byte;
         skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
-        *op++ = c;
+        op[3] = c;
 
-        /*
-        val = FSE_lookBitsFast(&bitD, dtLog);
-        c = dt[val].byte;
+        op += 4;
+#else
+
+        size_t val = FSE_lookBitsFast(&bitD, dtLog);
+        BYTE c = dt[val].byte;
         FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
 
@@ -2097,7 +2100,14 @@ static size_t HUF_decompress_usingDTable(
         c = dt[val].byte;
         FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
-        */
+
+        val = FSE_lookBitsFast(&bitD, dtLog);
+        c = dt[val].byte;
+        FSE_skipBits(&bitD, dt[val].nbBits);
+        *op++ = c;
+
+#endif // 0
+
     }
 
     return op-ostart;
