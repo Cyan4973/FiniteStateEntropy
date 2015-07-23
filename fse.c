@@ -1648,7 +1648,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
 *  Huff0 : Huffman block compression
 *********************************************************/
 #define HUF_ABSOLUTEMAX_TABLELOG  16
-#define HUF_MAX_TABLELOG  14
+#define HUF_MAX_TABLELOG  13
 #define HUF_DEFAULT_TABLELOG  12
 #define HUF_MAX_SYMBOL_VALUE 255
 
@@ -1960,8 +1960,12 @@ size_t HUF_compress (void* dst, size_t maxDstSize, const void* src, size_t srcSi
 /*********************************************************
 *  Huff0 : Huffman block decompression
 *********************************************************/
+typedef struct {
+    BYTE byte;
+    BYTE nbBits;
+} HUF_DElt;
 
-size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
+size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
 {
     BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
     U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1] = {0};
@@ -1972,10 +1976,9 @@ size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
     size_t oSize;
     U32 n;
     U32 nextRankStart;
-    U32 nbSymbols = DTable[0]+1;
-    BYTE* const nbBits = DTable + 2;
-    BYTE* const dt = nbBits + nbSymbols;
+    HUF_DElt* const dt = (HUF_DElt*)(DTable + 1);
 
+    FSE_STATIC_ASSERT(sizeof(HUF_DElt) == sizeof(U16));   // if compilation fails here, assertion is false
     if (iSize >= 128) return (size_t)-FSE_ERROR_GENERIC;  // special case, not implemented
     if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
 
@@ -1991,8 +1994,8 @@ size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
 
     // get last symbol weight(implied)
     maxBits = FSE_highbit32(weightTotal) + 1;
-    if (maxBits > DTable[1]) return (size_t)-FSE_ERROR_GENERIC;   // DTable is too small
-    DTable[1] = (BYTE)maxBits;
+    if (maxBits > DTable[0]) return (size_t)-FSE_ERROR_GENERIC;   // DTable is too small
+    DTable[0] = (U16)maxBits;
     {
         U32 total = 1 << maxBits;
         U32 rest = total - weightTotal;
@@ -2001,12 +2004,6 @@ size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
         huffWeight[oSize] = FSE_highbit32(rest) + 1;
         rankVal[huffWeight[oSize]]++;
     }
-
-    // fill nbBits
-    if (oSize + 1 > nbSymbols) return (size_t)-FSE_ERROR_GENERIC;  // too many symbols, overflow
-    for (n=0; n<=oSize; n++)
-        nbBits[n] = (BYTE)(maxBits + 1 - huffWeight[n]);
-    memset(nbBits + n, 0, nbSymbols-n);
 
     // Prepare ranks
     nextRankStart = 0;
@@ -2022,7 +2019,10 @@ size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
     {
         U32 w = huffWeight[n];
         size_t length = (1 << w) >> 1;
-        memset(dt + rankVal[w], n, length);
+        HUF_DElt D = {n, maxBits + 1 - w};
+        U32 i;
+        for (i = rankVal[w]; i < rankVal[w] + length; i++)
+            dt[i] = D;
         rankVal[w] += length;
     }
 
@@ -2033,17 +2033,15 @@ size_t HUF_readDTree (BYTE* DTable, const void* src, size_t srcSize)
 static size_t HUF_decompress_usingDTable(
           void* dst, size_t maxDstSize,
     const void* cSrc, size_t cSrcSize,
-    const BYTE* DTable)
+    const U16* DTable)
 {
     BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
     BYTE* const omax = op + maxDstSize;
     BYTE* const olimit = omax-3;
 
-    const BYTE* const nbBits = ((const BYTE*)DTable) + 2;
-    const U32 symbolTableSize = nbBits[-2];
-    const BYTE* const dt = nbBits + symbolTableSize;
-    const U32 dtLog = nbBits[-1];
+    const HUF_DElt* const dt = (const HUF_DElt*)(DTable+1);
+    const U32 dtLog = DTable[0];
     FSE_DStream_t bitD;
     size_t errorCode;
 
@@ -2057,47 +2055,47 @@ static size_t HUF_decompress_usingDTable(
         bitD.bitContainer <<= bitD.bitsConsumed;
 
         size_t val = bitD.bitContainer >> (64-dtLog);
-        U32 c = dt[val];
-        U32 skip = nbBits[c];
+        U32 c = dt[val].byte;
+        U32 skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
         *op++ = c;
 
         val = bitD.bitContainer >> (64-dtLog);
-        c = dt[val];
-        skip = nbBits[c];
+        c = dt[val].byte;
+        skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
         *op++ = c;
 
         val = bitD.bitContainer >> (64-dtLog);
-        c = dt[val];
-        skip = nbBits[c];
+        c = dt[val].byte;
+        skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
         *op++ = c;
 
         val = bitD.bitContainer >> (64-dtLog);
-        c = dt[val];
-        skip = nbBits[c];
+        c = dt[val].byte;
+        skip = dt[val].nbBits;
         bitD.bitContainer <<= skip;
         bitD.bitsConsumed += skip;
         *op++ = c;
 
         /*
         val = FSE_lookBitsFast(&bitD, dtLog);
-        c = dt[val];
-        FSE_skipBits(&bitD, nbBits[c]);
+        c = dt[val].byte;
+        FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
 
         val = FSE_lookBitsFast(&bitD, dtLog);
-        c = dt[val];
-        FSE_skipBits(&bitD, nbBits[c]);
+        c = dt[val].byte;
+        FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
 
         val = FSE_lookBitsFast(&bitD, dtLog);
-        c = dt[val];
-        FSE_skipBits(&bitD, nbBits[c]);
+        c = dt[val].byte;
+        FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
         */
     }
@@ -2108,8 +2106,8 @@ static size_t HUF_decompress_usingDTable(
     while (FSE_reloadDStream(&bitD) < 2)
     {
         size_t val = FSE_lookBitsFast(&bitD, dtLog);
-        BYTE c = dt[val];
-        FSE_skipBits(&bitD, nbBits[c]);
+        BYTE c = dt[val].byte;
+        FSE_skipBits(&bitD, dt[val].nbBits);
         *op++ = c;
     }
 
@@ -2123,17 +2121,14 @@ static size_t HUF_decompress_usingDTable(
 }
 
 
-#define HUF_MAX_DTABLE_LOG 13
 size_t HUF_decompress (void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize)
 {
-    HUF_CREATE_STATIC_DTABLE(DTable, HUF_MAX_DTABLE_LOG, HUF_MAX_SYMBOL_VALUE);
+    HUF_CREATE_STATIC_DTABLE(DTable, HUF_MAX_TABLELOG);
     const BYTE* ip = (const BYTE*) cSrc;
     const BYTE* const iend = ip + cSrcSize;
     size_t errorCode;
 
-    (void)dst; (void)maxDstSize; (void)cSrc; (void)cSrcSize; (void)iend;
-
-    errorCode = HUF_readDTree (DTable, cSrc, cSrcSize);
+    errorCode = HUF_readDTable (DTable, cSrc, cSrcSize);
     if (FSE_isError(errorCode)) return errorCode;
     if (errorCode >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
     ip += errorCode;
