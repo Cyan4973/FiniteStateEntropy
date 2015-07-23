@@ -1649,7 +1649,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
 *********************************************************/
 #define HUF_ABSOLUTEMAX_TABLELOG  16
 #define HUF_MAX_TABLELOG  14
-#define HUF_DEFAULT_TABLELOG  13
+#define HUF_DEFAULT_TABLELOG  12
 #define HUF_MAX_SYMBOL_VALUE 255
 
 typedef struct HUF_CElt_s {
@@ -1710,37 +1710,54 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
             n --;
         }
 
-        // renorm cost
+        /* renorm totalCost */
         totalCost >>= (largestBits - maxNbBits);  /* note : totalCost necessarily multiple of baseCost */
 
         // repay cost
         while (huffNode[n].nbBits == maxNbBits) n--;   // n at last of rank (maxNbBits-1)
         {
-            U32 lastId[HUF_MAX_TABLELOG];
-            int id = n;
-            U32 rank = maxNbBits;
-            for ( ; id >= 0; id--)
+            const U32 noOne = HUF_MAX_SYMBOL_VALUE + 2;
+            // Get pos of last (smallest) symbol per rank
+            U32 rankLast[HUF_MAX_TABLELOG];
+            U32 currentNbBits = maxNbBits;
+            int pos;
+            for (pos=0 ; pos < HUF_MAX_TABLELOG; pos++) rankLast[pos] = noOne;
+            for (pos=n ; pos >= 0; pos--)
             {
-                if (huffNode[id].nbBits == rank) continue;
-                lastId[--rank] = id;
-                if (huffNode[id].nbBits < rank) id++;
+                if (huffNode[pos].nbBits >= currentNbBits) continue;
+                currentNbBits = huffNode[pos].nbBits;
+                rankLast[maxNbBits-currentNbBits] = pos;
             }
+
             while (totalCost > 0)
             {
-                U32 nBitsToDecrease = FSE_highbit32(totalCost);
-                for ( ; nBitsToDecrease > 0; nBitsToDecrease--)
+                U32 nBitsToDecrease = FSE_highbit32(totalCost) + 1;
+                for ( ; nBitsToDecrease > 1; nBitsToDecrease--)
                 {
-                    U32 highTotal = huffNode[ lastId[maxNbBits-1 - nBitsToDecrease] ].count;
-                    U32 lowTotal = huffNode[ lastId[maxNbBits - nBitsToDecrease] ].count + huffNode[ lastId[maxNbBits - nBitsToDecrease] +1 ].count;
-                    if (highTotal <= lowTotal) break;
+                    U32 highPos = rankLast[nBitsToDecrease];
+                    U32 lowPos = rankLast[nBitsToDecrease-1];
+                    if (highPos == noOne) continue;
+                    if (lowPos == noOne) break;
+                    {
+                        U32 highTotal = huffNode[highPos].count;
+                        U32 lowTotal = 2 * huffNode[lowPos].count;
+                        if (highTotal <= lowTotal) break;
+                    }
                 }
-                totalCost -= 1 << (maxNbBits-1 - huffNode[ lastId[maxNbBits-1 - nBitsToDecrease] ].nbBits++);
-                lastId[maxNbBits-1 - nBitsToDecrease] --;
+                while (rankLast[nBitsToDecrease] == noOne)
+                    nBitsToDecrease ++;   // In some rare cases, no more rank 1 left => overshoot to closest
+                totalCost -= 1 << (nBitsToDecrease-1);
+                if (rankLast[nBitsToDecrease-1] == noOne)
+                    rankLast[nBitsToDecrease-1] = rankLast[nBitsToDecrease];   // now there is one elt
+                huffNode[rankLast[nBitsToDecrease]].nbBits ++;
+                rankLast[nBitsToDecrease]--;
+                if (rankLast[nBitsToDecrease] == rankLast[nBitsToDecrease+1])
+                    rankLast[nBitsToDecrease] = noOne;   // rank list emptied
             }
 			while (totalCost < 0)   // Sometimes, cost correction overshoot
 			{
-				huffNode[ lastId[maxNbBits-1] + 1 ].nbBits--;
-				lastId[maxNbBits-1]++;
+				huffNode[ rankLast[1] + 1 ].nbBits--;
+				rankLast[1]++;
 				totalCost ++;
 			}
         }
