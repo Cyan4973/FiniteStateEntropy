@@ -200,6 +200,11 @@ unsigned int  FSE_reloadDStream(FSE_DStream_t* bitD);
 unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
+typedef enum { FSE_DStream_unfinished = 0,
+               FSE_DStream_partiallyFilled = 1,
+               FSE_DStream_completed = 2,
+               FSE_DStream_tooFar = 3 } FSE_DStream_status;  /* result of FSE_reloadDStream() */
+
 /*
 Let's now decompose FSE_decompress_usingDTable() into its unitary components.
 You will decode FSE-encoded symbols from the bitStream,
@@ -232,15 +237,15 @@ Refueling the register from memory is manually performed by the reload method.
     endSignal = FSE_reloadDStream(&DStream);
 
 FSE_reloadDStream() result tells if there is still some more data to read from DStream.
-0 : there is still some data left into the DStream.
-1 : Dstream reached end of buffer, but is not yet fully extracted. It will not load data from memory any more.
-2 : Dstream reached its exact end, corresponding in general to decompression completed.
-3 : Dstream went too far. Decompression result is corrupted.
+FSE_DStream_unfinished : there is still some data left into the DStream.
+FSE_DStream_partiallyFilled : Dstream reached end of buffer. Its container may not be completely filled. It will not load data from memory any more.
+FSE_DStream_completed : Dstream reached its exact end, corresponding in general to decompression completed.
+FSE_DStream_tooFar : Dstream went too far. Decompression result is corrupted.
 
-When reaching end of buffer(1), progress slowly, notably if you decode multiple symbols per loop,
+When reaching end of buffer (FSE_DStream_partiallyFilled), progress slowly, notably if you decode multiple symbols per loop,
 to properly detect the exact end of stream.
 After each decoded symbol, check if DStream is fully consumed using this simple test :
-    FSE_reloadDStream(&DStream) >= 2
+    FSE_reloadDStream(&DStream) >= FSE_DStream_completed
 
 When it's done, verify decompression is fully completed, by checking both DStream and the relevant states.
 Checking if DStream has reached its end is performed by :
