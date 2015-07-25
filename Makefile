@@ -59,6 +59,7 @@ staticAnalyze: clean
 
 sanitize: clean
 	@echo ---- check undefined behavior - sanitize ----
-	@cd $(PROGDIR); $(MAKE) test CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	@cd $(PROGDIR); $(MAKE) test   CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	@cd $(PROGDIR); $(MAKE) test32 CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
 
 

@@ -113,9 +113,9 @@ test-fse32: probagen fse32
 	rm proba.bin
 
 test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32
-	./fuzzer32
+	./fuzzer32 $(FSETEST) 
 	./fullbench32 -i1
-	./fuzzerU16_32
+	./fuzzerU16_32 $(FSEU16TEST)
 
 memtest: fuzzer fullbench
 	valgrind --leak-check=yes ./fuzzer -i256

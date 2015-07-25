@@ -204,6 +204,7 @@ typedef enum { FSE_DStream_unfinished = 0,
                FSE_DStream_partiallyFilled = 1,
                FSE_DStream_completed = 2,
                FSE_DStream_tooFar = 3 } FSE_DStream_status;  /* result of FSE_reloadDStream() */
+               /* 1,2,4,8 would be better for bitmap combinations, but slows down performance a bit ... ?! */
 
 /*
 Let's now decompose FSE_decompress_usingDTable() into its unitary components.
@@ -229,16 +230,16 @@ Keep in mind that symbols are decoded in reverse order, like a LIFO stack (last 
     unsigned char symbol = FSE_decodeSymbol(&DState, &DStream);
 
 You can retrieve any bitfield you eventually stored into the bitStream (in reverse order)
-Note : maximum allowed nbBits is 25
-    unsigned int bitField = FSE_readBits(&DStream, nbBits);
+Note : maximum allowed nbBits is 25, for 32-bits compatibility
+    size_t bitField = FSE_readBits(&DStream, nbBits);
 
-All above operations only read from local register (which size is controlled by bitD_t==32 bits).
+All above operations only read from local register (which size depends on size_t).
 Refueling the register from memory is manually performed by the reload method.
     endSignal = FSE_reloadDStream(&DStream);
 
 FSE_reloadDStream() result tells if there is still some more data to read from DStream.
 FSE_DStream_unfinished : there is still some data left into the DStream.
-FSE_DStream_partiallyFilled : Dstream reached end of buffer. Its container may not be completely filled. It will not load data from memory any more.
+FSE_DStream_partiallyFilled : Dstream reached end of buffer. Its container may no longer be completely filled.
 FSE_DStream_completed : Dstream reached its exact end, corresponding in general to decompression completed.
 FSE_DStream_tooFar : Dstream went too far. Decompression result is corrupted.
 

@@ -719,7 +719,7 @@ static int local_HUF_compress(void* dst, size_t dstSize, const void* src, size_t
 }
 
 typedef struct HUF_CElt_s HUF_CElt;
-size_t HUF_buildTree (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
+size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
 static U32 fakeTree[256];
 static HUF_CElt* g_tree = (HUF_CElt*)fakeTree;
 
@@ -733,10 +733,10 @@ static size_t g_skip;
 static size_t g_fast;
 static size_t g_cSize;
 
-static int local_HUF_buildTree(void* dst, size_t dstSize, const void* src, size_t srcSize)
+static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return (int)HUF_buildTree(g_tree, g_countTable, 255, 13);
+    return (int)HUF_buildCTable(g_tree, g_countTable, 255, 13);
 }
 
 
@@ -795,6 +795,13 @@ static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, s
     (void)srcSize;
     return (int)FSE_decompress(dst, maxDstSize, src, g_cSize);
 }
+
+static int local_HUF_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize;
+    return (int)HUF_decompress(dst, maxDstSize, src, g_cSize);
+}
+
 
 
 int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
@@ -926,8 +933,17 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         {
             U32 max=255;
             FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
-            funcName = "HUF_buildTree";
-            func = local_HUF_buildTree;
+            funcName = "HUF_buildCTable";
+            func = local_HUF_buildCTable;
+            break;
+        }
+
+    case 30:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress";
+            func = local_HUF_decompress;
             break;
         }
 
