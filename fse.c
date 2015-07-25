@@ -1724,13 +1724,14 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
 
         // repay cost
         while (huffNode[n].nbBits == maxNbBits) n--;   // n at last of rank (maxNbBits-1)
+
         {
-            const U32 noOne = HUF_MAX_SYMBOL_VALUE + 2;
+            const U32 noOne = 0xF0F0F0F0;
             // Get pos of last (smallest) symbol per rank
             U32 rankLast[HUF_MAX_TABLELOG];
             U32 currentNbBits = maxNbBits;
             int pos;
-            for (pos=0 ; pos < HUF_MAX_TABLELOG; pos++) rankLast[pos] = noOne;
+			memset(rankLast, 0xF0, sizeof(rankLast));
             for (pos=n ; pos >= 0; pos--)
             {
                 if (huffNode[pos].nbBits >= currentNbBits) continue;
@@ -1760,11 +1761,19 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
                     rankLast[nBitsToDecrease-1] = rankLast[nBitsToDecrease];   // now there is one elt
                 huffNode[rankLast[nBitsToDecrease]].nbBits ++;
                 rankLast[nBitsToDecrease]--;
-                if (rankLast[nBitsToDecrease] == rankLast[nBitsToDecrease+1])
+				if (huffNode[rankLast[nBitsToDecrease]].nbBits != maxNbBits-nBitsToDecrease)
                     rankLast[nBitsToDecrease] = noOne;   // rank list emptied
             }
 			while (totalCost < 0)   // Sometimes, cost correction overshoot
 			{
+				if (rankLast[1] == noOne)   /* special case, no weight 1, let's find it back at n */
+				{
+					while (huffNode[n].nbBits == maxNbBits) n--;
+					huffNode[n+1].nbBits--;
+					rankLast[1] = n+1;
+					totalCost++;
+					continue;
+				}
 				huffNode[ rankLast[1] + 1 ].nbBits--;
 				rankLast[1]++;
 				totalCost ++;
@@ -2039,7 +2048,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     op += HUF_compress_usingCTable(op, oend - op, src, srcSize, CTable);
 
     /* check compressibility */
-    if ( (size_t)(op-ostart) >= srcSize-1 )
+    if ((size_t)(op-ostart) >= srcSize-1)
         return 0;
 
     return op-ostart;
@@ -2111,10 +2120,11 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     // fill table
     for (n=0; n<=oSize; n++)
     {
-        U32 w = huffWeight[n];
-        size_t length = (1 << w) >> 1;
-        HUF_DElt D = { (BYTE)n, (BYTE)(maxBits + 1 - w) };
         U32 i;
+        const U32 w = huffWeight[n];
+        const U32 length = (1 << w) >> 1;
+        HUF_DElt D;
+        D.byte = (BYTE)n; D.nbBits = (BYTE)(maxBits + 1 - w);
         for (i = rankVal[w]; i < rankVal[w] + length; i++)
             dt[i] = D;
         rankVal[w] += length;
@@ -2234,7 +2244,6 @@ size_t HUF_decompress (void* dst, size_t maxDstSize, const void* cSrc, size_t cS
 {
     HUF_CREATE_STATIC_DTABLE(DTable, HUF_MAX_TABLELOG);
     const BYTE* ip = (const BYTE*) cSrc;
-    const BYTE* const iend = ip + cSrcSize;
     size_t errorCode;
 
     errorCode = HUF_readDTable (DTable, cSrc, cSrcSize);
@@ -2243,7 +2252,7 @@ size_t HUF_decompress (void* dst, size_t maxDstSize, const void* cSrc, size_t cS
     ip += errorCode;
     cSrcSize -= errorCode;
 
-    return HUF_decompress_usingDTable (dst, maxDstSize, ip, iend-ip, DTable);
+    return HUF_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }
 
 
