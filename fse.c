@@ -1691,7 +1691,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
 #define HUF_MAX_SYMBOL_VALUE 255
 #define HUF_DEFAULT_TABLELOG  12       /* used by default, when not specified */
 #define HUF_MAX_TABLELOG  12           /* max possible tableLog; for allocation purpose; can be modified */
-#define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code is unsupported */
+#define HUF_ABSOLUTEMAX_TABLELOG  15   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, header does not work */
 #if (HUF_MAX_TABLELOG > HUF_ABSOLUTEMAX_TABLELOG)
 #  error "HUF_MAX_TABLELOG is too large !"
 #endif
@@ -1726,9 +1726,24 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
 
     size = FSE_compress(op+1, maxDstSize-1, huffWeight, maxSymbolValue);   // don't need last symbol stat : implied
     if (FSE_isError(size)) return size;
-    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;
-    if (size <= 1) return (size_t)-FSE_ERROR_GENERIC;   // special case, not implemented
+    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   // should never happen
+    if ((size <= 1) || (size >= maxSymbolValue/2))
+    {
+        if (maxSymbolValue > 64) return (size_t)-FSE_ERROR_GENERIC;   // special case, not implemented
+        if (size==1)   // RLE
+        {
+            op[0] = (BYTE)(128 /*special case*/ + 64 /* RLE */ + (maxSymbolValue-1));
+            op[1] = huffWeight[0];
+            return 2;
+        }
+        // Not compressible
+        op[0] = (BYTE)(128 /*special case*/ + 0 /* Not Compressible */ + (maxSymbolValue-1));
+        for (n=0; n<maxSymbolValue; n+=2)
+            op[(n/2)+1] = (BYTE)((huffWeight[n] << 4) + huffWeight[n+1]);
+        return ((maxSymbolValue+1)/2) + 1;
+    }
 
+    // normal case
     op[0] = (BYTE)size;
     return size+1;
 }
@@ -2117,11 +2132,35 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     HUF_DElt* const dt = (HUF_DElt*)(DTable + 1);
 
     FSE_STATIC_ASSERT(sizeof(HUF_DElt) == sizeof(U16));   // if compilation fails here, assertion is false
-    if (iSize >= 128) return (size_t)-FSE_ERROR_GENERIC;  // special case, not implemented
-    if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
+    if (iSize >= 128) // special case
+    {
+        if (iSize >= (128+64))   // RLE
+        {
+            if (srcSize < 2) return (size_t)-FSE_ERROR_srcSize_wrong;
+            oSize = (iSize & 63) + 1;
+            memset(huffWeight, ip[1], oSize);
+            iSize = 1;
+        }
+        else   // Incompressible
+        {
+            oSize = (iSize & 63) + 1;
+            iSize = ((oSize+1)/2);
+            if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
+            ip += 1;
+            for (n=0; n<oSize; n+=2)
+            {
+                huffWeight[n]   = (ip[n/2] >> 4);
+                huffWeight[n+1] = (ip[n/2] & 15);
+            }
+        }
+    }
+    else  // normal case, header compressed with FSE
+    {
+        if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
+        oSize = FSE_decompress(huffWeight, HUF_MAX_SYMBOL_VALUE, ip+1, iSize);   // max 255 values stored, last is implied
+        if (FSE_isError(oSize)) return oSize;
+    }
 
-    oSize = FSE_decompress(huffWeight, HUF_MAX_SYMBOL_VALUE, ip+1, iSize);   // max 255 values stored, last is implied
-    if (FSE_isError(oSize)) return oSize;
 
     // stats on weights
     for (n=0; n<oSize; n++)
@@ -2167,14 +2206,6 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
 
     return iSize+1;
 }
-
-/*
-#define HUF_DECODE_SYMBOL(n, Dstream) \
-        val = FSE_lookBitsFast(&Dstream, dtLog); \
-        c = dt[val].byte; \
-        FSE_skipBits(&Dstream, dt[val].nbBits); \
-        op[n] = c;
-*/
 
 static void HUF_decodeSymbol(BYTE* ptr, FSE_DStream_t* Dstream, const HUF_DElt* dt, U32 dtLog)
 {
