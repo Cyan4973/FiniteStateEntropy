@@ -719,7 +719,6 @@ static int local_HUF_compress(void* dst, size_t dstSize, const void* src, size_t
 }
 
 typedef struct HUF_CElt_s HUF_CElt;
-size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
 static U32 fakeTree[256];
 static HUF_CElt* g_tree = (HUF_CElt*)fakeTree;
 
@@ -732,11 +731,20 @@ static U32    g_max;
 static size_t g_skip;
 static size_t g_fast;
 static size_t g_cSize;
+HUF_CREATE_STATIC_DTABLE(g_huff_dtable, 16);
 
+size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
 static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return (int)HUF_buildCTable(g_tree, g_countTable, 255, 13);
+    return (int)HUF_buildCTable(g_tree, g_countTable, 255, 0);
+}
+
+size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog);
+static int local_HUF_writeCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)src; (void)srcSize;
+    return (int)HUF_writeCTable(dst, dstSize, g_tree, 255, g_tableLog);
 }
 
 
@@ -796,12 +804,19 @@ static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, s
     return (int)FSE_decompress(dst, maxDstSize, src, g_cSize);
 }
 
+
 static int local_HUF_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)srcSize;
     return (int)HUF_decompress(dst, maxDstSize, src, g_cSize);
 }
 
+size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize);
+static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)maxDstSize; (void)srcSize;
+    return (int)HUF_readDTable(g_huff_dtable, src, g_cSize);
+}
 
 
 int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
@@ -938,12 +953,31 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
+    case 22:
+        {
+            U32 max=255;
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = HUF_buildCTable(g_tree, g_countTable, max, 0);
+            funcName = "HUF_writeCTable";
+            func = local_HUF_writeCTable;
+            break;
+        }
+
     case 30:
         {
             g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             memcpy(oBuffer, cBuffer, g_cSize);
             funcName = "HUF_decompress";
             func = local_HUF_decompress;
+            break;
+        }
+
+    case 31:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readDTable";
+            func = local_HUF_readDTable;
             break;
         }
 

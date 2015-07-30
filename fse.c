@@ -1691,7 +1691,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
 #define HUF_MAX_SYMBOL_VALUE 255
 #define HUF_DEFAULT_TABLELOG  12       /* used by default, when not specified */
 #define HUF_MAX_TABLELOG  12           /* max possible tableLog; for allocation purpose; can be modified */
-#define HUF_ABSOLUTEMAX_TABLELOG  15   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, header does not work */
+#define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code does not work */
 #if (HUF_MAX_TABLELOG > HUF_ABSOLUTEMAX_TABLELOG)
 #  error "HUF_MAX_TABLELOG is too large !"
 #endif
@@ -1709,7 +1709,6 @@ typedef struct nodeElt_s {
 } nodeElt;
 
 
-#define HUF_HEADERLOG 8
 size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog)
 {
     BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
@@ -1726,10 +1725,10 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
 
     size = FSE_compress(op+1, maxDstSize-1, huffWeight, maxSymbolValue);   // don't need last symbol stat : implied
     if (FSE_isError(size)) return size;
-    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   // should never happen
+    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   // should never happen, since maxSymbolValue <= 255
     if ((size <= 1) || (size >= maxSymbolValue/2))
     {
-        if (maxSymbolValue > 64) return (size_t)-FSE_ERROR_GENERIC;   // special case, not implemented
+        if (maxSymbolValue > 64) return (size_t)-FSE_ERROR_GENERIC;   // special case, not implemented (not possible)
         if (size==1)   // RLE
         {
             op[0] = (BYTE)(128 /*special case*/ + 64 /* RLE */ + (maxSymbolValue-1));
@@ -1876,7 +1875,8 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     U32 nodeRoot;
 
     // check
-    if (maxSymbolValue > 255) return (size_t)-FSE_ERROR_GENERIC;
+    if (maxNbBits == 0) maxNbBits = HUF_DEFAULT_TABLELOG;
+    if (maxSymbolValue > HUF_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_GENERIC;
 	memset(huffNode0, 0, sizeof(huffNode0));
 
     // sort, decreasing order
