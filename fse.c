@@ -286,11 +286,9 @@ static void FSE_writeLEST(void* memPtr, size_t val)
 ****************************************************************/
 typedef struct
 {
-    int  deltaFindState;
-    U16  maxState;
-    BYTE minBitsOut;
-    /* one byte padding ; total 8 bytes */
-} FSE_symbolCompressionTransform;
+    int deltaFindState;
+    U32 deltaNbBits;
+} FSE_symbolCompressionTransform; /* total 8 bytes */
 
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
@@ -509,20 +507,22 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
         {
             switch (normalizedCounter[s])
             {
-            case 0:
+            case  0:
                 break;
             case -1:
-            case 1:
-                symbolTT[s].minBitsOut = (BYTE)tableLog;
+            case  1:
+                symbolTT[s].deltaNbBits = tableLog * (1 << 16);
                 symbolTT[s].deltaFindState = total - 1;
                 total ++;
-                symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   /* ensures state <= maxState */
                 break;
             default :
-                symbolTT[s].minBitsOut = (BYTE)( (tableLog-1) - FSE_highbit32 (normalizedCounter[s]-1) );
-                symbolTT[s].deltaFindState = total - normalizedCounter[s];
-                total +=  normalizedCounter[s];
-                symbolTT[s].maxState = (U16)( (normalizedCounter[s] << (symbolTT[s].minBitsOut+1)) - 1);
+                {
+                    U32 maxBitsOut = tableLog - FSE_highbit32 (normalizedCounter[s]-1);
+                    U32 minStatePlus = normalizedCounter[s] << maxBitsOut;
+                    symbolTT[s].deltaNbBits = (maxBitsOut << 16) - minStatePlus;
+                    symbolTT[s].deltaFindState = total - normalizedCounter[s];
+                    total +=  normalizedCounter[s];
+                }
             }
         }
     }
@@ -914,50 +914,6 @@ int FSE_compareRankT(const void* r1, const void* r2)
 }
 
 
-#if 0
-static size_t FSE_adjustNormSlow(short* norm, int pointsToRemove, const unsigned* count, U32 maxSymbolValue)
-{
-    rank_t rank[FSE_MAX_SYMBOL_VALUE+2];
-    U32 s;
-
-    /* Init */
-    for (s=0; s<=maxSymbolValue; s++)
-    {
-        rank[s].id = s;
-        rank[s].count = count[s];
-        if (norm[s] <= 1) rank[s].count = 0;
-    }
-    rank[maxSymbolValue+1].id = 0;
-    rank[maxSymbolValue+1].count = 0;   /* ensures comparison ends here in worst case */
-
-    /* Sort according to count */
-    qsort(rank, maxSymbolValue+1, sizeof(rank_t), FSE_compareRankT);
-
-    while(pointsToRemove)
-    {
-        int newRank = 1;
-        rank_t savedR;
-        if (norm[rank[0].id] == 1)
-            return (size_t)-FSE_ERROR_GENERIC;
-        norm[rank[0].id]--;
-        pointsToRemove--;
-        rank[0].count -= (rank[0].count + 6) >> 3;
-        if (norm[rank[0].id] == 1)
-            rank[0].count=0;
-        savedR = rank[0];
-        while (rank[newRank].count > savedR.count)
-        {
-            rank[newRank-1] = rank[newRank];
-            newRank++;
-        }
-        rank[newRank-1] = savedR;
-    }
-
-    return 0;
-}
-
-#else
-
 /* Secondary normalization method.
    To be used when primary method fails. */
 
@@ -1048,7 +1004,6 @@ static size_t FSE_normalizeM2(short* norm, U32 tableLog, const unsigned* count, 
 
     return 0;
 }
-#endif
 
 
 size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
@@ -1153,9 +1108,8 @@ size_t FSE_buildCTable_raw (FSE_CTable* ct, unsigned nbBits)
     /* Build Symbol Transformation Table */
     for (s=0; s<=maxSymbolValue; s++)
     {
-        symbolTT[s].minBitsOut = (BYTE)nbBits;
+        symbolTT[s].deltaNbBits = nbBits << 16;
         symbolTT[s].deltaFindState = s-1;
-        symbolTT[s].maxState = (U16)( (tableSize*2) - 1);   /* ensures state <= maxState */
     }
 
     return 0;
@@ -1165,7 +1119,6 @@ size_t FSE_buildCTable_raw (FSE_CTable* ct, unsigned nbBits)
 /* fake FSE_CTable, for rle (100% always same symbol) input */
 size_t FSE_buildCTable_rle (FSE_CTable* ct, BYTE symbolValue)
 {
-    const unsigned tableSize = 1;
     U16* tableU16 = ( (U16*) ct) + 2;
     FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) ((U32*)ct + 2);
 
@@ -1179,9 +1132,8 @@ size_t FSE_buildCTable_rle (FSE_CTable* ct, BYTE symbolValue)
 
     /* Build Symbol Transformation Table */
     {
-        symbolTT[symbolValue].minBitsOut = 0;
+        symbolTT[symbolValue].deltaNbBits = 0;
         symbolTT[symbolValue].deltaFindState = 0;
-        symbolTT[symbolValue].maxState = (U16)(2*tableSize-1);   /* ensures state <= maxState */
     }
 
     return 0;
@@ -1218,12 +1170,11 @@ void FSE_addBits(FSE_CStream_t* bitC, size_t value, unsigned nbBits)
     bitC->bitPos += nbBits;
 }
 
-void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtr, BYTE symbol)
+void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U32 symbol)
 {
     const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
     const U16* const stateTable = (const U16*)(statePtr->stateTable);
-    int nbBitsOut  = symbolTT.minBitsOut;
-    nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
+    int nbBitsOut  = (statePtr->value + symbolTT.deltaNbBits) >> 16;
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
 }

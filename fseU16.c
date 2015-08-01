@@ -90,17 +90,6 @@ typedef struct
 /*********************************************************
 *  U16 Compression functions
 *********************************************************/
-void FSE_encodeU16(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U16 symbol)
-{
-    const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
-    const U16* const stateTable = (const U16*)statePtr->stateTable;
-    int nbBitsOut  = symbolTT.minBitsOut;
-    nbBitsOut -= (int)((symbolTT.maxState - statePtr->value) >> 31);
-    FSE_addBits(bitC, statePtr->value, nbBitsOut);
-    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
-}
-
-
 size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
                               const U16*  src, size_t srcSize,
                               const FSE_CTable* ct)
@@ -124,32 +113,32 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     /* join to even */
     if (srcSize & 1)
     {
-        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_encodeSymbol(&bitC, &CState, *--ip);
         FSE_flushBits(&bitC);
     }
 
     /* join to mod 4 */
     if (srcSize & 2)
     {
-        FSE_encodeU16(&bitC, &CState, *--ip);
-        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_encodeSymbol(&bitC, &CState, *--ip);
+        FSE_encodeSymbol(&bitC, &CState, *--ip);
         FSE_flushBits(&bitC);
     }
 
     /* 2 or 4 encoding per loop */
     while (ip>istart)
     {
-        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_encodeSymbol(&bitC, &CState, *--ip);
 
         if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* This test must be static */
             FSE_flushBits(&bitC);
 
-        FSE_encodeU16(&bitC, &CState, *--ip);
+        FSE_encodeSymbol(&bitC, &CState, *--ip);
 
         if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   /* This test must be static */
         {
-            FSE_encodeU16(&bitC, &CState, *--ip);
-            FSE_encodeU16(&bitC, &CState, *--ip);
+            FSE_encodeSymbol(&bitC, &CState, *--ip);
+            FSE_encodeSymbol(&bitC, &CState, *--ip);
         }
 
         FSE_flushBits(&bitC);
