@@ -1894,6 +1894,16 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     return maxNbBits;
 }
 
+static void HUF_encodeSymbol(FSE_CStream_t* bitCPtr, U32 symbol, const HUF_CElt* CTable)
+{
+    FSE_addBitsFast(bitCPtr, CTable[symbol].val, CTable[symbol].nbBits);
+}
+
+#define FSE_FLUSHBITS_1(stream) \
+    if (sizeof((stream)->bitContainer)*8 < HUF_MAX_TABLELOG*2+7) FSE_flushBits(stream)
+
+#define FSE_FLUSHBITS_2(stream) \
+    if (sizeof((stream)->bitContainer)*8 < HUF_MAX_TABLELOG*4+7) FSE_flushBits(stream)
 
 static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable)
 {
@@ -1909,41 +1919,38 @@ static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* sr
     op += 6;   /* jump Table -- could be optimized by delta / deviation */
     FSE_initCStream(&bitC, op);
 
-#define FSE_FLUSHBITS_32(stream) \
-    if (FSE_32bits()) FSE_flushBits(stream)
-
     n = srcSize & ~15;  // mod 16
     switch (srcSize & 15)
     {
-        case 15: FSE_addBitsFast(&bitC, CTable[ip[n+14]].val, CTable[ip[n+14]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 14: FSE_addBitsFast(&bitC, CTable[ip[n+13]].val, CTable[ip[n+13]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 13: FSE_addBitsFast(&bitC, CTable[ip[n+12]].val, CTable[ip[n+12]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 12: FSE_addBitsFast(&bitC, CTable[ip[n+11]].val, CTable[ip[n+11]].nbBits);
+        case 15: HUF_encodeSymbol(&bitC, ip[n+14], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 14: HUF_encodeSymbol(&bitC, ip[n+13], CTable);
+                 FSE_FLUSHBITS_2(&bitC);
+        case 13: HUF_encodeSymbol(&bitC, ip[n+12], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 12: HUF_encodeSymbol(&bitC, ip[n+11], CTable);
                  FSE_flushBits(&bitC);
-        case 11: FSE_addBitsFast(&bitC, CTable[ip[n+10]].val, CTable[ip[n+10]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 10: FSE_addBitsFast(&bitC, CTable[ip[n+9]].val, CTable[ip[n+9]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 9 : FSE_addBitsFast(&bitC, CTable[ip[n+8]].val, CTable[ip[n+8]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 8 : FSE_addBitsFast(&bitC, CTable[ip[n+7]].val, CTable[ip[n+7]].nbBits);
+        case 11: HUF_encodeSymbol(&bitC, ip[n+10], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 10: HUF_encodeSymbol(&bitC, ip[n+ 9], CTable);
+                 FSE_FLUSHBITS_2(&bitC);
+        case 9 : HUF_encodeSymbol(&bitC, ip[n+ 8], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 8 : HUF_encodeSymbol(&bitC, ip[n+ 7], CTable);
                  FSE_flushBits(&bitC);
-        case 7 : FSE_addBitsFast(&bitC, CTable[ip[n+6]].val, CTable[ip[n+6]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 6 : FSE_addBitsFast(&bitC, CTable[ip[n+5]].val, CTable[ip[n+5]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 5 : FSE_addBitsFast(&bitC, CTable[ip[n+4]].val, CTable[ip[n+4]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 4 : FSE_addBitsFast(&bitC, CTable[ip[n+3]].val, CTable[ip[n+3]].nbBits);
+        case 7 : HUF_encodeSymbol(&bitC, ip[n+ 6], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 6 : HUF_encodeSymbol(&bitC, ip[n+ 5], CTable);
+                 FSE_FLUSHBITS_2(&bitC);
+        case 5 : HUF_encodeSymbol(&bitC, ip[n+ 4], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 4 : HUF_encodeSymbol(&bitC, ip[n+ 3], CTable);
                  FSE_flushBits(&bitC);
-        case 3 : FSE_addBitsFast(&bitC, CTable[ip[n+2]].val, CTable[ip[n+2]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 2 : FSE_addBitsFast(&bitC, CTable[ip[n+1]].val, CTable[ip[n+1]].nbBits);
-                 FSE_FLUSHBITS_32(&bitC);
-        case 1 : FSE_addBitsFast(&bitC, CTable[ip[n+0]].val, CTable[ip[n+0]].nbBits);
+        case 3 : HUF_encodeSymbol(&bitC, ip[n+ 2], CTable);
+                 FSE_FLUSHBITS_2(&bitC);
+        case 2 : HUF_encodeSymbol(&bitC, ip[n+ 1], CTable);
+                 FSE_FLUSHBITS_1(&bitC);
+        case 1 : HUF_encodeSymbol(&bitC, ip[n+ 0], CTable);
                  FSE_flushBits(&bitC);
         case 0 :
         default: ;
@@ -1951,13 +1958,13 @@ static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* sr
 
     for (; n>0; n-=16)
     {
-        FSE_addBitsFast(&bitC, CTable[ip[n- 4]].val, CTable[ip[n- 4]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n- 8]].val, CTable[ip[n- 8]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-12]].val, CTable[ip[n-12]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-16]].val, CTable[ip[n-16]].nbBits);
+        HUF_encodeSymbol(&bitC, ip[n- 4], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n- 8], CTable);
+        FSE_FLUSHBITS_2(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-12], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-16], CTable);
         FSE_flushBits(&bitC);
     }
     streamSize = FSE_closeCStream(&bitC);
@@ -1968,13 +1975,13 @@ static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* sr
     n = srcSize & ~15;  // mod 16
     for (; n>0; n-=16)
     {
-        FSE_addBitsFast(&bitC, CTable[ip[n- 3]].val, CTable[ip[n- 3]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n- 7]].val, CTable[ip[n- 7]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-11]].val, CTable[ip[n-11]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-15]].val, CTable[ip[n-15]].nbBits);
+        HUF_encodeSymbol(&bitC, ip[n- 3], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n- 7], CTable);
+        FSE_FLUSHBITS_2(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-11], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-15], CTable);
         FSE_flushBits(&bitC);
     }
     streamSize = FSE_closeCStream(&bitC);
@@ -1985,13 +1992,13 @@ static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* sr
     n = srcSize & ~15;  // mod 16
     for (; n>0; n-=16)
     {
-        FSE_addBitsFast(&bitC, CTable[ip[n- 2]].val, CTable[ip[n- 2]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n- 6]].val, CTable[ip[n- 6]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-10]].val, CTable[ip[n-10]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-14]].val, CTable[ip[n-14]].nbBits);
+        HUF_encodeSymbol(&bitC, ip[n- 2], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n- 6], CTable);
+        FSE_FLUSHBITS_2(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-10], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-14], CTable);
         FSE_flushBits(&bitC);
     }
     streamSize = FSE_closeCStream(&bitC);
@@ -2002,13 +2009,13 @@ static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* sr
     n = srcSize & ~15;  // mod 16
     for (; n>0; n-=16)
     {
-        FSE_addBitsFast(&bitC, CTable[ip[n- 1]].val, CTable[ip[n- 1]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n- 5]].val, CTable[ip[n- 5]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n- 9]].val, CTable[ip[n- 9]].nbBits);
-        FSE_FLUSHBITS_32(&bitC);
-        FSE_addBitsFast(&bitC, CTable[ip[n-13]].val, CTable[ip[n-13]].nbBits);
+        HUF_encodeSymbol(&bitC, ip[n- 1], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n- 5], CTable);
+        FSE_FLUSHBITS_2(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n- 9], CTable);
+        FSE_FLUSHBITS_1(&bitC);
+        HUF_encodeSymbol(&bitC, ip[n-13], CTable);
         FSE_flushBits(&bitC);
     }
     streamSize = FSE_closeCStream(&bitC);
