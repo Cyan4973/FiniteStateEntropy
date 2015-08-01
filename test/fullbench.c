@@ -957,7 +957,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         {
             U32 max=255;
             FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
-            g_tableLog = HUF_buildCTable(g_tree, g_countTable, max, 0);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, max, 0);
             funcName = "HUF_writeCTable";
             func = local_HUF_writeCTable;
             break;
