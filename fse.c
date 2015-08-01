@@ -1237,7 +1237,7 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
     }
 
     /* join to mod 4 */
-    if ((sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 ) && (srcSize & 2))   /* test bit 2 */
+    if ((sizeof(bitC.bitContainer)*8 > FSE_MAX_TABLELOG*4+7 ) && (srcSize & 2))   /* test bit 2 */
     {
         FSE_encodeSymbol(&bitC, &CState2, *--ip);
         FSE_encodeSymbol(&bitC, &CState1, *--ip);
@@ -1249,12 +1249,12 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
     {
         FSE_encodeSymbol(&bitC, &CState2, *--ip);
 
-        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* this test must be static */
+        if (sizeof(bitC.bitContainer)*8 < FSE_MAX_TABLELOG*2+7 )   /* this test must be static */
             FSE_flushBits(&bitC);
 
         FSE_encodeSymbol(&bitC, &CState1, *--ip);
 
-        if (sizeof(size_t)*8 > FSE_MAX_TABLELOG*4+7 )   /* this test must be static */
+        if (sizeof(bitC.bitContainer)*8 > FSE_MAX_TABLELOG*4+7 )   /* this test must be static */
         {
             FSE_encodeSymbol(&bitC, &CState2, *--ip);
             FSE_encodeSymbol(&bitC, &CState1, *--ip);
@@ -1555,22 +1555,27 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     FSE_initDState(&state1, &bitD, dt);
     FSE_initDState(&state2, &bitD, dt);
 
+#define FSE_GETSYMBOL(statePtr) fast ? FSE_decodeSymbolFast(statePtr, &bitD) : FSE_decodeSymbol(statePtr, &bitD)
 
-    /* 2 symbols per loop */
-    while ((FSE_reloadDStream(&bitD)==FSE_DStream_unfinished) && (op<olimit))
+    /* 4 symbols per loop */
+    for ( ; (FSE_reloadDStream(&bitD)==FSE_DStream_unfinished) && (op<olimit) ; op+=4)
     {
-        *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
+        op[0] = FSE_GETSYMBOL(&state1);
 
-        if (FSE_MAX_TABLELOG*2+7 > sizeof(size_t)*8)    /* This test must be static */
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(bitD.bitContainer)*8)    /* This test must be static */
             FSE_reloadDStream(&bitD);
 
-        *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
+        op[1] = FSE_GETSYMBOL(&state2);
 
-        if (FSE_MAX_TABLELOG*4+7 < sizeof(size_t)*8)    /* This test must be static */
-        {
-            *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
-            *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
-        }
+        if (FSE_MAX_TABLELOG*4+7 > sizeof(bitD.bitContainer)*8)    /* This test must be static */
+            { if (FSE_reloadDStream(&bitD) > FSE_DStream_unfinished) { op+=2; break; } }
+
+        op[2] = FSE_GETSYMBOL(&state1);
+
+        if (FSE_MAX_TABLELOG*2+7 > sizeof(bitD.bitContainer)*8)    /* This test must be static */
+            FSE_reloadDStream(&bitD);
+
+        op[3] = FSE_GETSYMBOL(&state2);
     }
 
     /* tail */
@@ -1580,16 +1585,16 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
         if ( (FSE_reloadDStream(&bitD)>FSE_DStream_completed) || (op==omax) || (FSE_endOfDStream(&bitD) && (fast || FSE_endOfDState(&state1))) )
             break;
 
-        *op++ = fast ? FSE_decodeSymbolFast(&state1, &bitD) : FSE_decodeSymbol(&state1, &bitD);
+        *op++ = FSE_GETSYMBOL(&state1);
 
         if ( (FSE_reloadDStream(&bitD)>FSE_DStream_completed) || (op==omax) || (FSE_endOfDStream(&bitD) && (fast || FSE_endOfDState(&state2))) )
             break;
 
-        *op++ = fast ? FSE_decodeSymbolFast(&state2, &bitD) : FSE_decodeSymbol(&state2, &bitD);
+        *op++ = FSE_GETSYMBOL(&state2);
     }
 
     /* end ? */
-    if (FSE_endOfDStream(&bitD) && FSE_endOfDState(&state1) && FSE_endOfDState(&state2) )
+    if (FSE_endOfDStream(&bitD) && FSE_endOfDState(&state1) && FSE_endOfDState(&state2))
         return op-ostart;
 
     if (op==omax) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* dst buffer is full, but cSrc unfinished */
