@@ -1174,7 +1174,7 @@ void FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* statePtr, U32 symbol)
 {
     const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
     const U16* const stateTable = (const U16*)(statePtr->stateTable);
-    U32 nbBitsOut  = (U32)(statePtr->value + symbolTT.deltaNbBits) >> 16;
+    U32 nbBitsOut  = (U32)((statePtr->value + symbolTT.deltaNbBits) >> 16);
     FSE_addBits(bitC, statePtr->value, nbBitsOut);
     statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
 }
