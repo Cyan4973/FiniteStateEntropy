@@ -207,6 +207,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
         /* Compression / Decompression tests */
         {
+            /* determine test sample */
             size_t sizeOrig = (FUZ_rand (&roundSeed) & maxTestSizeMask) + 1;
             size_t offset = (FUZ_rand(&roundSeed) % (BUFFERSIZE - 64 - maxTestSizeMask));
             size_t sizeCompressed;
@@ -225,11 +226,13 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             }
             DISPLAYLEVEL (4,"%3i ", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
+            /* compress */
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
             if (FSE_isError(sizeCompressed))
                 DISPLAY ("\r test %5u : Compression failed ! \n", testNb);
             else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
+                /* decompress */
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
                 size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)

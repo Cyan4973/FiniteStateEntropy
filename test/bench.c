@@ -449,12 +449,12 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
                 {
                     const char* src = chunkP[chunkNb].origBuffer;
                     const char* regen = chunkP[chunkNb].destBuffer;
-                    int n;
-                    int origSize = chunkP[chunkNb].origSize;
+                    size_t n;
+                    size_t origSize = chunkP[chunkNb].origSize;
                     for (n=0; (n<origSize) && (src[n]==regen[n]); n++);
                     if (n<origSize)
                     {
-                        DISPLAY("\n!!! %14s : Invalid block %i !!! pos %i/%i\n", inFileName, chunkNb, n, origSize);
+                        DISPLAY("\n!!! %14s : Invalid block %i !!! pos %u/%u\n", inFileName, chunkNb, (U32)n, (U32)origSize);
                         break;
                     }
                 }

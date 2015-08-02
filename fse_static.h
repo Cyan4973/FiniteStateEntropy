@@ -129,7 +129,7 @@ typedef struct
     unsigned    stateLog;
 } FSE_CState_t;
 
-void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer, size_t maxDstSize);
+size_t FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer, size_t maxDstSize);
 void   FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable* ct);
 
 void   FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned symbol);
@@ -148,17 +148,18 @@ So the first symbol you will encode is the last you will decode, like a LIFO sta
 
 You will need a few variables to track your CStream. They are :
 
-FSE_CTable ct;        // Provided by FSE_buildCTable()
-FSE_CStream_t bitC;   // bitStream tracking structure
-FSE_CState_t state;   // State tracking structure (can have several)
+FSE_CTable    ct;         // Provided by FSE_buildCTable()
+FSE_CStream_t bitStream;  // bitStream tracking structure
+FSE_CState_t  state;      // State tracking structure (can have several)
 
 
 The first thing to do is to init bitStream and state.
-    FSE_initCStream(&bitC, dstBuffer, maxDstSize);
+    size_t errorCode = FSE_initCStream(&bitStream, dstBuffer, maxDstSize);
     FSE_initCState(&state, ct);
 
+Note that FSE_initCStream() can produce an error code, so its result should be tested, using FSE_isError();
 You can then encode your input data, byte after byte.
-FSE_encodeByte() outputs a maximum of 'tableLog' bits at a time.
+FSE_encodeSymbol() outputs a maximum of 'tableLog' bits at a time.
 Remember decoding will be done in reverse direction.
     FSE_encodeByte(&bitStream, &state, symbol);
 
@@ -174,8 +175,8 @@ Writing data to memory is a manual operation, performed by the flushBits functio
 Your last FSE encoding operation shall be to flush your last state value(s).
     FSE_flushState(&bitStream, &state);
 
-Finally, you must then close the bitStream.
-The function returns the size in bytes of CStream.
+Finally, you must close the bitStream.
+The function returns the size of CStream in bytes.
 If data couldn't fit into dstBuffer, it will return a 0 ( == not compressible)
 If there is an error, it returns an errorCode (which can be tested using FSE_isError()).
     size_t size = FSE_closeCStream(&bitStream);

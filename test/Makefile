@@ -23,7 +23,7 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE    = v0.2.1
+RELEASE    = v0.3.0
 
 DESTDIR   ?=
 CFLAGS    ?= -O3
@@ -117,10 +117,13 @@ test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32
 	./fullbench32 -i1
 	./fuzzerU16_32 $(FSEU16TEST)
 
-memtest: fuzzer fullbench
-	valgrind --leak-check=yes ./fuzzer -i256
-	valgrind --leak-check=yes ./fullbench -i1
-	valgrind --leak-check=yes ./fuzzerU16 -i128
+memtest: fuzzer fullbench fuzzerU16
+	valgrind --version
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i256
+	# Note : below test fails with -P20 within HUF_ReadDTable, but for no visible reason. 
+	# But memory sanitizer works fine on the same test. Could it be a bug in Valgrind ? (tested with 3.10 svn)
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 -P2   
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzerU16 -i128
 
 test-all: test test32 memtest
 	@echo test completed
