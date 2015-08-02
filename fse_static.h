@@ -48,14 +48,21 @@ extern "C" {
 /******************************************
 *  Static allocation
 ******************************************/
-#define FSE_MAX_HEADERSIZE 512
-#define FSE_COMPRESSBOUND(size) (size + (size>>7) + FSE_MAX_HEADERSIZE)   /* Macro can be useful for static allocation */
+/* FSE buffer bounds */
+#define FSE_NCOUNTBOUND 512
+#define FSE_BLOCKBOUND(size) (size + (size>>7))
+#define FSE_COMPRESSBOUND(size) (FSE_NCOUNTBOUND + FSE_BLOCKBOUND(size))   /* Macro version, useful for static allocation */
 
-/* You can statically allocate CTable/DTable as a table of unsigned using below macro */
+/* You can statically allocate FSE CTable/DTable as a table of unsigned using below macro */
 #define FSE_CTABLE_SIZE_U32(maxTableLog, maxSymbolValue)   (1 + (1<<(maxTableLog-1)) + ((maxSymbolValue+1)*2))
 #define FSE_DTABLE_SIZE_U32(maxTableLog)                   (1 + (1<<maxTableLog))
 
-/* You can statically allocate a Huff0 DTable as a table of unsigned char using below macro */
+/* Huff0 buffer bounds */
+#define HUF_CTABLEBOUND 129
+#define HUF_BLOCKBOUND(size) (size + (size>>8) + 8)   /* only true if pre-filtered with fast heuristic */
+#define HUF_COMPRESSBOUND(size) (HUF_CTABLEBOUND + HUF_BLOCKBOUND(size))   /* Macro version, useful for static allocation */
+
+/* You can statically allocate Huff0 DTable as a table of unsigned short using below macro */
 #define HUF_DTABLE_SIZE_U16(maxTableLog)   (1 + (1<<maxTableLog))
 #define HUF_CREATE_STATIC_DTABLE(DTable, maxTableLog) \
         unsigned short DTable[HUF_DTABLE_SIZE_U16(maxTableLog)] = { maxTableLog }
@@ -102,6 +109,7 @@ size_t FSE_buildDTable_rle (FSE_DTable* dt, unsigned char symbolValue);
    You will want to enable link-time-optimization to ensure these functions are properly inlined in your binary.
    Visual seems to do it automatically.
    For gcc or clang, you'll need to add -flto flag at compilation and linking stages.
+   If none of these solutions is applicable, include "fse.c" directly.
 */
 
 typedef struct
@@ -110,6 +118,7 @@ typedef struct
     int    bitPos;
     char*  startPtr;
     char*  ptr;
+    char*  endPtr;
 } FSE_CStream_t;
 
 typedef struct
@@ -120,7 +129,7 @@ typedef struct
     unsigned    stateLog;
 } FSE_CState_t;
 
-void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer);
+void   FSE_initCStream(FSE_CStream_t* bitC, void* dstBuffer, size_t maxDstSize);
 void   FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable* ct);
 
 void   FSE_encodeSymbol(FSE_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned symbol);
@@ -145,7 +154,7 @@ FSE_CState_t state;   // State tracking structure (can have several)
 
 
 The first thing to do is to init bitStream and state.
-    FSE_initCStream(&bitC, dstBuffer);
+    FSE_initCStream(&bitC, dstBuffer, maxDstSize);
     FSE_initCState(&state, ct);
 
 You can then encode your input data, byte after byte.
@@ -167,6 +176,7 @@ Your last FSE encoding operation shall be to flush your last state value(s).
 
 Finally, you must then close the bitStream.
 The function returns the size in bytes of CStream.
+If data couldn't fit into dstBuffer, it will return a 0 ( == not compressible)
 If there is an error, it returns an errorCode (which can be tested using FSE_isError()).
     size_t size = FSE_closeCStream(&bitStream);
 */

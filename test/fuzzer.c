@@ -250,7 +250,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
             maxSV = 255;
-            result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_MAX_HEADERSIZE);
+            result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_NCOUNTBOUND);
             if (!FSE_isError(result))
             {
                 int check;
@@ -259,7 +259,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 check = FUZ_checkCount (count, tableLog, maxSV);
                 if (check==-1)
                     DISPLAY ("\r test %5u : symbol distribution corrupted !\n", testNb);
-                if (result > FSE_MAX_HEADERSIZE)
+                if (result > FSE_NCOUNTBOUND)
                     DISPLAY ("\r test %5u : FSE_readHeader() reads too far !\n", testNb);
             }
         }

@@ -397,7 +397,6 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         while(BMK_GetMilliStart() == milliTime);
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-        //while(BMK_GetMilliStart() == milliTime)
         {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
             {

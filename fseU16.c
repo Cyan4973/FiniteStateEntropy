@@ -95,8 +95,8 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
                               const FSE_CTable* ct)
 {
     const U16* const istart = src;
-    const U16* ip;
     const U16* const iend = istart + srcSize;
+    const U16* ip;
 
     BYTE* op = (BYTE*) dst;
     FSE_CStream_t bitC;
@@ -104,8 +104,7 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
 
 
     /* init */
-    (void)(maxDstSize);   /* tbd */
-    FSE_initCStream(&bitC, op);
+    FSE_initCStream(&bitC, op, maxDstSize);
     FSE_initCState(&CState, ct);
 
     ip=iend;
@@ -185,7 +184,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     if (FSE_isError(errorCode)) return errorCode;
 
     /* Write table description header */
-    errorCode = FSE_writeNCount (op, FSE_MAX_HEADERSIZE, norm, maxSymbolValue, tableLog);
+    errorCode = FSE_writeNCount (op, omax-op, norm, maxSymbolValue, tableLog);
     if (FSE_isError(errorCode)) return errorCode;
     op += errorCode;
 
