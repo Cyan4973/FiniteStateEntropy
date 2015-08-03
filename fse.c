@@ -544,12 +544,16 @@ void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (FSE_DTable* dt)
     free(dt);
 }
 
+typedef struct {
+    U16 tableLog;
+    U16 fastMode;
+} FSE_DTableHeader;   /* sizeof U32 */
 
 size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
 (FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
-    U32* const base32 = (U32*)dt;
-    FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (base32+1);
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
+    FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (dt+1);   /* because dt is unsigned, 32-bits aligned on 32-bits */
     const U32 tableSize = 1 << tableLog;
     const U32 tableMask = tableSize-1;
     const U32 step = FSE_tableStep(tableSize);
@@ -565,7 +569,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_tableLog_tooLarge;
 
     /* Init, lay down lowprob symbols */
-    base32[0] = tableLog;
+    DTableH[0].tableLog = (U16)tableLog;
     for (s=0; s<=maxSymbolValue; s++)
     {
         if (normalizedCounter[s]==-1)
@@ -606,7 +610,8 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         }
     }
 
-    return noLarge;
+    DTableH->fastMode = (U16)noLarge;
+    return 0;
 }
 
 
@@ -1349,10 +1354,11 @@ size_t FSE_compress (void* dst, size_t dstSize, const void* src, size_t srcSize)
 *********************************************************/
 size_t FSE_buildDTable_rle (FSE_DTable* dt, BYTE symbolValue)
 {
-    U32* const base32 = (U32*)dt;
-    FSE_decode_t* const cell = (FSE_decode_t*)(base32 + 1);
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
+    FSE_decode_t* const cell = (FSE_decode_t*)(dt + 1);   /* because dt is unsigned */
 
-    base32[0] = 0;
+    DTableH->tableLog = 0;
+    DTableH->fastMode = 0;
 
     cell->newState = 0;
     cell->symbol = symbolValue;
@@ -1364,8 +1370,8 @@ size_t FSE_buildDTable_rle (FSE_DTable* dt, BYTE symbolValue)
 
 size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
 {
-    U32* const base32 = (U32*)dt;
-    FSE_decode_t* dinfo = (FSE_decode_t*)(base32 + 1);
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
+    FSE_decode_t* const dinfo = (FSE_decode_t*)(dt + 1);   /* because dt is unsigned */
     const unsigned tableSize = 1 << nbBits;
     const unsigned tableMask = tableSize - 1;
     const unsigned maxSymbolValue = tableMask;
@@ -1375,7 +1381,8 @@ size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
     if (nbBits < 1) return (size_t)-FSE_ERROR_GENERIC;             /* min size */
 
     /* Build Decoding Table */
-    base32[0] = nbBits;
+    DTableH->tableLog = (U16)nbBits;
+    DTableH->fastMode = 1;
     for (s=0; s<=maxSymbolValue; s++)
     {
         dinfo[s].newState = 0;
@@ -1510,10 +1517,10 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
 
 void FSE_initDState(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD, const FSE_DTable* dt)
 {
-    const U32* const base32 = (const U32*)dt;
-    DStatePtr->state = FSE_readBits(bitD, base32[0]);
+    const FSE_DTableHeader* const DTableH = (const FSE_DTableHeader*)dt;
+    DStatePtr->state = FSE_readBits(bitD, DTableH->tableLog);
     FSE_reloadDStream(bitD);
-    DStatePtr->table = base32 + 1;
+    DStatePtr->table = dt + 1;
 }
 
 BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
@@ -1555,7 +1562,7 @@ unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr)
 FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
           void* dst, size_t maxDstSize,
     const void* cSrc, size_t cSrcSize,
-    const FSE_DTable* dt, unsigned fast)
+    const FSE_DTable* dt, const unsigned fast)
 {
     BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
@@ -1624,8 +1631,11 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
 
 size_t FSE_decompress_usingDTable(void* dst, size_t originalSize,
                             const void* cSrc, size_t cSrcSize,
-                            const FSE_DTable* dt, size_t fastMode)
+                            const FSE_DTable* dt)
 {
+    const FSE_DTableHeader* DTableH = (const FSE_DTableHeader*)dt;
+    const U32 fastMode = DTableH->fastMode;
+
     /* select fast mode (static) */
     if (fastMode) return FSE_decompress_usingDTable_generic(dst, originalSize, cSrc, cSrcSize, dt, 1);
     return FSE_decompress_usingDTable_generic(dst, originalSize, cSrc, cSrcSize, dt, 0);
@@ -1640,7 +1650,7 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     DTable_max_t dt;   /* Static analyzer seems unable to understand this table will be properly initialized later */
     unsigned tableLog;
     unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
-    size_t errorCode, fastMode;
+    size_t errorCode;
 
     if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   /* too small input size */
 
@@ -1651,11 +1661,11 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     ip += errorCode;
     cSrcSize -= errorCode;
 
-    fastMode = FSE_buildDTable (dt, counting, maxSymbolValue, tableLog);
-    if (FSE_isError(fastMode)) return fastMode;
+    errorCode = FSE_buildDTable (dt, counting, maxSymbolValue, tableLog);
+    if (FSE_isError(errorCode)) return errorCode;
 
     /* always return, even if it is an error code */
-    return FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, dt, fastMode);
+    return FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, dt);
 }
 
 
@@ -2144,7 +2154,9 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
             for (n=0; n<oSize; n+=2)
             {
                 /* for some reason, Valgrind considers HuffWeight un-initialized after this loop ??? */
-                /* maybe it believes ip == cSrc+1 is not initialized ? but that's verified too */
+                /* reminder : huffWeight is memset() at the beginning, just to please Valgrind. So it IS initialized */
+                /* maybe it believes ip == cSrc+1 is not initialized ? */
+                /* but that's verified too. And then, it should fails here, not later */
                 huffWeight[n]   = ip[n/2] >> 4;
                 huffWeight[n+1] = ip[n/2] & 15;
             }

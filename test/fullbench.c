@@ -729,7 +729,6 @@ static U32    g_CTable[2350];
 static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
 static size_t g_skip;
-static size_t g_fast;
 static size_t g_cSize;
 HUF_CREATE_STATIC_DTABLE(g_huff_dtable, 16);
 
@@ -795,7 +794,7 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
 static int local_FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)srcSize;
-    return (int)FSE_decompress_usingDTable(dst, maxDstSize, (const BYTE*)src + g_skip, g_cSize, g_DTable, g_fast);
+    return (int)FSE_decompress_usingDTable(dst, maxDstSize, (const BYTE*)src + g_skip, g_cSize, g_DTable);
 }
 
 static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
@@ -924,7 +923,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             g_max = 255;
             g_skip = FSE_readNCount(g_normTable, &g_max, &g_tableLog, oBuffer, g_cSize);
             g_cSize -= g_skip;
-            g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
+            FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
             funcName = "FSE_decompress_usingDTable";
             func = local_FSE_decompress_usingDTable;
             break;

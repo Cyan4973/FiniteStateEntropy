@@ -276,7 +276,7 @@ void        FSE_freeDTable(FSE_DTable* dt);
 /*
 FSE_buildDTable():
    Builds 'dt', which must be already allocated, using FSE_createDTable()
-   return : 1 if 'dt' is compatible with fast mode, 0 otherwise,
+   return : 0,
             or an errorCode, which can be tested using FSE_isError() */
 size_t FSE_buildDTable (FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog);
 
@@ -287,7 +287,7 @@ FSE_decompress_usingDTable():
    Use fastMode==1 only if authorized by result of FSE_buildDTable().
    return : size of regenerated data (necessarily <= maxDstSize)
             or an errorCode, which can be tested using FSE_isError() */
-size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable* dt, size_t fastMode);
+size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable* dt);
 
 /*
 Tutorial :
@@ -306,14 +306,12 @@ The result of FSE_readNCount() is the number of bytes read from 'rBuffer'.
 Note that 'rBufferSize' must be at least 4 bytes, even if useful information is less than that.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
-The next step is to create the decompression tables 'FSE_DTable' from 'normalizedCounter'.
+The next step is to build the decompression tables 'FSE_DTable' from 'normalizedCounter'.
 This is performed by the function FSE_buildDTable().
 The space required by 'FSE_DTable' must be already allocated using FSE_createDTable().
-The function will return 1 if FSE_DTable is compatible with fastMode, 0 otherwise.
 If there is an error, the function will return an error code, which can be tested using FSE_isError().
 
 'FSE_DTable' can then be used to decompress 'cSrc', with FSE_decompress_usingDTable().
-Only trigger fastMode if it was authorized by the result of FSE_buildDTable(), otherwise decompression will fail.
 'cSrcSize' must be strictly correct, otherwise decompression will fail.
 FSE_decompress_usingDTable() result will tell how many bytes were regenerated (<=maxDstSize).
 If there is an error, the function will return an error code, which can be tested using FSE_isError(). (ex: dst buffer too small)

@@ -628,7 +628,6 @@ static void BMK_benchCore_Mem(char* dst,
     short norm[256];
     FSE_CTable* ct;
     FSE_DTable* dt;
-    size_t fastMode;
 
     /* Init */
     crcOrig = XXH64(src, benchedSize,0);
@@ -637,7 +636,7 @@ static void BMK_benchCore_Mem(char* dst,
     ct = FSE_createCTable(tableLog, nbSymbols);
     FSE_buildCTable(ct, norm, nbSymbols, tableLog);
     dt = FSE_createDTable(tableLog);
-    fastMode = FSE_buildDTable(dt, norm, nbSymbols, tableLog);
+    FSE_buildDTable(dt, norm, nbSymbols, tableLog);
 
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -676,7 +675,7 @@ static void BMK_benchCore_Mem(char* dst,
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
         {
-            dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, dt, fastMode);
+            dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, dt);
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
