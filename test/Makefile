@@ -75,6 +75,12 @@ fuzzerU16: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
 fuzzerU16_32: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
+fuzzerHuff0: fuzzerHuff0.c xxhash.c ../fse.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+fuzzerHuff0_32: fuzzerHuff0.c xxhash.c ../fse.c
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
+
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
@@ -98,10 +104,11 @@ test-fse: probagen fse
 	rm proba.bin
 	rm tmp
 
-test: test-fse fullbench fuzzer fuzzerU16
+test: test-fse fullbench fuzzer fuzzerU16 fuzzerHuff0
 	./fuzzer $(FSETEST) 
 	./fullbench -i1
 	./fuzzerU16 $(FSEU16TEST) 
+	./fuzzerHuff0 $(FSETEST) 
 
 test-fse32: probagen fse32
 	./probagen 20%
@@ -112,10 +119,11 @@ test-fse32: probagen fse32
 	rm tmp
 	rm proba.bin
 
-test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32
-	./fuzzer32 $(FSETEST) 
+test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
+	./fuzzer32 $(FSETEST)
 	./fullbench32 -i1
 	./fuzzerU16_32 $(FSEU16TEST)
+	./fuzzerHuff0_32 $(FSETEST)
 
 memtest: fuzzer fullbench fuzzerU16
 	valgrind --version

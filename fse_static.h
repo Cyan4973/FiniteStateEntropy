@@ -212,7 +212,7 @@ unsigned FSE_endOfDStream(const FSE_DStream_t* bitD);
 unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
 typedef enum { FSE_DStream_unfinished = 0,
-               FSE_DStream_partiallyFilled = 1,
+               FSE_DStream_endOfBuffer = 1,
                FSE_DStream_completed = 2,
                FSE_DStream_tooFar = 3 } FSE_DStream_status;  /* result of FSE_reloadDStream() */
                /* 1,2,4,8 would be better for bitmap combinations, but slows down performance a bit ... ?! */
@@ -224,16 +224,17 @@ and also any other bitFields you put in, **in reverse order**.
 
 You will need a few variables to track your bitStream. They are :
 
-FSE_DStream_t DStream;  // Stream context
-FSE_DState_t DState;    // State context. Multiple ones are possible
-FSE_DTable dt;          // Decoding table, provided by FSE_buildDTable()
-U32 tableLog;           // Provided by FSE_readHeader()
+FSE_DStream_t DStream;    // Stream context
+FSE_DState_t  DState;     // State context. Multiple ones are possible
+FSE_DTable*   DTablePtr;  // Decoding table, provided by FSE_buildDTable()
+U32 tableLog;             // Provided by FSE_readHeader()
 
 The first thing to do is to init the bitStream.
     errorCode = FSE_initDStream(&DStream, &optionalId, srcBuffer, srcSize);
 
-You should then retrieve your initial state(s) :
-    errorCode = FSE_initDState(&DState, &DStream, dt, tableLog);
+You should then retrieve your initial state(s)
+(in reverse flushing order if you have several ones) :
+    errorCode = FSE_initDState(&DState, &DStream, DTablePtr, tableLog);
 
 You can then decode your data, symbol after symbol.
 For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.
@@ -250,11 +251,11 @@ Refueling the register from memory is manually performed by the reload method.
 
 FSE_reloadDStream() result tells if there is still some more data to read from DStream.
 FSE_DStream_unfinished : there is still some data left into the DStream.
-FSE_DStream_partiallyFilled : Dstream reached end of buffer. Its container may no longer be completely filled.
+FSE_DStream_endOfBuffer : Dstream reached end of buffer. Its container may no longer be completely filled.
 FSE_DStream_completed : Dstream reached its exact end, corresponding in general to decompression completed.
 FSE_DStream_tooFar : Dstream went too far. Decompression result is corrupted.
 
-When reaching end of buffer (FSE_DStream_partiallyFilled), progress slowly, notably if you decode multiple symbols per loop,
+When reaching end of buffer (FSE_DStream_endOfBuffer), progress slowly, notably if you decode multiple symbols per loop,
 to properly detect the exact end of stream.
 After each decoded symbol, check if DStream is fully consumed using this simple test :
     FSE_reloadDStream(&DStream) >= FSE_DStream_completed
@@ -262,7 +263,7 @@ After each decoded symbol, check if DStream is fully consumed using this simple 
 When it's done, verify decompression is fully completed, by checking both DStream and the relevant states.
 Checking if DStream has reached its end is performed by :
     FSE_endOfDStream(&DStream);
-Check also the states. There might be some entropy left there, able to decode some high probability (>50%) symbol.
+Check also the states. There might be some symbols left there, if some high probability ones (>50%) are possible.
     FSE_endOfDState(&DState);
 */
 
@@ -274,7 +275,7 @@ size_t FSE_readBitsFast(FSE_DStream_t* bitD, unsigned nbBits);
 /* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
 
 unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD);
-/* faster, but works only if nbBits >= 1 (otherwise, result will be corrupted) */
+/* faster, but works only if allways nbBits >= 1 (otherwise, result will be corrupted) */
 
 
 #if defined (__cplusplus)

@@ -1488,7 +1488,7 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
     }
     if (bitD->ptr == bitD->start)
     {
-        if (bitD->bitsConsumed < sizeof(bitD->bitContainer)*8) return FSE_DStream_partiallyFilled;
+        if (bitD->bitsConsumed < sizeof(bitD->bitContainer)*8) return FSE_DStream_endOfBuffer;
         if (bitD->bitsConsumed == sizeof(bitD->bitContainer)*8) return FSE_DStream_completed;
         return FSE_DStream_tooFar;
     }
@@ -1498,7 +1498,7 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
         if (bitD->ptr - nbBytes < bitD->start)
         {
             nbBytes = (U32)(bitD->ptr - bitD->start);  /* note : necessarily ptr > start */
-            result = FSE_DStream_partiallyFilled;
+            result = FSE_DStream_endOfBuffer;
         }
         bitD->ptr -= nbBytes;
         bitD->bitsConsumed -= nbBytes*8;
@@ -2131,6 +2131,7 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
         if (iSize >= (128+64))   // RLE
         {
             if (srcSize < 2) return (size_t)-FSE_ERROR_srcSize_wrong;
+            if (ip[1] > HUF_MAX_TABLELOG) return (size_t)-FSE_ERROR_srcSize_wrong;
             oSize = (iSize & 63) + 1;
             memset(huffWeight, ip[1], oSize);
             iSize = 1;
@@ -2163,18 +2164,23 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
         weightTotal += (1 << huffWeight[n]) >> 1;
     }
 
-    // get last symbol weight(implied)
+    /* get last non-null symbol weight (implied, total must be 2^n) */
     maxBits = FSE_highbit32(weightTotal) + 1;
-    if (maxBits > DTable[0]) return (size_t)-FSE_ERROR_GENERIC;   // DTable is too small
+    if (maxBits > DTable[0]) return (size_t)-FSE_ERROR_GENERIC;   /* DTable is too small */
     DTable[0] = (U16)maxBits;
     {
         U32 total = 1 << maxBits;
         U32 rest = total - weightTotal;
         U32 verif = 1 << FSE_highbit32(rest);
-        if (verif != rest) return (size_t)-FSE_ERROR_GENERIC;    // last value must be a clean power of 2
-        huffWeight[oSize] = (BYTE)(FSE_highbit32(rest) + 1);
-        rankVal[huffWeight[oSize]]++;
+        U32 lastWeight = FSE_highbit32(rest) + 1;
+        if (verif != rest) return (size_t)-FSE_ERROR_corruptionDetected;    /* last value must be a clean power of 2 */
+        huffWeight[oSize] = (BYTE)lastWeight;
+        rankVal[lastWeight]++;
     }
+
+    if ((rankVal[1] < 2) || (rankVal[1] & 1)) return (size_t)-FSE_ERROR_GENERIC;   // impossible by construction : at least 2 elts, must be even
+    //if (huffWeight[1] < 2) return (size_t)-FSE_ERROR_GENERIC;   // impossible by construction : at least 2 elts, must be even
+    //if (rankVal[1] < 2) printf("!");
 
     /* Prepare ranks */
     nextRankStart = 0;
@@ -2237,6 +2243,8 @@ static size_t HUF_decompress_usingDTable(
     const char* const start3 = start2 + length2;
     const char* const start4 = start3 + length3;
     FSE_DStream_t bitD1, bitD2, bitD3, bitD4;
+
+    if (length1+length2+length3+6 >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
 
     errorCode = FSE_initDStream(&bitD1, start1, length1);
     if (FSE_isError(errorCode)) return errorCode;

@@ -35,6 +35,12 @@ all:
 test:
 	@cd $(PROGDIR); $(MAKE) test
 
+test32:
+	@cd $(PROGDIR); $(MAKE) test32
+
+memtest:
+	@cd $(PROGDIR); $(MAKE) memtest
+
 clean:
 	@cd $(PROGDIR); $(MAKE) clean
 
