@@ -45,11 +45,11 @@ endif
 
 default: fse
 
-all: allNative all32
+all: bin bin32
 
-all32: fse32 fullbench32 fuzzer32
+bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
-allNative: fse fullbench fuzzer fuzzerU16 probagen
+bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
 fse: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
@@ -91,7 +91,8 @@ probagen: probaGenerator.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
 	@rm -f tmp result proba.bin
 	@echo Cleaning completed
 
@@ -125,13 +126,14 @@ test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 	./fuzzerU16_32 $(FSEU16TEST)
 	./fuzzerHuff0_32 $(FSETEST)
 
-memtest: fuzzer fullbench fuzzerU16
+memtest: fuzzer fullbench fuzzerU16 fuzzerHuff0
 	valgrind --version
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i256
-	# Note : below test fails with -P20 within HUF_ReadDTable, but for no visible reason. 
-	# But memory sanitizer works fine on the same test. Could it be a bug in Valgrind ? (tested with 3.10 svn)
-	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 -P2   
+	# Note : below test fails with -P20 within HUF_ReadDTable. No visible reason (??)
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 -P4   
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzerU16 -i128
+	# Note : below test fails on same code as above (within HUF_ReadDTable); still no understood reason
+	# valgrind --leak-check=yes --error-exitcode=1 ./fuzzerHuff0 -i256
 
 test-all: test test32 memtest
 	@echo test completed

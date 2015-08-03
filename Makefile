@@ -53,7 +53,7 @@ gpptest: clean
 
 armtest: clean
 	@echo ---- test ARM compilation ----
-	@cd $(PROGDIR); $(MAKE) allNative CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
+	@cd $(PROGDIR); $(MAKE) bin CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
 
 clangtest: clean
 	@echo ---- test clang compilation ----

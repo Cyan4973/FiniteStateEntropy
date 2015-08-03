@@ -170,6 +170,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     generate (bufferP15 , BUFFERSIZE, 0.15, &seed);
     generate (bufferP90 , BUFFERSIZE, 0.90, &seed);
     memset(bufferP100, (BYTE)FUZ_rand(&seed), BUFFERSIZE);
+    memset(bufferDst, 0, BUFFERSIZE);
 
     if (startTestNb)
     {
@@ -180,7 +181,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
     for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
-        BYTE* bufferTest;
+        BYTE* bufferTest = NULL;
         int tag=0;
         U32 roundSeed = seed ^ 0xEDA5B371;
         FUZ_rand(&seed);
@@ -221,20 +222,14 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
                 /* decompress */
-                BYTE saved = (bufferVerif[sizeOrig] = 254);
+                U32 hashEnd;
+                BYTE saved = (bufferVerif[sizeOrig] = 253);
                 size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                 if (bufferVerif[sizeOrig] != saved)
                     DISPLAY ("\r test %5u : Output buffer (bufferVerif) overrun (write beyond specified end) !\n", testNb);
-                if (FSE_isError(result))
-                {
-                    DISPLAY ("\r test %5u : Decompression failed ! \n", testNb);
-                    exit(1);
-                }
-                else
-                {
-                    U32 hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    if (hashEnd != hashOrig) DISPLAY ("\r test %5u : Decompressed data corrupted !! \n", testNb);
-                }
+                if (FSE_isError(result)) { DISPLAY ("\r test %5u : Decompression failed ! \n", testNb); exit(1); }
+                hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                if (hashEnd != hashOrig) { DISPLAY ("\r test %5u : Decompressed data corrupted !! \n", testNb); exit(1); }
             }
         }
 

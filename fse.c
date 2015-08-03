@@ -2113,7 +2113,7 @@ typedef struct {
 size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
 {
     BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
-    U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];
+    U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];  /* large enough for values from 0 to 16 */
     U32 weightTotal;
     U32 maxBits;
     const BYTE* ip = (const BYTE*) src;
@@ -2124,19 +2124,18 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     HUF_DElt* const dt = (HUF_DElt*)(DTable + 1);
 
     FSE_STATIC_ASSERT(sizeof(HUF_DElt) == sizeof(U16));   // if compilation fails here, assertion is false
-    memset(rankVal, 0, sizeof(rankVal));
     memset(huffWeight, 0, sizeof(huffWeight));   // should not be necessary, but some analyzer complain ...
-    if (iSize >= 128)  // special case
+    if (iSize >= 128)  /* special header */
     {
-        if (iSize >= (128+64))   // RLE
+        if (iSize >= (128+64))   /* RLE */
         {
             if (srcSize < 2) return (size_t)-FSE_ERROR_srcSize_wrong;
-            if (ip[1] > HUF_MAX_TABLELOG) return (size_t)-FSE_ERROR_srcSize_wrong;
+            if (ip[1] != 1) return (size_t)-FSE_ERROR_corruptionDetected;  /* 1 is only possibility for RLE, since 1 is necessarily present at least 2x, and only one symbol is implied */
             oSize = (iSize & 63) + 1;
-            memset(huffWeight, ip[1], oSize);
+            memset(huffWeight, 1, oSize);
             iSize = 1;
         }
-        else   // Incompressible
+        else   /* Incompressible */
         {
             oSize = (iSize & 63) + 1;
             iSize = ((oSize+1)/2);
@@ -2144,19 +2143,22 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
             ip += 1;
             for (n=0; n<oSize; n+=2)
             {
-                huffWeight[n]   = (ip[n/2] >> 4);
-                huffWeight[n+1] = (ip[n/2] & 15);
+                /* for some reason, Valgrind considers HuffWeight un-initialized after this loop ??? */
+                /* maybe it believes ip == cSrc+1 is not initialized ? but that's verified too */
+                huffWeight[n]   = ip[n/2] >> 4;
+                huffWeight[n+1] = ip[n/2] & 15;
             }
         }
     }
-    else  // normal case, header compressed with FSE
+    else  /* header compressed with FSE (normal case) */
     {
         if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
-        oSize = FSE_decompress(huffWeight, HUF_MAX_SYMBOL_VALUE, ip+1, iSize);   // max 255 values stored, last is implied
+        oSize = FSE_decompress(huffWeight, HUF_MAX_SYMBOL_VALUE, ip+1, iSize);   /* max 255 values decoded, last one is implied */
         if (FSE_isError(oSize)) return oSize;
     }
 
-    // stats on weights
+    /* collect weight stats */
+    memset(rankVal, 0, sizeof(rankVal));
     weightTotal = 0;
     for (n=0; n<oSize; n++)
     {
@@ -2166,7 +2168,7 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
 
     /* get last non-null symbol weight (implied, total must be 2^n) */
     maxBits = FSE_highbit32(weightTotal) + 1;
-    if (maxBits > DTable[0]) return (size_t)-FSE_ERROR_GENERIC;   /* DTable is too small */
+    if (maxBits > DTable[0]) return (size_t)-FSE_ERROR_tableLog_tooLarge;   /* DTable is too small */
     DTable[0] = (U16)maxBits;
     {
         U32 total = 1 << maxBits;
@@ -2178,9 +2180,8 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
         rankVal[lastWeight]++;
     }
 
-    if ((rankVal[1] < 2) || (rankVal[1] & 1)) return (size_t)-FSE_ERROR_GENERIC;   // impossible by construction : at least 2 elts, must be even
-    //if (huffWeight[1] < 2) return (size_t)-FSE_ERROR_GENERIC;   // impossible by construction : at least 2 elts, must be even
-    //if (rankVal[1] < 2) printf("!");
+    /* check tree construction validity */
+    if ((rankVal[1] < 2) || (rankVal[1] & 1)) return (size_t)-FSE_ERROR_corruptionDetected;   /* by construction : at least 2 elts of rank 1, must be even */
 
     /* Prepare ranks */
     nextRankStart = 0;
@@ -2290,7 +2291,7 @@ static size_t HUF_decompress_usingDTable(
         HUF_DECODE_SYMBOL_0(15, bitD4);
     }
 
-    if (reloadStatus!=FSE_DStream_completed)   /* not complete : some bitStream might be 0 (unfinished) */
+    if (reloadStatus!=FSE_DStream_completed)   /* not complete : some bitStream might be FSE_DStream_unfinished */
         return (size_t)-FSE_ERROR_corruptionDetected;
 
     /* tail */
@@ -2299,7 +2300,7 @@ static size_t HUF_decompress_usingDTable(
         FSE_DStream_t bitTail;
         bitTail.ptr = bitD1.ptr;
         bitTail.bitsConsumed = bitD1.bitsConsumed;
-        bitTail.bitContainer = bitD1.bitContainer;   // required in case FSE_DStream_partiallyFilled
+        bitTail.bitContainer = bitD1.bitContainer;   // required in case of FSE_DStream_endOfBuffer
         bitTail.start = start1;
         for ( ; (FSE_reloadDStream(&bitTail) < FSE_DStream_completed) && (op<omax) ; op++)
         {
