@@ -496,7 +496,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     for (i=0; i<tableSize; i++)
     {
         FSE_FUNCTION_TYPE s = tableSymbol[i];   /* static analyzer doesn't understand tableSymbol is properly initialized */
-        tableU16[cumul[s]++] = (U16) (tableSize+i);   /* Table U16 : sorted by symbol order; gives next state value */
+        tableU16[cumul[s]++] = (U16) (tableSize+i);   /* TableU16 : sorted by symbol order; gives next state value */
     }
 
     /* Build Symbol Transformation Table */
@@ -511,7 +511,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
                 break;
             case -1:
             case  1:
-                symbolTT[s].deltaNbBits = tableLog * (1 << 16);
+                symbolTT[s].deltaNbBits = tableLog << 16;
                 symbolTT[s].deltaFindState = total - 1;
                 total ++;
                 break;
@@ -1710,7 +1710,7 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
     /* convert to weight */
     bitsToWeight[0] = 0;
     for (n=1; n<=huffLog; n++)
-        bitsToWeight[n] = huffLog + 1 - n;
+        bitsToWeight[n] = (BYTE)(huffLog + 1 - n);
     for (n=0; n<maxSymbolValue; n++)
         huffWeight[n] = bitsToWeight[tree[n].nbBits];
 
@@ -1729,6 +1729,7 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
          /* Not compressible */
         if (((maxSymbolValue+1)/2) + 1 > maxDstSize) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* not enough space within dst buffer */
         op[0] = (BYTE)(128 /*special case*/ + 0 /* Not Compressible */ + (maxSymbolValue-1));
+		huffWeight[maxSymbolValue] = 0;   /* to be sure it doesn't cause issue in final combination */
         for (n=0; n<maxSymbolValue; n+=2)
             op[(n/2)+1] = (BYTE)((huffWeight[n] << 4) + huffWeight[n+1]);
         return ((maxSymbolValue+1)/2) + 1;
@@ -2139,8 +2140,8 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     U32 nextRankStart;
     HUF_DElt* const dt = (HUF_DElt*)(DTable + 1);
 
-    FSE_STATIC_ASSERT(sizeof(HUF_DElt) == sizeof(U16));   // if compilation fails here, assertion is false
-    memset(huffWeight, 0, sizeof(huffWeight));   // should not be necessary, but some analyzer complain ...
+    FSE_STATIC_ASSERT(sizeof(HUF_DElt) == sizeof(U16));   /* if compilation fails here, assertion is false */
+    //memset(huffWeight, 0, sizeof(huffWeight));   /* should not be necessary, but some analyzer complain ... */
     if (iSize >= 128)  /* special header */
     {
         if (iSize >= (128+64))   /* RLE */
@@ -2159,9 +2160,6 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
             ip += 1;
             for (n=0; n<oSize; n+=2)
             {
-                /* for some reason, Valgrind considers HuffWeight un-initialized *after* this loop */
-                /* Does it believe ip == cSrc+1 to be not initialized ? */
-                /* but that's verified too. And then, it should fails here, not later */
                 huffWeight[n]   = ip[n/2] >> 4;
                 huffWeight[n+1] = ip[n/2] & 15;
             }
@@ -2179,8 +2177,7 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     weightTotal = 0;
     for (n=0; n<oSize; n++)
     {
-        /* valgrind complains of some 8-byte element not initialized here. */
-        /* But there is no 8-byte element. Besides, rankVal, huffWeight and n are all properly initialized */
+        if (huffWeight[n] >= HUF_ABSOLUTEMAX_TABLELOG) return (size_t)-FSE_ERROR_corruptionDetected;
         rankVal[huffWeight[n]]++;
         weightTotal += (1 << huffWeight[n]) >> 1;
     }
@@ -2228,15 +2225,15 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
 }
 
 
-static BYTE HUF_decodeSymbol(FSE_DStream_t* Dstream, const HUF_DElt* dt, U32 dtLog)
+static BYTE HUF_decodeSymbol(FSE_DStream_t* Dstream, const HUF_DElt* dt, const U32 dtLog)
 {
-        size_t val = FSE_lookBitsFast(Dstream, dtLog);
-        BYTE c = dt[val].byte;
+        const size_t val = FSE_lookBitsFast(Dstream, dtLog); /* note : dtLog >= 1 */
+        const BYTE c = dt[val].byte;
         FSE_skipBits(Dstream, dt[val].nbBits);
         return c;
 }
 
-static size_t HUF_decompress_usingDTable(
+static size_t HUF_decompress_usingDTable(   /* -3% slower when non static */
           void* dst, size_t maxDstSize,
     const void* cSrc, size_t cSrcSize,
     const U16* DTable)
