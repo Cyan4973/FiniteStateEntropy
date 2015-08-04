@@ -207,7 +207,22 @@ int main(int argc, char** argv)
                 case 'k': break;
 
                     // Modify Block Properties
-                case 'B': break;   // to be completed later
+                case 'B':
+                    {
+                        unsigned bSize = 0;
+                        while ((argument[1] >='0') && (argument[1] <='9'))
+                        {
+                            unsigned digit = argument[1] - '0';
+                            bSize *= 10;
+                            bSize += digit;
+                            argument++;
+                        }
+                        if (argument[1]=='K') bSize<<=10, argument++;  /* allows using KB notation */
+                        if (argument[1]=='M') bSize<<=20, argument++;
+                        if (argument[1]=='B') argument++;
+                        BMK_SetBlocksize(bSize);
+                    }
+                    break;
 
                     // Modify Stream properties
                 case 'S': break;   // to be completed later
