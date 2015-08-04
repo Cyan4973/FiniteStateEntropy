@@ -1257,7 +1257,7 @@ static size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
     }
 
     /* 2 or 4 encoding per loop */
-    while (ip>istart)
+    for ( ; ip>istart ; )
     {
         FSE_encodeSymbol(&bitC, &CState2, *--ip);
 
@@ -1693,24 +1693,30 @@ typedef struct nodeElt_s {
     BYTE nbBits;
 } nodeElt;
 
-
+/* HUF_writeCTable() :
+   return : size of saved CTable */
 size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog)
 {
+    BYTE bitsToWeight[HUF_ABSOLUTEMAX_TABLELOG + 1];
     BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
     U32 n;
     BYTE* op = (BYTE*)dst;
     size_t size;
 
-    // check conditions
+     /* check conditions */
     if (maxSymbolValue > HUF_MAX_SYMBOL_VALUE + 1)
         return (size_t)-FSE_ERROR_GENERIC;
 
+    /* convert to weight */
+    bitsToWeight[0] = 0;
+    for (n=1; n<=huffLog; n++)
+        bitsToWeight[n] = huffLog + 1 - n;
     for (n=0; n<maxSymbolValue; n++)
-        huffWeight[n] = tree[n].nbBits ? (BYTE)(huffLog + 1 - tree[n].nbBits) : 0;
+        huffWeight[n] = bitsToWeight[tree[n].nbBits];
 
-    size = FSE_compress(op+1, maxDstSize-1, huffWeight, maxSymbolValue);   // don't need last symbol stat : implied
+    size = FSE_compress(op+1, maxDstSize-1, huffWeight, maxSymbolValue);   /* don't need last symbol stat : implied */
     if (FSE_isError(size)) return size;
-    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   // should never happen, since maxSymbolValue <= 255
+    if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   /* should never happen, since maxSymbolValue <= 255 */
     if ((size <= 1) || (size >= maxSymbolValue/2))
     {
         if (maxSymbolValue > 64) return (size_t)-FSE_ERROR_GENERIC;   /* not implemented (not possible with current format) */
@@ -1720,7 +1726,7 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
             op[1] = huffWeight[0];
             return 2;
         }
-        // Not compressible
+         /* Not compressible */
         if (((maxSymbolValue+1)/2) + 1 > maxDstSize) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* not enough space within dst buffer */
         op[0] = (BYTE)(128 /*special case*/ + 0 /* Not Compressible */ + (maxSymbolValue-1));
         for (n=0; n<maxSymbolValue; n+=2)
@@ -1728,7 +1734,7 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
         return ((maxSymbolValue+1)/2) + 1;
     }
 
-    // normal case
+    /* normal header case */
     op[0] = (BYTE)size;
     return size+1;
 }
@@ -1935,7 +1941,7 @@ static void HUF_encodeSymbol(FSE_CStream_t* bitCPtr, U32 symbol, const HUF_CElt*
 #define FSE_FLUSHBITS_2(stream) \
     if (sizeof((stream)->bitContainer)*8 < HUF_MAX_TABLELOG*4+7) FSE_FLUSHBITS(stream)
 
-static size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable)
+size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable)
 {
     const BYTE* ip = (const BYTE*) src;
     BYTE* const ostart = (BYTE*)dst;
