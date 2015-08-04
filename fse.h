@@ -55,8 +55,7 @@ size_t FSE_decompress(void* dst,  size_t maxDstSize,
 /*
 FSE_compress():
     Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
-    'dst' buffer must be already allocated.
-    Worst case size evaluation is provided by FSE_compressBound().
+    'dst' buffer must be already allocated. Compression runs fast is maxDstSize >= FSE_compressBound(srcSize)
     return : size of compressed data (<= maxDstSize)
     Special values : if return == 0, srcData is not compressible => Nothing is stored within dst !!!
                      if return == 1, srcData is a single byte symbol * srcSize times. Use RLE compression instead.
@@ -84,8 +83,7 @@ size_t HUF_decompress(void* dst,  size_t maxDstSize,
 /*
 HUF_compress():
     Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
-    'dst' buffer must be already allocated.
-    Worst case size evaluation is provided by HUF_compressBound().
+    'dst' buffer must be already allocated. Compression runs faster is maxDstSize >= HUF_compressBound(srcSize)
     return : size of compressed data (<= maxDstSize)
     Special values : if return == 0, srcData is not compressible => Nothing is stored within dst !!!
                      if return == 1, srcData is a single byte symbol * srcSize times. Use RLE compression.
@@ -284,7 +282,6 @@ size_t FSE_buildDTable (FSE_DTable* dt, const short* normalizedCounter, unsigned
 FSE_decompress_usingDTable():
    Decompress compressed source 'cSrc' of size 'cSrcSize' using 'dt'
    into 'dst' which must be already allocated.
-   Use fastMode==1 only if authorized by result of FSE_buildDTable().
    return : size of regenerated data (necessarily <= maxDstSize)
             or an errorCode, which can be tested using FSE_isError() */
 size_t FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const FSE_DTable* dt);

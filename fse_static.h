@@ -227,14 +227,13 @@ You will need a few variables to track your bitStream. They are :
 FSE_DStream_t DStream;    // Stream context
 FSE_DState_t  DState;     // State context. Multiple ones are possible
 FSE_DTable*   DTablePtr;  // Decoding table, provided by FSE_buildDTable()
-U32 tableLog;             // Provided by FSE_readHeader()
 
 The first thing to do is to init the bitStream.
-    errorCode = FSE_initDStream(&DStream, &optionalId, srcBuffer, srcSize);
+    errorCode = FSE_initDStream(&DStream, srcBuffer, srcSize);
 
 You should then retrieve your initial state(s)
 (in reverse flushing order if you have several ones) :
-    errorCode = FSE_initDState(&DState, &DStream, DTablePtr, tableLog);
+    errorCode = FSE_initDState(&DState, &DStream, DTablePtr);
 
 You can then decode your data, symbol after symbol.
 For information the maximum number of bits read by FSE_decodeSymbol() is 'tableLog'.

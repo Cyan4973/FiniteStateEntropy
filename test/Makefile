@@ -129,7 +129,7 @@ test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 memtest: fuzzer fullbench fuzzerU16 fuzzerHuff0
 	valgrind --version
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i256
-	# Note : below test fails with -P20 within HUF_ReadDTable. No visible reason (??)
+	# Note : below test fails with -P20 within HUF_ReadDTable. Reasons are unclear.
 	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 -P4   
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzerU16 -i128
 	# Note : below test fails on same code as above (within HUF_ReadDTable); still no understood reason

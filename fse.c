@@ -2153,9 +2153,8 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
             ip += 1;
             for (n=0; n<oSize; n+=2)
             {
-                /* for some reason, Valgrind considers HuffWeight un-initialized after this loop ??? */
-                /* reminder : huffWeight is memset() at the beginning, just to please Valgrind. So it IS initialized */
-                /* maybe it believes ip == cSrc+1 is not initialized ? */
+                /* for some reason, Valgrind considers HuffWeight un-initialized *after* this loop */
+                /* Does it believe ip == cSrc+1 to be not initialized ? */
                 /* but that's verified too. And then, it should fails here, not later */
                 huffWeight[n]   = ip[n/2] >> 4;
                 huffWeight[n+1] = ip[n/2] & 15;
@@ -2174,6 +2173,8 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     weightTotal = 0;
     for (n=0; n<oSize; n++)
     {
+        /* valgrind complains of some 8-byte element not initialized here. */
+        /* But there is no 8-byte element. Besides, rankVal, huffWeight and n are all properly initialized */
         rankVal[huffWeight[n]]++;
         weightTotal += (1 << huffWeight[n]) >> 1;
     }
