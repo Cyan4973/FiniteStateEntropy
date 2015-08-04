@@ -101,9 +101,10 @@ static int usage(void)
     DISPLAY(" -h : benchmark using huff0\n");
     DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
-    DISPLAY(" -o : force compression\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
-    DISPLAY(" -H : display help/long help and exit\n");
+    DISPLAY(" -B#: block size (default : 32768), benchmark mode only\n");
+    DISPLAY(" -o : force compression\n");
+    DISPLAY(" -H : display help and exit\n");
     return 0;
 }
 

@@ -832,9 +832,9 @@ static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const 
 }
 
 
-int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
+int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb, U32 blockSize)
 {
-    size_t benchedSize = DEFAULT_BLOCKSIZE;
+    size_t benchedSize = blockSize;
     size_t cBuffSize = FSE_compressBound((unsigned)benchedSize);
     void* oBuffer = malloc(benchedSize);
     void* cBuffer = malloc(cBuffSize);
@@ -866,8 +866,8 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 4:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
             break;
@@ -876,9 +876,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 5:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             funcName = "FSE_writeNCount";
             func = local_FSE_writeNCount;
             break;
@@ -887,9 +887,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 6:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             funcName = "FSE_buildCTable";
             func = local_FSE_buildCTable;
             break;
@@ -898,8 +898,8 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
             func = local_FSE_compress_usingCTable;
@@ -1127,6 +1127,7 @@ int usage_advanced(char* exename)
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -i#    : iteration loops [1-9] (default : %i)\n", NBLOOPS);
     DISPLAY( " -P#    : probability curve, in %% (default : %i%%)\n", DEFAULT_PROBA);
+    DISPLAY( " -B#    : block size, in bytes (default : %i)\n", DEFAULT_BLOCKSIZE);
     return 0;
 }
 
@@ -1144,6 +1145,7 @@ int main(int argc, char** argv)
     U32 nbLoops = NBLOOPS;
     U32 pause = 0;
     U32 algNb = 0;
+    U32 blockSize = DEFAULT_BLOCKSIZE;
     int i;
     int result;
 
@@ -1196,6 +1198,16 @@ int main(int argc, char** argv)
                     while ((*argument >='0') && (*argument <='9')) proba*=10, proba += *argument++ - '0';
                     break;
 
+                    // Modify block size
+                case 'B':
+                    argument++;
+                    blockSize=0;
+                    while ((*argument >='0') && (*argument <='9')) blockSize*=10, blockSize += *argument++ - '0';
+                    if (argument[0]=='K') blockSize<<=10, argument++;  /* allows using KB notation */
+                    if (argument[0]=='M') blockSize<<=20, argument++;
+                    if (argument[0]=='B') argument++;
+                    break;
+
                     // Pause at the end (hidden option)
                 case 'p':
                     pause=1;
@@ -1214,10 +1226,10 @@ int main(int argc, char** argv)
     if (algNb==0)
     {
         for (i=1; i<=99; i++)
-            result = fullSpeedBench((double)proba / 100, nbLoops, i);
+            result = fullSpeedBench((double)proba / 100, nbLoops, i, blockSize);
     }
     else
-        result = fullSpeedBench((double)proba / 100, nbLoops, algNb);
+        result = fullSpeedBench((double)proba / 100, nbLoops, algNb, blockSize);
 
     if (pause) { DISPLAY("press enter...\n"); getchar(); }
 
