@@ -1719,14 +1719,34 @@ size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 
     if (size >= 128) return (size_t)-FSE_ERROR_GENERIC;   /* should never happen, since maxSymbolValue <= 255 */
     if ((size <= 1) || (size >= maxSymbolValue/2))
     {
-        if (maxSymbolValue > 64) return (size_t)-FSE_ERROR_GENERIC;   /* not implemented (not possible with current format) */
         if (size==1)   /* RLE */
         {
-            op[0] = (BYTE)(128 /*special case*/ + 64 /* RLE */ + (maxSymbolValue-1));
-            op[1] = huffWeight[0];
-            return 2;
+            /* only possible case : serie of 1 (because there are at least 2) */
+            /* can only be 2^n or (2^n-1), otherwise not an huffman tree */
+            BYTE code;
+            switch(maxSymbolValue)
+            {
+            case 1: code = 0; break;
+            case 2: code = 1; break;
+            case 3: code = 2; break;
+            case 4: code = 3; break;
+            case 7: code = 4; break;
+            case 8: code = 5; break;
+            case 15: code = 6; break;
+            case 16: code = 7; break;
+            case 31: code = 8; break;
+            case 32: code = 9; break;
+            case 63: code = 10; break;
+            case 64: code = 11; break;
+            case 127: code = 12; break;
+            case 128: code = 13; break;
+            default : return (size_t)-FSE_ERROR_corruptionDetected;
+            }
+            op[0] = (BYTE)(255-13 + code);
+            return 1;
         }
          /* Not compressible */
+        if (maxSymbolValue > (241-128)) return (size_t)-FSE_ERROR_GENERIC;   /* not implemented (not possible with current format) */
         if (((maxSymbolValue+1)/2) + 1 > maxDstSize) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* not enough space within dst buffer */
         op[0] = (BYTE)(128 /*special case*/ + 0 /* Not Compressible */ + (maxSymbolValue-1));
 		huffWeight[maxSymbolValue] = 0;   /* to be sure it doesn't cause issue in final combination */
@@ -2144,17 +2164,16 @@ size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize)
     //memset(huffWeight, 0, sizeof(huffWeight));   /* should not be necessary, but some analyzer complain ... */
     if (iSize >= 128)  /* special header */
     {
-        if (iSize >= (128+64))   /* RLE */
+        if (iSize >= (242))   /* RLE */
         {
-            if (srcSize < 2) return (size_t)-FSE_ERROR_srcSize_wrong;
-            if (ip[1] != 1) return (size_t)-FSE_ERROR_corruptionDetected;  /* 1 is only possibility for RLE, since 1 is necessarily present at least 2x, and only one symbol is implied */
-            oSize = (iSize & 63) + 1;
+            static int l[14] = { 1, 2, 3, 4, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128 };
+            oSize = l[iSize-242];
             memset(huffWeight, 1, oSize);
-            iSize = 1;
+            iSize = 0;
         }
         else   /* Incompressible */
         {
-            oSize = (iSize & 63) + 1;
+            oSize = iSize - 127;
             iSize = ((oSize+1)/2);
             if (iSize+1 > srcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
             ip += 1;
