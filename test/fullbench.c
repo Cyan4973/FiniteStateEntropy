@@ -832,18 +832,17 @@ static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const 
 }
 
 
-int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb, U32 blockSize)
+int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 {
     size_t benchedSize = blockSize;
     size_t cBuffSize = FSE_compressBound((unsigned)benchedSize);
-    void* oBuffer = malloc(benchedSize);
+    void* oBuffer = malloc(blockSize);
     void* cBuffer = malloc(cBuffSize);
     const char* funcName;
     int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
 
-
-    // Init
-    BMK_genData(oBuffer, benchedSize, proba);
+    // init
+    memcpy(oBuffer, buffer, blockSize);
 
     // Bench selection
     switch (algNb)
@@ -1111,36 +1110,67 @@ _end:
 }
 
 
-int usage(char* exename)
+static int fullbench(const char* filename, size_t blockSize, double p, U32 algNb, U32 nbLoops)
+{
+    int result = 0;
+    void* buffer = malloc(blockSize);
+
+    if (filename==NULL)
+        BMK_genData(buffer, blockSize, p);
+    else
+    {
+        FILE* f = fopen( filename, "rb" );
+        DISPLAY("Loading %u KB from %s \n", (U32)(blockSize>>10), filename);
+        if (f==NULL) { DISPLAY( "Pb opening %s\n", filename); return 11; }
+        blockSize = fread(buffer, 1, blockSize, f);
+        fclose(f);
+    }
+
+    if (algNb==0)
+    {
+        int i;
+        for (i=1; i<=99; i++)
+            result += runBench(buffer, blockSize, i, nbLoops);
+    }
+    else
+        result = runBench(buffer, blockSize, algNb, nbLoops);
+
+    free(buffer);
+    return result;
+}
+
+
+static int usage(const char* exename)
 {
     DISPLAY( "Usage :\n");
-    DISPLAY( "      %s [arg] \n", exename);
+    DISPLAY( "      %s [arg] [filename]\n", exename);
     DISPLAY( "Arguments :\n");
     DISPLAY( " -b#    : select function to benchmark (default : 0 ==  all)\n");
     DISPLAY( " -H/-h  : Help (this text + advanced options)\n");
     return 0;
 }
 
-int usage_advanced(char* exename)
+static int usage_advanced(const char* exename)
 {
     usage(exename);
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -i#    : iteration loops [1-9] (default : %i)\n", NBLOOPS);
-    DISPLAY( " -P#    : probability curve, in %% (default : %i%%)\n", DEFAULT_PROBA);
     DISPLAY( " -B#    : block size, in bytes (default : %i)\n", DEFAULT_BLOCKSIZE);
+    DISPLAY( " -P#    : probability curve, in %% (default : %i%%)\n", DEFAULT_PROBA);
     return 0;
 }
 
-int badusage(char* exename)
+static int badusage(const char* exename)
 {
     DISPLAY("Wrong parameters\n");
     usage(exename);
     return 1;
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
-    char* exename=argv[0];
+    const char* exename = argv[0];
+    const char* filename = NULL;
     U32 proba = DEFAULT_PROBA;
     U32 nbLoops = NBLOOPS;
     U32 pause = 0;
@@ -1155,7 +1185,7 @@ int main(int argc, char** argv)
 
     for(i=1; i<argc; i++)
     {
-        char* argument = argv[i];
+        const char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
         if (!strcmp(argument, "--no-prompt")) { no_prompt = 1; continue; }
@@ -1221,15 +1251,11 @@ int main(int argc, char** argv)
             continue;
         }
 
+        // note : non-command are filenames
+        filename = argument;
     }
 
-    if (algNb==0)
-    {
-        for (i=1; i<=99; i++)
-            result = fullSpeedBench((double)proba / 100, nbLoops, i, blockSize);
-    }
-    else
-        result = fullSpeedBench((double)proba / 100, nbLoops, algNb, blockSize);
+    result = fullbench(filename, blockSize, (double)proba / 100, algNb, nbLoops);
 
     if (pause) { DISPLAY("press enter...\n"); getchar(); }
 
