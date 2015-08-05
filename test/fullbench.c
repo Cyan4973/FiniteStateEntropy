@@ -736,7 +736,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
 static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return (int)HUF_buildCTable(g_tree, g_countTable, 255, 0);
+    return (int)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
 }
 
 size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog);
@@ -958,8 +958,8 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 21:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             funcName = "HUF_buildCTable";
             func = local_HUF_buildCTable;
             break;
