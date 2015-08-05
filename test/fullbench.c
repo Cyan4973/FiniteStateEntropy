@@ -755,13 +755,13 @@ static int local_HUF_compress_usingCTable(void* dst, size_t dstSize, const void*
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src;
-    return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, (U32)srcSize, 255);
+    return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, srcSize, g_max);
 }
 
 static int local_FSE_writeNCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return (int)FSE_writeNCount(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
+    return (int)FSE_writeNCount(dst, dstSize, g_normTable, g_max, g_tableLog);
 }
 
 /*
@@ -775,7 +775,7 @@ static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* sr
 static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return (int)FSE_buildCTable(g_CTable, g_normTable, 255, g_tableLog);
+    return (int)FSE_buildCTable(g_CTable, g_normTable, g_max, g_tableLog);
 }
 
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -864,9 +864,9 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 4:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
             break;
@@ -874,10 +874,10 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 5:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_writeNCount";
             func = local_FSE_writeNCount;
             break;
@@ -885,10 +885,10 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 6:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_buildCTable";
             func = local_FSE_buildCTable;
             break;
