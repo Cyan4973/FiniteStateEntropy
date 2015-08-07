@@ -1884,7 +1884,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     U16 nodeNb = STARTNODE;
     U32 nodeRoot;
 
-    // check
+    /* safety checks */
     if (maxNbBits == 0) maxNbBits = HUF_DEFAULT_TABLELOG;
     if (maxSymbolValue > HUF_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_GENERIC;
 	memset(huffNode0, 0, sizeof(huffNode0));
@@ -1973,7 +1973,7 @@ size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size
 
     /* init */
     op += 6;   /* jump Table -- could be optimized by delta / deviation */
-    errorCode = FSE_initCStream(&bitC, op, dstSize);
+    errorCode = FSE_initCStream(&bitC, op, oend-op);
     if (FSE_isError(errorCode)) return 0;
 
     n = srcSize & ~15;  // mod 16
@@ -2121,7 +2121,10 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     op += errorCode;
 
     /* Compress */
-    op += HUF_compress_usingCTable(op, oend - op, src, srcSize, CTable);
+    errorCode = HUF_compress_usingCTable(op, oend - op, src, srcSize, CTable);
+    if (FSE_isError(errorCode)) return errorCode;
+    if (errorCode==0) return 0;
+    op += errorCode;
 
     /* check compressibility */
     if ((size_t)(op-ostart) >= srcSize-1)
