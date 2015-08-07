@@ -55,7 +55,7 @@ size_t FSE_decompress(void* dst,  size_t maxDstSize,
 /*
 FSE_compress():
     Compress content of buffer 'src', of size 'srcSize', into destination buffer 'dst'.
-    'dst' buffer must be already allocated. Compression runs fast is maxDstSize >= FSE_compressBound(srcSize)
+    'dst' buffer must be already allocated. Compression runs faster is maxDstSize >= FSE_compressBound(srcSize)
     return : size of compressed data (<= maxDstSize)
     Special values : if return == 0, srcData is not compressible => Nothing is stored within dst !!!
                      if return == 1, srcData is a single byte symbol * srcSize times. Use RLE compression instead.

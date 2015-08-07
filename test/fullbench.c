@@ -783,6 +783,12 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
 }
 
+static int local_FSE_compress_usingCTable_tooSmall(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dstSize;
+    return (int)FSE_compress_usingCTable(dst, FSE_compressBound(srcSize)-1, src, srcSize, g_CTable);
+}
+
 static int local_FSE_readNCount(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
 {
     short norm[256];
@@ -906,6 +912,17 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         }
 
     case 8:
+        {
+            U32 max=255;
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
+            FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
+            funcName = "FSE_compress_usingCTable_tooSmall";
+            func = local_FSE_compress_usingCTable_tooSmall;
+            break;
+        }
+
+    case 9:
         funcName = "FSE_compress";
         func = local_FSE_compress;
         break;

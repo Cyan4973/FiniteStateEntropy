@@ -164,6 +164,9 @@ static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
 }
 
 
+#define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
+
 static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 {
     BYTE* bufferP0    = (BYTE*) malloc (BUFFERSIZE+64);
@@ -176,27 +179,28 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb, maxSV, tableLog;
     const size_t maxTestSizeMask = 0x1FFFF;
+    U32 rootSeed = seed;
     U32 time = FUZ_GetMilliStart();
 
-    generateNoise (bufferP0, BUFFERSIZE, &seed);
-    generate (bufferP1  , BUFFERSIZE, 0.01, &seed);
-    generate (bufferP15 , BUFFERSIZE, 0.15, &seed);
-    generate (bufferP90 , BUFFERSIZE, 0.90, &seed);
-    memset(bufferP100, (BYTE)FUZ_rand(&seed), BUFFERSIZE);
+    generateNoise (bufferP0, BUFFERSIZE, &rootSeed);
+    generate (bufferP1  , BUFFERSIZE, 0.01, &rootSeed);
+    generate (bufferP15 , BUFFERSIZE, 0.15, &rootSeed);
+    generate (bufferP90 , BUFFERSIZE, 0.90, &rootSeed);
+    memset(bufferP100, (BYTE)FUZ_rand(&rootSeed), BUFFERSIZE);
 
     if (startTestNb)
     {
         U32 i;
         for (i=0; i<startTestNb; i++)
-            FUZ_rand (&seed);
+            FUZ_rand (&rootSeed);
     }
 
     for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
         BYTE* bufferTest;
         int tag=0;
-        U32 roundSeed = seed ^ 0xEDA5B371;
-        FUZ_rand(&seed);
+        U32 roundSeed = rootSeed ^ 0xEDA5B371;
+        FUZ_rand(&rootSeed);
 
         DISPLAYLEVEL (4, "\r test %5u  ", testNb);
         if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
@@ -226,23 +230,31 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             }
             DISPLAYLEVEL (4,"%3i ", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
-            /* compress */
+
+            /* compress test */
             sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            if (FSE_isError(sizeCompressed))
-                DISPLAY ("\r test %5u : Compression failed ! \n", testNb);
-            else if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
+            CHECK(FSE_isError(sizeCompressed), "Compression failed !");
+
+            if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
-                /* decompress */
+                /* failed compression test*/
+                {
+                    size_t errorCode;
+                    void* tooSmallDBuffer = malloc(sizeCompressed-1);   /* overflows detected with Valgrind */
+                    CHECK(tooSmallDBuffer==NULL, "Not enough memory for tooSmallDBuffer test");
+                    errorCode = FSE_compress (tooSmallDBuffer, sizeCompressed-1, bufferTest, sizeOrig);
+                    CHECK(errorCode!=0, "Compression should have failed : destination buffer too small");
+                    free(tooSmallDBuffer);
+                }
+
+                /* decompression test */
                 BYTE saved = (bufferVerif[sizeOrig] = 254);
                 size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                if (bufferVerif[sizeOrig] != saved)
-                    DISPLAY ("\r test %5u : Output buffer (bufferVerif) overrun (write beyond specified end) !\n", testNb);
-                if (FSE_isError(result))
-                    DISPLAY ("\r test %5u : Decompression failed ! \n", testNb);
-                else
+                CHECK(bufferVerif[sizeOrig] != saved, "Output buffer overrun (bufferVerif) : write beyond specified end");
+                CHECK(FSE_isError(result), "Decompression failed");
                 {
                     U32 hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    if (hashEnd != hashOrig) DISPLAY ("\r test %5u : Decompressed data corrupted !! \n", testNb);
+                    CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
                 }
             }
         }
@@ -254,16 +266,13 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
             maxSV = 255;
             result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_NCOUNTBOUND);
-            if (!FSE_isError(result))
+            if (!FSE_isError(result))   /* an error would be normal */
             {
-                int check;
-                if (maxSV > 255)
-                    DISPLAY ("\r test %5u : count table overflow (%u)!\n", testNb, maxSV+1);
-                check = FUZ_checkCount (count, tableLog, maxSV);
-                if (check==-1)
-                    DISPLAY ("\r test %5u : symbol distribution corrupted !\n", testNb);
-                if (result > FSE_NCOUNTBOUND)
-                    DISPLAY ("\r test %5u : FSE_readHeader() reads too far !\n", testNb);
+                int checkCount;
+                CHECK(result > FSE_NCOUNTBOUND, "FSE_readHeader() reads too far (buffer overflow)");
+                CHECK(maxSV > 255, "count table overflow (%u)", maxSV+1);
+                checkCount = FUZ_checkCount(count, tableLog, maxSV);
+                CHECK(checkCount==-1, "symbol distribution corrupted");
             }
         }
 
@@ -275,12 +284,8 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
-            if (!FSE_isError(result))
-            {
-                if (result > maxDstSize) DISPLAY ("\r test %5u : Decompression overrun output buffer\n", testNb);
-            }
-            if (bufferDst[maxDstSize] != saved)
-                DISPLAY ("\r test %5u : Output buffer bufferDst corrupted !\n", testNb);
+            CHECK(!FSE_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
+            CHECK(bufferDst[maxDstSize] != saved, "Output buffer bufferDst corrupted");
         }
     }
 
@@ -300,8 +305,6 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 *****************************************************************/
 extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
 
-#define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
 #define TBSIZE (16 KB)
 static void unitTest(void)
 {

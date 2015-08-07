@@ -1132,9 +1132,9 @@ size_t FSE_buildCTable_rle (FSE_CTable* ct, BYTE symbolValue)
 
 size_t FSE_initCStream(FSE_CStream_t* bitC, void* start, size_t maxSize)
 {
-    if (maxSize < 8) return (size_t)-FSE_ERROR_dstSize_tooSmall;
+    if (maxSize < sizeof(bitC->ptr)) return (size_t)-FSE_ERROR_dstSize_tooSmall;
     bitC->bitContainer = 0;
-    bitC->bitPos = 0;   /* reserved for unusedBits */
+    bitC->bitPos = 0;
     bitC->startPtr = (char*)start;
     bitC->ptr = bitC->startPtr;
     bitC->endPtr = bitC->startPtr + maxSize - sizeof(bitC->ptr);
@@ -1186,12 +1186,9 @@ void FSE_flushBits(FSE_CStream_t* bitC)
     size_t nbBytes = bitC->bitPos >> 3;
     FSE_writeLEST(bitC->ptr, bitC->bitContainer);
     bitC->ptr += nbBytes;
-    if (bitC->ptr <= bitC->endPtr)
-    {
-        bitC->bitPos &= 7;
-        bitC->bitContainer >>= nbBytes*8;
-        return;
-    }
+    if (bitC->ptr > bitC->endPtr) bitC->ptr = bitC->endPtr;
+    bitC->bitPos &= 7;
+    bitC->bitContainer >>= nbBytes*8;
 }
 
 void FSE_flushCState(FSE_CStream_t* bitC, const FSE_CState_t* statePtr)
@@ -1208,7 +1205,7 @@ size_t FSE_closeCStream(FSE_CStream_t* bitC)
     FSE_addBitsFast(bitC, 1, 1);
     FSE_flushBits(bitC);
 
-    if (bitC->bitPos > 7)   /* still some data to flush => too close to buffer's end */
+    if (bitC->ptr >= bitC->endPtr)   /* too close to buffer's end */
         return 0;   /* not compressible */
 
     endPtr = bitC->ptr;
