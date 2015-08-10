@@ -1,7 +1,7 @@
 /*
-Fuzzer.c
-Automated test program for FSE
-Copyright (C) Yann Collet 2013-2015
+FuzzerHuff0.c
+Automated test program for Huff0
+Copyright (C) Yann Collet 2015
 
 GPL v2 License
 
@@ -20,7 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 You can contact the author at :
-- FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
+- FSE+Huff0 source repository : https://github.com/Cyan4973/FiniteStateEntropy
 - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -151,19 +151,6 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
 }
 
 
-static int FUZ_checkCount (short* normalizedCount, int tableLog, int maxSV)
-{
-    int total = 1<<tableLog;
-    int count = 0;
-    int i;
-    if (tableLog > 20) return -1;
-    for (i=0; i<=maxSV; i++)
-        count += abs(normalizedCount[i]);
-    if (count != total) return -1;
-    return 0;
-}
-
-
 #define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                          DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
 
@@ -177,7 +164,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     size_t bufferDstSize = BUFFERSIZE+64;
-    unsigned testNb, maxSV, tableLog;
+    unsigned testNb;
     const size_t maxTestSizeMask = 0x1FFFF;
     U32 rootSeed = seed;
     U32 time = FUZ_GetMilliStart();
@@ -187,6 +174,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     generate (bufferP15 , BUFFERSIZE, 0.15, &rootSeed);
     generate (bufferP90 , BUFFERSIZE, 0.90, &rootSeed);
     memset(bufferP100, (BYTE)FUZ_rand(&rootSeed), BUFFERSIZE);
+    memset(bufferDst, 0, BUFFERSIZE);
 
     if (startTestNb)
     {
@@ -197,7 +185,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
     for (testNb=startTestNb; testNb<totalTest; testNb++)
     {
-        BYTE* bufferTest;
+        BYTE* bufferTest = NULL;
         int tag=0;
         U32 roundSeed = rootSeed ^ 0xEDA5B371;
         FUZ_rand(&rootSeed);
@@ -212,7 +200,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
         /* Compression / Decompression tests */
         {
             /* determine test sample */
-            size_t sizeOrig = (FUZ_rand (&roundSeed) & maxTestSizeMask) + 1;
+            size_t sizeOrig = (FUZ_rand(&roundSeed) & maxTestSizeMask) + 1;
             size_t offset = (FUZ_rand(&roundSeed) % (BUFFERSIZE - 64 - maxTestSizeMask));
             size_t sizeCompressed;
             U32 hashOrig;
@@ -231,49 +219,29 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             DISPLAYLEVEL (4,"%3i ", tag++);;
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
 
-            /* compress test */
-            sizeCompressed = FSE_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            CHECK(FSE_isError(sizeCompressed), "Compression failed !");
-
+            /* compression test */
+            sizeCompressed = HUF_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
+            CHECK(FSE_isError(sizeCompressed), "Compression failed");
             if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
-                /* failed compression test*/
+                /* failed compression test */
                 {
                     size_t errorCode;
-                    void* tooSmallDBuffer = malloc(sizeCompressed-1);   /* overflows detected with Valgrind */
-                    CHECK(tooSmallDBuffer==NULL, "Not enough memory for tooSmallDBuffer test");
-                    errorCode = FSE_compress (tooSmallDBuffer, sizeCompressed-1, bufferTest, sizeOrig);
-                    CHECK(errorCode!=0, "Compression should have failed : destination buffer too small");
+                    void* tooSmallDBuffer = malloc(sizeCompressed-1);   /* overflow will be detected by Valgrind */
+                    CHECK(tooSmallDBuffer==NULL, "not enough memory for test tooSmallDBuffer");
+                    errorCode = HUF_compress (tooSmallDBuffer, sizeCompressed-1, bufferTest, sizeOrig);
+                    CHECK(errorCode!=0, "compression should have failed (too small destination buffer)")
                     free(tooSmallDBuffer);
                 }
 
                 /* decompression test */
-                {
-                    U32 hashEnd;
-                    BYTE saved = (bufferVerif[sizeOrig] = 254);
-                    size_t result = FSE_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                    CHECK(bufferVerif[sizeOrig] != saved, "Output buffer overrun (bufferVerif) : write beyond specified end");
-                    CHECK(FSE_isError(result), "Decompression failed");
-                    hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
-                }
-            }
-        }
-
-        /* Attempt header decoding on bogus data */
-        {
-            short count[256];
-            size_t result;
-            DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);
-            maxSV = 255;
-            result = FSE_readNCount (count, &maxSV, &tableLog, bufferTest, FSE_NCOUNTBOUND);
-            if (!FSE_isError(result))   /* an error would be normal */
-            {
-                int checkCount;
-                CHECK(result > FSE_NCOUNTBOUND, "FSE_readHeader() reads too far (buffer overflow)");
-                CHECK(maxSV > 255, "count table overflow (%u)", maxSV+1);
-                checkCount = FUZ_checkCount(count, tableLog, maxSV);
-                CHECK(checkCount==-1, "symbol distribution corrupted");
+                U32 hashEnd;
+                BYTE saved = (bufferVerif[sizeOrig] = 253);
+                size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                CHECK(bufferVerif[sizeOrig] != saved, "(bufferVerif) Output buffer overflow");
+                CHECK(FSE_isError(result), "Decompression failed");
+                hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
             }
         }
 
@@ -284,9 +252,9 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             BYTE saved = (bufferDst[maxDstSize] = 253);
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
-            result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
+            result = HUF_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
             CHECK(!FSE_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
-            CHECK(bufferDst[maxDstSize] != saved, "Output buffer bufferDst corrupted");
+            CHECK(bufferDst[maxDstSize] != saved, "Decompression output buffer overflow");
         }
     }
 
@@ -304,17 +272,12 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 /*****************************************************************
 *  Unitary tests
 *****************************************************************/
-extern int FSE_countU16(unsigned* count, const unsigned short* source, unsigned sourceSize, unsigned* maxSymbolValuePtr);
-
 #define TBSIZE (16 KB)
 static void unitTest(void)
 {
     BYTE* testBuff = (BYTE*)malloc(TBSIZE);
     BYTE* cBuff = (BYTE*)malloc(FSE_COMPRESSBOUND(TBSIZE));
     BYTE* verifBuff = (BYTE*)malloc(TBSIZE);
-    size_t errorCode;
-    U32 seed=0, testNb=0, lseed=0;
-    U32 count[256];
 
     if ((!testBuff) || (!cBuff) || (!verifBuff))
     {
@@ -325,142 +288,12 @@ static void unitTest(void)
         return;
     }
 
-    /* FSE_count */
+    /* Targeted test 1 */
     {
-        U32 max, i;
-        for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&lseed) & 63) + '0';
-        max = '0' + 63;
-        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
-        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
-        max -= 1;
-        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_count() should have failed : value > max");
-        max = 65000;
-        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
-        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
     }
 
-    /* FSE_optimalTableLog */
+    /* Targeted test 2 */
     {
-        U32 max, i, tableLog=12;
-        size_t testSize = 999;
-        for (i=0; i< testSize; i++) testBuff[i] = (BYTE)FUZ_rand(&lseed);
-        max = 256;
-        FSE_count(count, &max, testBuff, testSize);
-        tableLog = FSE_optimalTableLog(tableLog, testSize, max);
-        CHECK(tableLog<=8, "Too small tableLog");
-    }
-
-    /* FSE_normalizeCount */
-    {
-        S16 norm[256];
-        U32 max = 256;
-        FSE_count(count, &max, testBuff, TBSIZE);
-        errorCode = FSE_normalizeCount(norm, 10, count, TBSIZE, max);
-        CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
-        errorCode = FSE_normalizeCount(norm, 8, count, TBSIZE, 256);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_normalizeCount() should have failed (max >= 1<<tableLog)");
-        /* limit corner case : try to make internal rank overflow */
-        {
-            U32 i;
-            U32 total = 0;
-            count[0] =  940;
-            count[1] =  910;
-            count[2] =  470;
-            count[3] =  190;
-            count[4] =   90;
-            for(i=5; i<=255; i++) count[i] = 6;
-            for (i=0; i<=255; i++) total += count[i];
-            errorCode = FSE_normalizeCount(norm, 10, count, total, 255);
-            CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
-            count[0] =  300;
-            count[1] =  300;
-            count[2] =  300;
-            count[3] =  300;
-            count[4] =   50;
-            for(i=5; i<=80; i++) count[i] = 4;
-            total = 0; for (i=0; i<=80; i++) total += count[i];
-            errorCode = FSE_normalizeCount(norm, 10, count, total, 80);
-            CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
-        }
-    }
-
-    /* FSE_writeNCount, FSE_readNCount */
-    {
-        S16 norm[129];
-        BYTE header[513];
-        U32 max, tableLog, i;
-        size_t headerSize;
-
-        for (i=0; i< TBSIZE; i++) testBuff[i] = i % 127;
-        max = 128;
-        errorCode = FSE_count(count, &max, testBuff, TBSIZE);
-        CHECK(FSE_isError(errorCode), "Error : FSE_count() should have worked");
-        tableLog = FSE_optimalTableLog(0, TBSIZE, max);
-        errorCode = FSE_normalizeCount(norm, tableLog, count, TBSIZE, max);
-        CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
-
-        headerSize = FSE_NCountWriteBound(max, tableLog);
-
-        headerSize = FSE_writeNCount(header, 513, norm, max, tableLog);
-        CHECK(FSE_isError(headerSize), "Error : FSE_writeNCount() should have worked");
-
-        header[headerSize-1] = 0;
-        errorCode = FSE_writeNCount(header, headerSize-1, norm, max, tableLog);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_writeNCount() should have failed");
-        CHECK (header[headerSize-1] != 0, "Error : FSE_writeNCount() buffer overwrite");
-
-        errorCode = FSE_writeNCount(header, headerSize+1, norm, max, tableLog);
-        CHECK(FSE_isError(errorCode), "Error : FSE_writeNCount() should have worked");
-
-        max = 129;
-        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
-        CHECK(FSE_isError(errorCode), "Error : FSE_readNCount() should have worked : (error %s)", FSE_getErrorName(errorCode));
-
-        max = 64;
-        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (max too small)");
-
-        max = 129;
-        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize-1);
-        CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
-
-        {
-            void* smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
-            CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readNCount unit test)");
-            memcpy(smallBuffer, header, headerSize-1);
-            max = 129;
-            errorCode = FSE_readNCount(norm, &max, &tableLog, smallBuffer, headerSize-1);
-            CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
-            free(smallBuffer);
-        }
-    }
-
-
-    /* FSE_buildCTable_raw & FSE_buildDTable_raw */
-    {
-        U32 ct[FSE_CTABLE_SIZE_U32(8, 256)];
-        U32 dt[FSE_DTABLE_SIZE_U32(8)];
-        U64 crcOrig, crcVerif;
-        size_t cSize, verifSize;
-
-        U32 i;
-        for (i=0; i< TBSIZE; i++) testBuff[i] = (FUZ_rand(&seed) & 63) + '0';
-        crcOrig = XXH64(testBuff, TBSIZE, 0);
-
-        errorCode = FSE_buildCTable_raw(ct, 8);
-        CHECK(FSE_isError(errorCode), "FSE_buildCTable_raw should have worked");
-        errorCode = FSE_buildDTable_raw(dt, 8);
-        CHECK(FSE_isError(errorCode), "FSE_buildDTable_raw should have worked");
-
-        cSize = FSE_compress_usingCTable(cBuff, FSE_COMPRESSBOUND(TBSIZE), testBuff, TBSIZE, ct);
-        CHECK(FSE_isError(cSize), "FSE_compress_usingCTable should have worked using raw CTable");
-
-        verifSize = FSE_decompress_usingDTable(verifBuff, TBSIZE, cBuff, cSize, dt);
-        CHECK(FSE_isError(verifSize), "FSE_decompress_usingDTable should have worked using raw DTable");
-
-        crcVerif = XXH64(verifBuff, verifSize, 0);
-        CHECK(crcOrig != crcVerif, "Raw regenerated data is corrupted");
     }
 
     free(testBuff);
@@ -488,7 +321,7 @@ int main (int argc, char** argv)
     int argNb;
 
     seed = FUZ_GetMilliStart() % 10000;
-    DISPLAYLEVEL (1, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
+    DISPLAYLEVEL (1, "Huff0 (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];

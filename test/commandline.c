@@ -96,14 +96,15 @@ static int usage(void)
     DISPLAY("Usage :\n");
     DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
     DISPLAY("Arguments :\n");
-    DISPLAY("(default): core loop timing tests\n");
-    DISPLAY(" -b : benchmark full mode\n");
-    DISPLAY(" -m : benchmark lowMem mode\n");
+    DISPLAY("(default): fse core loop timing tests\n");
+    DISPLAY(" -b : benchmark using fse\n");
+    DISPLAY(" -h : benchmark using huff0\n");
     DISPLAY(" -z : benchmark using zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
-    DISPLAY(" -o : force compression\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
-    DISPLAY(" -h/-H : display help/long help and exit\n");
+    DISPLAY(" -B#: block size (default : 32768), benchmark mode only\n");
+    DISPLAY(" -o : force compression\n");
+    DISPLAY(" -H : display help and exit\n");
     return 0;
 }
 
@@ -168,7 +169,6 @@ int main(int argc, char** argv)
                 {
                     // Display help
                 case 'V': DISPLAY(WELCOME_MESSAGE); return 0;   // Version
-                case 'h':
                 case 'H': usage(); return 0;
 
                     // compression
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
                 case 'b': bench=1; break;
 
                     // Benchmark full mode
-                case 'm': DISPLAY("benchmark using experimental lowMem mode\n");
+                case 'h':
                     bench=1;
                     BMK_SetByteCompressor(2);
                     break;
@@ -208,7 +208,22 @@ int main(int argc, char** argv)
                 case 'k': break;
 
                     // Modify Block Properties
-                case 'B': break;   // to be completed later
+                case 'B':
+                    {
+                        unsigned bSize = 0;
+                        while ((argument[1] >='0') && (argument[1] <='9'))
+                        {
+                            unsigned digit = argument[1] - '0';
+                            bSize *= 10;
+                            bSize += digit;
+                            argument++;
+                        }
+                        if (argument[1]=='K') bSize<<=10, argument++;  /* allows using KB notation */
+                        if (argument[1]=='M') bSize<<=20, argument++;
+                        if (argument[1]=='B') argument++;
+                        BMK_SetBlocksize(bSize);
+                    }
+                    break;
 
                     // Modify Stream properties
                 case 'S': break;   // to be completed later

@@ -23,7 +23,7 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE    = v0.2.1
+RELEASE    = v0.3.0
 
 DESTDIR   ?=
 CFLAGS    ?= -O3
@@ -45,11 +45,11 @@ endif
 
 default: fse
 
-all: allNative all32
+all: bin bin32
 
-all32: fse32 fullbench32 fuzzer32
+bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
-allNative: fse fullbench fuzzer fuzzerU16 probagen
+bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
 fse: bench.c commandline.c fileio.c xxhash.c zlibh.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
@@ -75,6 +75,12 @@ fuzzerU16: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
 fuzzerU16_32: fuzzerU16.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
+fuzzerHuff0: fuzzerHuff0.c xxhash.c ../fse.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+fuzzerHuff0_32: fuzzerHuff0.c xxhash.c ../fse.c
+	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
+
 fullbench: fullbench.c xxhash.c ../fse.c ../fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
@@ -85,7 +91,8 @@ probagen: probaGenerator.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fse$(EXT) fse32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@rm -f core *.o fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
 	@rm -f tmp result proba.bin
 	@echo Cleaning completed
 
@@ -98,10 +105,11 @@ test-fse: probagen fse
 	rm proba.bin
 	rm tmp
 
-test: test-fse fullbench fuzzer fuzzerU16
+test: test-fse fullbench fuzzer fuzzerU16 fuzzerHuff0
 	./fuzzer $(FSETEST) 
 	./fullbench -i1
 	./fuzzerU16 $(FSEU16TEST) 
+	./fuzzerHuff0 $(FSETEST) 
 
 test-fse32: probagen fse32
 	./probagen 20%
@@ -112,15 +120,18 @@ test-fse32: probagen fse32
 	rm tmp
 	rm proba.bin
 
-test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32
-	./fuzzer32
+test32: test-fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
+	./fuzzer32 $(FSETEST)
 	./fullbench32 -i1
-	./fuzzerU16_32
+	./fuzzerU16_32 $(FSEU16TEST)
+	./fuzzerHuff0_32 $(FSETEST)
 
-memtest: fuzzer fullbench
-	valgrind --leak-check=yes ./fuzzer -i256
-	valgrind --leak-check=yes ./fullbench -i1
-	valgrind --leak-check=yes ./fuzzerU16 -i128
+memtest: fuzzer fullbench fuzzerU16 fuzzerHuff0
+	valgrind --version
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i256
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzerU16 -i128
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzerHuff0 -i256
 
 test-all: test test32 memtest
 	@echo test completed

@@ -74,7 +74,7 @@
 
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
-#define DEFAULT_BLOCKSIZE (48 KB)
+#define DEFAULT_BLOCKSIZE (32 KB)
 #define DEFAULT_PROBA 20
 
 
@@ -710,9 +710,17 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
 
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
-    (void)dstSize;
     return (int)FSE_compress(dst, dstSize, src, srcSize);
 }
+
+static int local_HUF_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    return (int)HUF_compress(dst, dstSize, src, srcSize);
+}
+
+typedef struct HUF_CElt_s HUF_CElt;
+static U32 fakeTree[256];
+static HUF_CElt* g_tree = (HUF_CElt*)fakeTree;
 
 static short  g_normTable[256];
 static U32    g_countTable[256];
@@ -721,19 +729,39 @@ static U32    g_CTable[2350];
 static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
 static size_t g_skip;
-static size_t g_fast;
 static size_t g_cSize;
+HUF_CREATE_STATIC_DTABLE(g_huff_dtable, 16);
+
+size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
+static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+}
+
+size_t HUF_writeCTable (void* dst, size_t maxDstSize, const HUF_CElt* tree, U32 maxSymbolValue, U32 huffLog);
+static int local_HUF_writeCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)src; (void)srcSize;
+    return (int)HUF_writeCTable(dst, dstSize, g_tree, g_max, g_tableLog);
+}
+
+size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable);
+static int local_HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    return (int)HUF_compress_usingCTable(dst, dstSize, src, srcSize, g_tree);
+}
 
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src;
-    return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, (U32)srcSize, 255);
+    return (int)FSE_normalizeCount(g_normTable, 0, g_countTable, srcSize, g_max);
 }
 
 static int local_FSE_writeNCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)src; (void)srcSize;
-    return (int)FSE_writeNCount(dst, (U32)dstSize, g_normTable, 255, g_tableLog);
+    return (int)FSE_writeNCount(dst, dstSize, g_normTable, g_max, g_tableLog);
 }
 
 /*
@@ -747,12 +775,18 @@ static int local_FSE_writeHeader_small(void* dst, size_t dstSize, const void* sr
 static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
-    return (int)FSE_buildCTable(g_CTable, g_normTable, 255, g_tableLog);
+    return (int)FSE_buildCTable(g_CTable, g_normTable, g_max, g_tableLog);
 }
 
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
+}
+
+static int local_FSE_compress_usingCTable_tooSmall(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dstSize;
+    return (int)FSE_compress_usingCTable(dst, FSE_compressBound(srcSize)-1, src, srcSize, g_CTable);
 }
 
 static int local_FSE_readNCount(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
@@ -771,7 +805,7 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
 static int local_FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)srcSize;
-    return (int)FSE_decompress_usingDTable(dst, maxDstSize, (const BYTE*)src + g_skip, g_cSize, g_DTable, g_fast);
+    return (int)FSE_decompress_usingDTable(dst, maxDstSize, (const BYTE*)src + g_skip, g_cSize, g_DTable);
 }
 
 static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
@@ -781,18 +815,40 @@ static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, s
 }
 
 
-int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
+static int local_HUF_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    size_t benchedSize = DEFAULT_BLOCKSIZE;
+    (void)srcSize;
+    return (int)HUF_decompress(dst, maxDstSize, src, g_cSize);
+}
+
+size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize);
+static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)maxDstSize; (void)srcSize;
+    return (int)HUF_readDTable(g_huff_dtable, src, g_cSize);
+}
+
+// unimplemented
+size_t HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable)
+{ (void)dst; (void)maxDstSize; (void)cSrc; (void)cSrcSize; (void)DTable; return 0; }
+static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize;
+    return (int)HUF_decompress_usingDTable(dst, maxDstSize, src, g_cSize, g_huff_dtable);
+}
+
+
+int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
+{
+    size_t benchedSize = blockSize;
     size_t cBuffSize = FSE_compressBound((unsigned)benchedSize);
-    void* oBuffer = malloc(benchedSize);
+    void* oBuffer = malloc(blockSize);
     void* cBuffer = malloc(cBuffSize);
     const char* funcName;
     int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
 
-
-    // Init
-    BMK_genData(oBuffer, benchedSize, proba);
+    // init
+    memcpy(oBuffer, buffer, blockSize);
 
     // Bench selection
     switch (algNb)
@@ -814,9 +870,9 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 
     case 4:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
             break;
@@ -824,34 +880,21 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
 
     case 5:
         {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_writeNCount";
             func = local_FSE_writeNCount;
             break;
         }
 
-/*
     case 6:
         {
-            U32 max=255;
-            FSE_count(g_countTable, oBuffer, (U32)benchedSize, &max);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
-            funcName = "FSE_writeHeader(small)";
-            func = local_FSE_writeHeader_small;
-            break;
-        }
-*/
-
-    case 6:
-        {
-            U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = FSE_optimalTableLog(g_tableLog, (U32)benchedSize, max);
-            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_buildCTable";
             func = local_FSE_buildCTable;
             break;
@@ -860,8 +903,8 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, (U32)benchedSize);
-            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, (U32)benchedSize, max);
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
             func = local_FSE_compress_usingCTable;
@@ -869,6 +912,17 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
         }
 
     case 8:
+        {
+            U32 max=255;
+            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
+            FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
+            funcName = "FSE_compress_usingCTable_tooSmall";
+            func = local_FSE_compress_usingCTable_tooSmall;
+            break;
+        }
+
+    case 9:
         funcName = "FSE_compress";
         func = local_FSE_compress;
         break;
@@ -899,7 +953,7 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             g_max = 255;
             g_skip = FSE_readNCount(g_normTable, &g_max, &g_tableLog, oBuffer, g_cSize);
             g_cSize -= g_skip;
-            g_fast = FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
+            FSE_buildDTable (g_DTable, g_normTable, g_max, g_tableLog);
             funcName = "FSE_decompress_usingDTable";
             func = local_FSE_decompress_usingDTable;
             break;
@@ -914,6 +968,69 @@ int fullSpeedBench(double proba, U32 nbBenchs, U32 algNb)
             break;
         }
 
+    case 20:
+        funcName = "HUF_compress";
+        func = local_HUF_compress;
+        break;
+
+    case 21:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            funcName = "HUF_buildCTable";
+            func = local_HUF_buildCTable;
+            break;
+        }
+
+    case 22:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            funcName = "HUF_writeCTable";
+            func = local_HUF_writeCTable;
+            break;
+        }
+
+    case 23:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            funcName = "HUF_compress_usingCTable";
+            func = local_HUF_compress_usingCTable;
+            break;
+        }
+
+    case 30:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress";
+            func = local_HUF_decompress;
+            break;
+        }
+
+    case 31:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readDTable";
+            func = local_HUF_readDTable;
+            break;
+        }
+
+    case 132:  // unimplemented yet
+        {
+            size_t hhsize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            hhsize = HUF_readDTable(g_huff_dtable, cBuffer, g_cSize);
+            g_cSize -= hhsize;
+            memcpy(oBuffer, ((char*)cBuffer) + hhsize, g_cSize);
+            funcName = "HUF_decompress_usingDTable";
+            func = local_HUF_decompress_usingDTable;
+            break;
+        }
 
     /* Specific test functions */
     case 100:
@@ -1010,39 +1127,72 @@ _end:
 }
 
 
-int usage(char* exename)
+static int fullbench(const char* filename, size_t blockSize, double p, U32 algNb, U32 nbLoops)
+{
+    int result = 0;
+    void* buffer = malloc(blockSize);
+
+    if (filename==NULL)
+        BMK_genData(buffer, blockSize, p);
+    else
+    {
+        FILE* f = fopen( filename, "rb" );
+        DISPLAY("Loading %u KB from %s \n", (U32)(blockSize>>10), filename);
+        if (f==NULL) { DISPLAY( "Pb opening %s\n", filename); return 11; }
+        blockSize = fread(buffer, 1, blockSize, f);
+        fclose(f);
+    }
+
+    if (algNb==0)
+    {
+        int i;
+        for (i=1; i<=99; i++)
+            result += runBench(buffer, blockSize, i, nbLoops);
+    }
+    else
+        result = runBench(buffer, blockSize, algNb, nbLoops);
+
+    free(buffer);
+    return result;
+}
+
+
+static int usage(const char* exename)
 {
     DISPLAY( "Usage :\n");
-    DISPLAY( "      %s [arg] \n", exename);
+    DISPLAY( "      %s [arg] [filename]\n", exename);
     DISPLAY( "Arguments :\n");
     DISPLAY( " -b#    : select function to benchmark (default : 0 ==  all)\n");
     DISPLAY( " -H/-h  : Help (this text + advanced options)\n");
     return 0;
 }
 
-int usage_advanced(char* exename)
+static int usage_advanced(const char* exename)
 {
     usage(exename);
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -i#    : iteration loops [1-9] (default : %i)\n", NBLOOPS);
+    DISPLAY( " -B#    : block size, in bytes (default : %i)\n", DEFAULT_BLOCKSIZE);
     DISPLAY( " -P#    : probability curve, in %% (default : %i%%)\n", DEFAULT_PROBA);
     return 0;
 }
 
-int badusage(char* exename)
+static int badusage(const char* exename)
 {
     DISPLAY("Wrong parameters\n");
     usage(exename);
     return 1;
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
-    char* exename=argv[0];
+    const char* exename = argv[0];
+    const char* filename = NULL;
     U32 proba = DEFAULT_PROBA;
     U32 nbLoops = NBLOOPS;
     U32 pause = 0;
     U32 algNb = 0;
+    U32 blockSize = DEFAULT_BLOCKSIZE;
     int i;
     int result;
 
@@ -1052,7 +1202,7 @@ int main(int argc, char** argv)
 
     for(i=1; i<argc; i++)
     {
-        char* argument = argv[i];
+        const char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
         if (!strcmp(argument, "--no-prompt")) { no_prompt = 1; continue; }
@@ -1095,6 +1245,16 @@ int main(int argc, char** argv)
                     while ((*argument >='0') && (*argument <='9')) proba*=10, proba += *argument++ - '0';
                     break;
 
+                    // Modify block size
+                case 'B':
+                    argument++;
+                    blockSize=0;
+                    while ((*argument >='0') && (*argument <='9')) blockSize*=10, blockSize += *argument++ - '0';
+                    if (argument[0]=='K') blockSize<<=10, argument++;  /* allows using KB notation */
+                    if (argument[0]=='M') blockSize<<=20, argument++;
+                    if (argument[0]=='B') argument++;
+                    break;
+
                     // Pause at the end (hidden option)
                 case 'p':
                     pause=1;
@@ -1108,15 +1268,11 @@ int main(int argc, char** argv)
             continue;
         }
 
+        // note : non-command are filenames
+        filename = argument;
     }
 
-    if (algNb==0)
-    {
-        for (i=1; i<=99; i++)
-            result = fullSpeedBench((double)proba / 100, nbLoops, i);
-    }
-    else
-        result = fullSpeedBench((double)proba / 100, nbLoops, algNb);
+    result = fullbench(filename, blockSize, (double)proba / 100, algNb, nbLoops);
 
     if (pause) { DISPLAY("press enter...\n"); getchar(); }
 

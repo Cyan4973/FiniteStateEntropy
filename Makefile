@@ -35,6 +35,12 @@ all:
 test:
 	@cd $(PROGDIR); $(MAKE) test
 
+test32:
+	@cd $(PROGDIR); $(MAKE) test32
+
+memtest:
+	@cd $(PROGDIR); $(MAKE) memtest
+
 clean:
 	@cd $(PROGDIR); $(MAKE) clean
 
@@ -47,7 +53,7 @@ gpptest: clean
 
 armtest: clean
 	@echo ---- test ARM compilation ----
-	@cd $(PROGDIR); $(MAKE) allNative CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
+	@cd $(PROGDIR); $(MAKE) bin CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
 
 clangtest: clean
 	@echo ---- test clang compilation ----
@@ -59,6 +65,7 @@ staticAnalyze: clean
 
 sanitize: clean
 	@echo ---- check undefined behavior - sanitize ----
-	@cd $(PROGDIR); $(MAKE) test CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	@cd $(PROGDIR); $(MAKE) test   CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	@cd $(PROGDIR); $(MAKE) test32 CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
 
 
