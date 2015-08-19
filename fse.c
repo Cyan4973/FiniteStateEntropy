@@ -643,13 +643,13 @@ static short FSE_abs(short a)
 ****************************************************************/
 size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog)
 {
-    size_t maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1;
-    return maxSymbolValue ? maxHeaderSize : FSE_NCOUNTBOUND;
+    size_t maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1 + 1;   /* last +1 : written by U16 */
+    return maxSymbolValue ? maxHeaderSize : FSE_NCOUNTBOUND;  /* maxSymbolValue==0 ? use default */
 }
 
 static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
                                        const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
-                                       unsigned safeWrite)
+                                       unsigned writeIsSafe)
 {
     BYTE* const ostart = (BYTE*) header;
     BYTE* out = ostart;
@@ -684,7 +684,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
             {
                 start+=24;
                 bitStream += 0xFFFFU << bitCount;
-                if ((!safeWrite) && (out > oend-2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+                if ((!writeIsSafe) && (out > oend-2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
                 out[0] = (BYTE) bitStream;
                 out[1] = (BYTE)(bitStream>>8);
                 out+=2;
@@ -700,7 +700,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
             bitCount += 2;
             if (bitCount>16)
             {
-                if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+                if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
                 out[0] = (BYTE)bitStream;
                 out[1] = (BYTE)(bitStream>>8);
                 out += 2;
@@ -723,7 +723,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
         }
         if (bitCount>16)
         {
-            if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+            if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
             out[0] = (BYTE)bitStream;
             out[1] = (BYTE)(bitStream>>8);
             out += 2;
@@ -733,7 +733,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
     }
 
     /* flush remaining bitStream */
-    if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+    if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
     out[0] = (BYTE)bitStream;
     out[1] = (BYTE)(bitStream>>8);
     out+= (bitCount+7) /8;
