@@ -789,8 +789,16 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             while ((bitStream & 0xFFFF) == 0xFFFF)
             {
                 n0+=24;
-                ip+=2;
-                bitStream = FSE_readLE32(ip) >> bitCount;
+                if (ip < iend-5)
+                {
+                    ip+=2;
+                    bitStream = FSE_readLE32(ip) >> bitCount;
+                }
+                else
+                {
+                    bitStream >>= 16;
+                    bitCount+=16;
+                }
             }
             while ((bitStream & 3) == 3)
             {
@@ -802,9 +810,14 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             bitCount += 2;
             if (n0 > *maxSVPtr) return (size_t)-FSE_ERROR_maxSymbolValue_tooSmall;
             while (charnum < n0) normalizedCounter[charnum++] = 0;
-            ip += bitCount>>3;
-            bitCount &= 7;
-            bitStream = FSE_readLE32(ip) >> bitCount;
+            if ((ip <= iend-7) || (ip + (bitCount>>3) <= iend-4))
+            {
+                ip += bitCount>>3;
+                bitCount &= 7;
+                bitStream = FSE_readLE32(ip) >> bitCount;
+            }
+            else
+                bitStream >>= 2;
         }
         {
             const short max = (short)((2*threshold-1)-remaining);
@@ -833,16 +846,15 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             }
 
             {
-                const BYTE* itarget = ip + (bitCount>>3);
-                if (itarget > iend - 4)
+                if ((ip <= iend-7) || (ip + (bitCount>>3) <= iend-4))
                 {
-                    ip = iend - 4;
-                    bitCount -= (int)(8 * (iend - 4 - ip));
+                    ip += bitCount>>3;
+                    bitCount &= 7;
                 }
                 else
                 {
-                    ip = itarget;
-                    bitCount &= 7;
+                    ip = iend - 4;
+                    bitCount -= (int)(8 * (iend - 4 - ip));
                 }
                 bitStream = FSE_readLE32(ip) >> (bitCount & 31);
             }
