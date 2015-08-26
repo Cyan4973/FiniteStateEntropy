@@ -45,6 +45,8 @@ static char const stdoutmark[] = "stdout";
 /**************************************
 *  Parameters
 **************************************/
+typedef enum { FIO_fse, FIO_huff0, FIO_zlibh } FIO_compressor_t;
+void FIO_setCompressor(FIO_compressor_t c);
 void FIO_overwriteMode(void);
 
 

@@ -1398,6 +1398,7 @@ size_t FSE_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     errorCode = FSE_count (count, &maxSymbolValue, ip, srcSize);
     if (FSE_isError(errorCode)) return errorCode;
     if (errorCode == srcSize) return 1;
+    if (errorCode == 1) return 0;   /* each symbol only present once */
     if (errorCode < (srcSize >> 7)) return 0;   /* Heuristic : not compressible enough */
 
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
@@ -1534,7 +1535,7 @@ static size_t FSE_lookBits(FSE_DStream_t* bitD, U32 nbBits)
 
 static size_t FSE_lookBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 1 !! */
 {
-    return (bitD->bitContainer << bitD->bitsConsumed) >> ((sizeof(bitD->bitContainer)*8)-nbBits);
+    return (bitD->bitContainer << (bitD->bitsConsumed & ((sizeof(bitD->bitContainer)*8)-1))) >> ((sizeof(bitD->bitContainer)*8)-nbBits);
 }
 
 static void FSE_skipBits(FSE_DStream_t* bitD, U32 nbBits)

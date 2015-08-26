@@ -58,11 +58,10 @@ ZLIBH_compress():
     Use ZLIBH_compressBound() to determine this size.
     return : size of compressed data
 ZLIBH_decompress():
-    Will decompress into destination buffer char* dest, a compressed data of final size int originalSize.
-    Destination buffer must be already allocated, and large enough to accomodate originalSize bytes.
+    Will decompress into destination buffer char* dest, a compressed data.
+    Destination buffer must be already allocated, and large enough to accommodate originalSize bytes.
     Compressed input must be pointed by const char* compressed.
-    The function will determine how many bytes are read from input buffer to generate originalSize bytes into dest buffer.
-    return : size of compressed data
+    return : originalSize
 */
 
 

@@ -98,8 +98,17 @@ clean:
 
 test-fse: probagen fse
 	./probagen 20%
-	./fse -f proba.bin -o tmp
-	./fse -df tmp -o result
+	@echo compress using fse
+	./fse -f proba.bin tmp
+	./fse -df tmp result
+	diff proba.bin result
+	@echo compress using huff0
+	./fse -fh proba.bin tmp
+	./fse -df tmp result
+	diff proba.bin result
+	@echo compress using zlibh
+	./fse -fz proba.bin tmp
+	./fse -df tmp result
 	diff proba.bin result
 	rm result
 	rm proba.bin
@@ -113,8 +122,17 @@ test: test-fse fullbench fuzzer fuzzerU16 fuzzerHuff0
 
 test-fse32: probagen fse32
 	./probagen 20%
-	./fse32 -f proba.bin -o tmp
-	./fse32 -df tmp -o result
+	@echo compress using fse
+	./fse32 -f proba.bin tmp
+	./fse32 -df tmp result
+	diff proba.bin result
+	@echo compress using huff0
+	./fse32 -fh proba.bin tmp
+	./fse32 -df tmp result
+	diff proba.bin result
+	@echo compress using zlibh
+	./fse32 -fz proba.bin tmp
+	./fse32 -df tmp result
 	diff proba.bin result
 	rm result
 	rm tmp

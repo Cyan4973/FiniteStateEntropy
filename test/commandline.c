@@ -43,7 +43,7 @@
 #include <stdio.h>    /* fprintf */
 #include <string.h>   /* strcmp, strcat */
 #include "bench.h"
-#include "fileio.h"
+#include "fileio.h"   /* FIO_setCompressor */
 
 
 /***************************************************
@@ -94,16 +94,16 @@ static int   fse_pause = 0;
 static int usage(void)
 {
     DISPLAY("Usage :\n");
-    DISPLAY("%s [arg] inputFilename [-o [outputFilename]]\n", programName);
+    DISPLAY("%s [arg] inputFilename [outputFilename]\n", programName);
     DISPLAY("Arguments :\n");
     DISPLAY("(default): fse core loop timing tests\n");
-    DISPLAY(" -b : benchmark using fse\n");
-    DISPLAY(" -h : benchmark using huff0\n");
-    DISPLAY(" -z : benchmark using zlib's huffman\n");
+    DISPLAY(" -e : use fse (default)\n");
+    DISPLAY(" -h : use huff0\n");
+    DISPLAY(" -z : use zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
+    DISPLAY(" -b : benchmark mode\n");
     DISPLAY(" -i#: iteration loops [1-9](default : 4), benchmark mode only\n");
     DISPLAY(" -B#: block size (default : 32768), benchmark mode only\n");
-    DISPLAY(" -o : force compression\n");
     DISPLAY(" -H : display help and exit\n");
     return 0;
 }
@@ -128,14 +128,14 @@ static void waitEnter(void)
 int main(int argc, char** argv)
 {
     int   i,
-          forceCompress=0, decode=0, bench=3; /* default action if no argument */
+          forceCompress=1, decode=0, bench=0; /* default action if no argument */
     int   indexFileNames=0;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
     char*  tmpFilenameBuffer   = NULL;
     size_t tmpFilenameSize     = 0;
-    int   nextNameIsOutput = 0;
     char  extension[] = FSE_EXTENSION;
+    FIO_compressor_t compressor = FIO_fse;
 
 
     /* Welcome message */
@@ -147,9 +147,8 @@ int main(int argc, char** argv)
     for(i = 1; i <= argc; i++)
     {
         char* argument = argv[i];
-        nextNameIsOutput --;
 
-        if(!argument) continue;   // Protection if argument empty
+        if(!argument) continue;   /* Protection if argument empty */
 
         // Decode command (note : aggregated commands are allowed)
         if (argument[0]=='-')
@@ -171,25 +170,28 @@ int main(int argc, char** argv)
                 case 'V': DISPLAY(WELCOME_MESSAGE); return 0;   // Version
                 case 'H': usage(); return 0;
 
-                    // compression
-                case 'o': bench=0; nextNameIsOutput=2; break;
-
                     // Decoding
                 case 'd': decode=1; bench=0; break;
 
                     // Benchmark full mode
                 case 'b': bench=1; break;
 
-                    // Benchmark full mode
-                case 'h':
-                    bench=1;
-                    BMK_SetByteCompressor(2);
+                    // fse selection (default)
+                case 'e':
+                    BMK_SetByteCompressor(1);
+                    compressor = FIO_fse;
                     break;
 
-                    // zlib Benchmark mode
+                    // huff0 selection
+                case 'h':
+                    BMK_SetByteCompressor(2);
+                    compressor = FIO_huff0;
+                    break;
+
+                    // zlib mode
                 case 'z':
-                    bench=1;
                     BMK_SetByteCompressor(3);
+                    compressor = FIO_zlibh;
                     break;
 
                     // Test
@@ -251,34 +253,34 @@ int main(int argc, char** argv)
                     }
                     break;
 
-                    // Unrecognised command
+                    /* Unrecognised command */
                 default : badusage();
                 }
             }
             continue;
         }
 
-        // following -o argument
-        if (nextNameIsOutput == 1) { output_filename=argument; continue; }
-
-        // first provided filename is input
+        /* first provided filename is input */
         if (!input_filename) { input_filename=argument; indexFileNames=i; continue; }
+
+        /* second provided filename is output */
+        if (!output_filename) { output_filename=argument; continue; }
     }
 
-    // End of command line reading
+    /* executing commands */
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
 
-    // No input filename ==> use stdin
+    /* No input filename ==> use stdin */
     if(!input_filename) { input_filename=stdinmark; }
 
-    // Check if input is defined as console; trigger an error in this case
-    if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
+    /* Check if input is defined as console; trigger an error in this case */
+    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
-    // Check if benchmark is selected
+    /* Check if benchmark is selected */
     if (bench==1) { BMK_benchFiles(argv+indexFileNames, argc-indexFileNames); goto _end; }
-    if (bench==3) { BMK_benchCore_Files(argv+indexFileNames, argc-indexFileNames); goto _end; }
+    if (bench==3) { BMK_benchCore_Files(argv+indexFileNames, argc-indexFileNames); goto _end; }   /* no longer possible */
 
-    // No output filename ==> try to select one automatically (when possible)
+    /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)
     {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   // Default to stdout whenever possible (i.e. not a console)
@@ -327,7 +329,11 @@ int main(int argc, char** argv)
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)) badusage();
 
     if (decode) FIO_decompressFilename(output_filename, input_filename);
-    else FIO_compressFilename(output_filename, input_filename);
+    else
+    {
+        FIO_setCompressor(compressor);
+        FIO_compressFilename(output_filename, input_filename);
+    }
 
 _end:
     if (fse_pause) waitEnter();

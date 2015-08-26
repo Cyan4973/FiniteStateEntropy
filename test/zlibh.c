@@ -1657,16 +1657,14 @@ dolen:
             return 0;
     }
 inf_leave:
-    return (int)(next-compressed);
+    //return (int)(next-compressed);   // compressed size
+    return (int)(put-dest);          // original size
 }
 
 int ZLIBH_decompress (char* dest, const char* compressed)
 {
     const unsigned char* ip = (const unsigned char*)compressed;
     unsigned char* op = (unsigned char*)dest;
-    int input_used_so_far;
-
-    input_used_so_far = ZLIBH_inflate(op, ip);
-    return input_used_so_far;
+    return ZLIBH_inflate(op, ip);
 }
 
