@@ -135,7 +135,7 @@ typedef   signed long long  S64;
  * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
  *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
  * Method 2 : direct access. This method is portable but violate C standard.
- *            It can generate buggy code on targets which generate assembly depending on alignment.
+ *            It can generate buggy code on targets generating assembly depending on alignment.
  *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
  * See http://fastcompression.blogspot.fr/2015/08/accessing-unaligned-memory.html for details.
  * Prefer these methods in priority order (0 > 1 > 2)
@@ -1904,11 +1904,17 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
                 if (rankLast[nBitsToDecrease-1] == noOne)
                     rankLast[nBitsToDecrease-1] = rankLast[nBitsToDecrease];   // now there is one elt
                 huffNode[rankLast[nBitsToDecrease]].nbBits ++;
-                rankLast[nBitsToDecrease]--;
-				if (huffNode[rankLast[nBitsToDecrease]].nbBits != maxNbBits-nBitsToDecrease)
-                    rankLast[nBitsToDecrease] = noOne;   // rank list emptied
+                if (rankLast[nBitsToDecrease] == 0)
+                    rankLast[nBitsToDecrease] = noOne;
+                else
+                {
+                    rankLast[nBitsToDecrease]--;
+                    if (huffNode[rankLast[nBitsToDecrease]].nbBits != maxNbBits-nBitsToDecrease)
+                        rankLast[nBitsToDecrease] = noOne;   // rank list emptied
+                }
             }
-			while (totalCost < 0)   // Sometimes, cost correction overshoot
+
+			while (totalCost < 0)   /* Sometimes, cost correction overshoot */
 			{
 				if (rankLast[1] == noOne)   /* special case, no weight 1, let's find it back at n */
 				{
