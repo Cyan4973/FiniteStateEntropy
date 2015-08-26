@@ -98,8 +98,17 @@ clean:
 
 test-fse: probagen fse
 	./probagen 20%
-	./fse -f proba.bin -o tmp
-	./fse -df tmp -o result
+	@echo compress using fse
+	./fse -f proba.bin tmp
+	./fse -df tmp result
+	diff proba.bin result
+	@echo compress using huff0
+	./fse -fh proba.bin tmp
+	./fse -df tmp result
+	diff proba.bin result
+	@echo compress using zlibh
+	./fse -fz proba.bin tmp
+	./fse -df tmp result
 	diff proba.bin result
 	rm result
 	rm proba.bin

@@ -54,6 +54,7 @@
 #include <time.h>     /* clock */
 #include "fileio.h"
 #include "fse.h"
+#include "zlibh.h"    /*ZLIBH_compress */
 #include "xxhash.h"
 
 
@@ -111,7 +112,9 @@ typedef unsigned long long  U64;
 #define BIT6  0x40
 #define BIT7  0x80
 
-static const unsigned FIO_magicNumber = 0x183E2308;
+#define FIO_magicNumber_fse   0x183E2308
+#define FIO_magicNumber_huff0 0x183E3308
+#define FIO_magicNumber_zlibh 0x183E4308
 static const unsigned FIO_maxBlockSizeID = 0xB;   /* => 2MB block */
 static const unsigned FIO_blockHeaderSize = 3;
 
@@ -167,8 +170,10 @@ static clock_t g_time = 0;
 **************************************/
 static U32 g_overwrite = 0;
 static U32 g_blockSizeId = FIO_BLOCKSIZEID_DEFAULT;
+FIO_compressor_t g_compressor = FIO_fse;
 
 void FIO_overwriteMode(void) { g_overwrite=1; }
+void FIO_setCompressor(FIO_compressor_t c) { g_compressor = c; }
 
 
 /**************************************
@@ -252,6 +257,12 @@ static void get_fileHandle(const char* input_filename, const char* output_filena
 }
 
 
+size_t FIO_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t srcSize )
+{
+    (void)dstSize;
+    return (size_t)ZLIBH_compress((char*)dst, (const char*)src, (int)srcSize);
+}
+
 /*
 Compressed format :
 MAGICNUMBER - STREAMDESCRIPTOR - BLOCKHEADER - COMPRESSEDBLOCK - STREAMCRC
@@ -280,11 +291,31 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
     size_t sizeCheck;
     size_t inputBlockSize  = FIO_GetBlockSize_FromBlockId(g_blockSizeId);
     XXH32_state_t xxhState;
+    typedef size_t (*compressor_t) (void* dst, size_t dstSize, const void* src, size_t srcSize);
+    compressor_t compressor;
+    unsigned magicNumber;
 
 
     /* Init */
     XXH32_reset (&xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
+    switch (g_compressor)
+    {
+    case FIO_fse:
+        compressor = FSE_compress;
+        magicNumber = FIO_magicNumber_fse;
+        break;
+    case FIO_huff0:
+        compressor = HUF_compress;
+        magicNumber = FIO_magicNumber_huff0;
+        break;
+    case FIO_zlibh:
+        compressor = FIO_ZLIBH_compress;
+        magicNumber = FIO_magicNumber_zlibh;
+        break;
+    default :
+        EXM_THROW(20, "unknown compressor selection");
+    }
 
     /* Allocate Memory */
     in_buff  = (char*)malloc(inputBlockSize);
@@ -292,7 +323,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
 
     /* Write Frame Header */
-    FIO_writeLE32(out_buff, FIO_magicNumber);
+    FIO_writeLE32(out_buff, magicNumber);
     out_buff[4] = (char)g_blockSizeId;          /* Max Block Size descriptor */
     sizeCheck = fwrite(out_buff, 1, FIO_FRAMEHEADERSIZE, foutput);
     if (sizeCheck!=FIO_FRAMEHEADERSIZE) EXM_THROW(22, "Write error : cannot write header");
@@ -310,7 +341,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
         DISPLAYUPDATE(2, "\rRead : %u MB   ", (U32)(filesize>>20));
 
         /* Compress Block */
-        cSize = FSE_compress(out_buff + FIO_blockHeaderSize, FSE_compressBound(inputBlockSize), in_buff, inSize);
+        cSize = compressor(out_buff + FIO_blockHeaderSize, FSE_compressBound(inputBlockSize), in_buff, inSize);
         if (FSE_isError(cSize)) EXM_THROW(23, "Compression error : %s ", FSE_getErrorName(cSize));
 
         /* Write cBlock */
@@ -375,6 +406,13 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
 }
 
 
+
+size_t FIO_ZLIBH_decompress(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)dstSize;
+    return (size_t) ZLIBH_decompress ((char*)dst, (const char*)src);
+}
+
 /*
 Compressed format :
 MAGICNUMBER - STREAMDESCRIPTOR - BLOCKHEADER - COMPRESSEDBLOCK - STREAMCRC
@@ -408,6 +446,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     U32*  magicNumberP = header32;
     size_t inputBufferSize;
     XXH32_state_t xxhState;
+    typedef size_t (*decompressor_t) (void* dst, size_t dstSize, const void* src, size_t srcSize);
+    decompressor_t decompressor = FSE_decompress;
 
 
     /* Init */
@@ -419,7 +459,21 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     if (sizeCheck != FIO_FRAMEHEADERSIZE) EXM_THROW(30, "Read error : cannot read header\n");
 
     magicNumber = FIO_readLE32(magicNumberP);
-    if (magicNumber != FIO_magicNumber) EXM_THROW(31, "Wrong file type : unknown header\n");
+    switch(magicNumber)
+    {
+    case FIO_magicNumber_fse:
+        decompressor = FSE_decompress;
+        break;
+    case FIO_magicNumber_huff0:
+        decompressor = HUF_decompress;
+        break;
+    case FIO_magicNumber_zlibh:
+        decompressor = FIO_ZLIBH_decompress;
+        break;
+    default :
+        EXM_THROW(31, "Wrong file type : unknown header\n");
+    }
+
     blockSizeId = header[4];
     if (blockSizeId > FIO_maxBlockSizeID) EXM_THROW(32, "Wrong version : unknown header flags\n");
     blockSize = FIO_GetBlockSize_FromBlockId(blockSizeId);
@@ -467,7 +521,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
         switch(bType)
         {
           case bt_compressed :
-            rSize = FSE_decompress(out_buff, blockSize, in_buff, cSize);
+            rSize = decompressor(out_buff, blockSize, in_buff, cSize);
             if (FSE_isError(rSize)) EXM_THROW(37, "Decoding error : %s", FSE_getErrorName(rSize));
             break;
           case bt_raw :
