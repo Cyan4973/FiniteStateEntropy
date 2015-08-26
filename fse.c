@@ -127,6 +127,29 @@ typedef   signed long long  S64;
 /****************************************************************
 *  Memory I/O
 *****************************************************************/
+/* FSE_FORCE_MEMORY_ACCESS
+ * By default, access to unaligned memory is controlled by `memcpy()`, which is safe and portable.
+ * Unfortunately, on some target/compiler combinations, the generated assembly is sub-optimal.
+ * The below switch allow to select different access method for improved performance.
+ * Method 0 (default) : use `memcpy()`. Safe and portable.
+ * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
+ *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
+ * Method 2 : direct access. This method is portable but violate C standard.
+ *            It can generate buggy code on targets generating assembly depending on alignment.
+ *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
+ * See http://fastcompression.blogspot.fr/2015/08/accessing-unaligned-memory.html for details.
+ * Prefer these methods in priority order (0 > 1 > 2)
+ */
+#ifndef FSE_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
+#  if defined(__GNUC__) && ( defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || defined(__ARM_ARCH_6T2__) )
+#    define FSE_FORCE_MEMORY_ACCESS 2
+#  elif defined(__INTEL_COMPILER) || \
+  (defined(__GNUC__) && ( defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7S__) ))
+#    define FSE_FORCE_MEMORY_ACCESS 1
+#  endif
+#endif
+
+
 static unsigned FSE_32bits(void)
 {
     return sizeof(void*)==4;
@@ -138,12 +161,63 @@ static unsigned FSE_isLittleEndian(void)
     return one.c[0];
 }
 
+#if defined(FSE_FORCE_MEMORY_ACCESS) && (FSE_FORCE_MEMORY_ACCESS==2)
+
+static U16 FSE_read16(const void* memPtr) { return *(const U16*) memPtr; }
+static U32 FSE_read32(const void* memPtr) { return *(const U32*) memPtr; }
+static U64 FSE_read64(const void* memPtr) { return *(const U64*) memPtr; }
+
+static void FSE_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
+static void FSE_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
+static void FSE_write64(void* memPtr, U64 value) { *(U64*)memPtr = value; }
+
+#elif defined(FSE_FORCE_MEMORY_ACCESS) && (FSE_FORCE_MEMORY_ACCESS==1)
+
+/* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
+/* currently only defined for gcc and icc */
+typedef union { U16 u16; U32 u32; U64 u64; } __attribute__((packed)) unalign;
+
+static U16 FSE_read16(const void* ptr) { return ((const unalign*)ptr)->u16; }
+static U32 FSE_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
+static U64 FSE_read64(const void* ptr) { return ((const unalign*)ptr)->u64; }
+
+static void FSE_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
+static void FSE_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
+static void FSE_write64(void* memPtr, U64 value) { ((unalign*)memPtr)->u64 = value; }
+
+#else
+
 static U16 FSE_read16(const void* memPtr)
 {
-    U16 val;
-    memcpy(&val, memPtr, sizeof(val));
-    return val;
+    U16 val; memcpy(&val, memPtr, sizeof(val)); return val;
 }
+
+static U32 FSE_read32(const void* memPtr)
+{
+    U32 val; memcpy(&val, memPtr, sizeof(val)); return val;
+}
+
+static U64 FSE_read64(const void* memPtr)
+{
+    U64 val; memcpy(&val, memPtr, sizeof(val)); return val;
+}
+
+static void FSE_write16(void* memPtr, U16 value)
+{
+    memcpy(memPtr, &value, sizeof(value));
+}
+
+static void FSE_write32(void* memPtr, U32 value)
+{
+    memcpy(memPtr, &value, sizeof(value));
+}
+
+static void FSE_write64(void* memPtr, U64 value)
+{
+    memcpy(memPtr, &value, sizeof(value));
+}
+
+#endif // FSE_FORCE_MEMORY_ACCESS
 
 static U16 FSE_readLE16(const void* memPtr)
 {
@@ -160,7 +234,7 @@ static void FSE_writeLE16(void* memPtr, U16 val)
 {
     if (FSE_isLittleEndian())
     {
-        memcpy(memPtr, &val, sizeof(val));
+        FSE_write16(memPtr, val);
     }
     else
     {
@@ -168,13 +242,6 @@ static void FSE_writeLE16(void* memPtr, U16 val)
         p[0] = (BYTE)val;
         p[1] = (BYTE)(val>>8);
     }
-}
-
-static U32 FSE_read32(const void* memPtr)
-{
-    U32 val32;
-    memcpy(&val32, memPtr, 4);
-    return val32;
 }
 
 static U32 FSE_readLE32(const void* memPtr)
@@ -192,7 +259,7 @@ static void FSE_writeLE32(void* memPtr, U32 val32)
 {
     if (FSE_isLittleEndian())
     {
-        memcpy(memPtr, &val32, 4);
+        FSE_write32(memPtr, val32);
     }
     else
     {
@@ -202,13 +269,6 @@ static void FSE_writeLE32(void* memPtr, U32 val32)
         p[2] = (BYTE)(val32>>16);
         p[3] = (BYTE)(val32>>24);
     }
-}
-
-static U64 FSE_read64(const void* memPtr)
-{
-    U64 val64;
-    memcpy(&val64, memPtr, 8);
-    return val64;
 }
 
 static U64 FSE_readLE64(const void* memPtr)
@@ -227,7 +287,7 @@ static void FSE_writeLE64(void* memPtr, U64 val64)
 {
     if (FSE_isLittleEndian())
     {
-        memcpy(memPtr, &val64, 8);
+        FSE_write64(memPtr, val64);
     }
     else
     {
@@ -643,13 +703,13 @@ static short FSE_abs(short a)
 ****************************************************************/
 size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog)
 {
-    size_t maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 1;
-    return maxSymbolValue ? maxHeaderSize : FSE_NCOUNTBOUND;
+    size_t maxHeaderSize = (((maxSymbolValue+1) * tableLog) >> 3) + 3;
+    return maxSymbolValue ? maxHeaderSize : FSE_NCOUNTBOUND;  /* maxSymbolValue==0 ? use default */
 }
 
 static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
                                        const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog,
-                                       unsigned safeWrite)
+                                       unsigned writeIsSafe)
 {
     BYTE* const ostart = (BYTE*) header;
     BYTE* out = ostart;
@@ -684,7 +744,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
             {
                 start+=24;
                 bitStream += 0xFFFFU << bitCount;
-                if ((!safeWrite) && (out > oend-2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+                if ((!writeIsSafe) && (out > oend-2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
                 out[0] = (BYTE) bitStream;
                 out[1] = (BYTE)(bitStream>>8);
                 out+=2;
@@ -700,7 +760,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
             bitCount += 2;
             if (bitCount>16)
             {
-                if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+                if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
                 out[0] = (BYTE)bitStream;
                 out[1] = (BYTE)(bitStream>>8);
                 out += 2;
@@ -723,7 +783,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
         }
         if (bitCount>16)
         {
-            if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+            if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
             out[0] = (BYTE)bitStream;
             out[1] = (BYTE)(bitStream>>8);
             out += 2;
@@ -733,7 +793,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
     }
 
     /* flush remaining bitStream */
-    if ((!safeWrite) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
+    if ((!writeIsSafe) && (out > oend - 2)) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* Buffer overflow */
     out[0] = (BYTE)bitStream;
     out[1] = (BYTE)(bitStream>>8);
     out+= (bitCount+7) /8;
@@ -744,15 +804,15 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
 }
 
 
-size_t FSE_writeNCount (void* header, size_t headerBufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+size_t FSE_writeNCount (void* buffer, size_t bufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported */
     if (tableLog < FSE_MIN_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported */
 
-    if (headerBufferSize < FSE_NCountWriteBound(maxSymbolValue, tableLog))
-        return FSE_writeNCount_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
+    if (bufferSize < FSE_NCountWriteBound(maxSymbolValue, tableLog))
+        return FSE_writeNCount_generic(buffer, bufferSize, normalizedCounter, maxSymbolValue, tableLog, 0);
 
-    return FSE_writeNCount_generic(header, headerBufferSize, normalizedCounter, maxSymbolValue, tableLog, 1);
+    return FSE_writeNCount_generic(buffer, bufferSize, normalizedCounter, maxSymbolValue, tableLog, 1);
 }
 
 
@@ -789,8 +849,16 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             while ((bitStream & 0xFFFF) == 0xFFFF)
             {
                 n0+=24;
-                ip+=2;
-                bitStream = FSE_readLE32(ip) >> bitCount;
+                if (ip < iend-5)
+                {
+                    ip+=2;
+                    bitStream = FSE_readLE32(ip) >> bitCount;
+                }
+                else
+                {
+                    bitStream >>= 16;
+                    bitCount+=16;
+                }
             }
             while ((bitStream & 3) == 3)
             {
@@ -802,9 +870,14 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             bitCount += 2;
             if (n0 > *maxSVPtr) return (size_t)-FSE_ERROR_maxSymbolValue_tooSmall;
             while (charnum < n0) normalizedCounter[charnum++] = 0;
-            ip += bitCount>>3;
-            bitCount &= 7;
-            bitStream = FSE_readLE32(ip) >> bitCount;
+            if ((ip <= iend-7) || (ip + (bitCount>>3) <= iend-4))
+            {
+                ip += bitCount>>3;
+                bitCount &= 7;
+                bitStream = FSE_readLE32(ip) >> bitCount;
+            }
+            else
+                bitStream >>= 2;
         }
         {
             const short max = (short)((2*threshold-1)-remaining);
@@ -833,17 +906,16 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             }
 
             {
-                const BYTE* itarget = ip + (bitCount>>3);
-                if (itarget > iend - 4)
+                if ((ip <= iend-7) || (ip + (bitCount>>3) <= iend-4))
                 {
-                    ip = iend - 4;
-                    bitCount -= (int)(8 * (iend - 4 - ip));
+                    ip += bitCount>>3;
+                    bitCount &= 7;
                 }
                 else
                 {
-                    ip = itarget;
-                    bitCount &= 7;
-                }
+                    bitCount -= (int)(8 * (iend - 4 - ip));
+					ip = iend - 4;
+				}
                 bitStream = FSE_readLE32(ip) >> (bitCount & 31);
             }
         }
@@ -892,12 +964,23 @@ void  FSE_freeCTable (FSE_CTable* ct)
 }
 
 
+/* provides the minimum logSize to safely represent a distribution */
+static unsigned FSE_minTableLog(size_t srcSize, unsigned maxSymbolValue)
+{
+	U32 minBitsSrc = FSE_highbit32((U32)(srcSize - 1)) + 1;
+	U32 minBitsSymbols = FSE_highbit32(maxSymbolValue) + 2;
+	U32 minBits = minBitsSrc < minBitsSymbols ? minBitsSrc : minBitsSymbols;
+	return minBits;
+}
+
 unsigned FSE_optimalTableLog(unsigned maxTableLog, size_t srcSize, unsigned maxSymbolValue)
 {
+	U32 maxBitsSrc = FSE_highbit32((U32)(srcSize - 1)) - 2;
     U32 tableLog = maxTableLog;
+	U32 minBits = FSE_minTableLog(srcSize, maxSymbolValue);
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
-    if ((FSE_highbit32((U32)(srcSize - 1)) - 2) < tableLog) tableLog = FSE_highbit32((U32)(srcSize - 1)) - 2;   /* Accuracy can be reduced */
-    if ((FSE_highbit32(maxSymbolValue)+2) > tableLog) tableLog = FSE_highbit32(maxSymbolValue)+2;   /* Need a minimum to safely represent all symbol values */
+	if (maxBitsSrc < tableLog) tableLog = maxBitsSrc;   /* Accuracy can be reduced */
+	if (minBits > tableLog) tableLog = minBits;   /* Need a minimum to safely represent all symbol values */
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) tableLog = FSE_MAX_TABLELOG;
     return tableLog;
@@ -1004,7 +1087,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
     if (tableLog < FSE_MIN_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported size */
     if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_GENERIC;   /* Unsupported size */
-    if ((1U<<tableLog) <= maxSymbolValue) return (size_t)-FSE_ERROR_GENERIC;   /* Too small tableLog, compression potentially impossible */
+    if (tableLog < FSE_minTableLog(total, maxSymbolValue)) return (size_t)-FSE_ERROR_GENERIC;   /* Too small tableLog, compression potentially impossible */
 
     {
         U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
@@ -1483,6 +1566,9 @@ size_t FSE_readBitsFast(FSE_DStream_t* bitD, U32 nbBits)   /* only if nbBits >= 
 
 unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
 {
+	if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* should never happen */
+		return FSE_DStream_tooFar;
+
     if (bitD->ptr >= bitD->start + sizeof(bitD->bitContainer))
     {
         bitD->ptr -= bitD->bitsConsumed >> 3;
@@ -1493,20 +1579,19 @@ unsigned FSE_reloadDStream(FSE_DStream_t* bitD)
     if (bitD->ptr == bitD->start)
     {
         if (bitD->bitsConsumed < sizeof(bitD->bitContainer)*8) return FSE_DStream_endOfBuffer;
-        if (bitD->bitsConsumed == sizeof(bitD->bitContainer)*8) return FSE_DStream_completed;
-        return FSE_DStream_tooFar;
+        return FSE_DStream_completed;
     }
     {
         U32 nbBytes = bitD->bitsConsumed >> 3;
         U32 result = FSE_DStream_unfinished;
         if (bitD->ptr - nbBytes < bitD->start)
         {
-            nbBytes = (U32)(bitD->ptr - bitD->start);  /* note : necessarily ptr > start */
+            nbBytes = (U32)(bitD->ptr - bitD->start);  /* ptr > start */
             result = FSE_DStream_endOfBuffer;
         }
         bitD->ptr -= nbBytes;
         bitD->bitsConsumed -= nbBytes*8;
-        bitD->bitContainer = FSE_readLEST(bitD->ptr);   /* note : necessarily srcSize > sizeof(bitD) */
+        bitD->bitContainer = FSE_readLEST(bitD->ptr);   /* reminder : srcSize > sizeof(bitD) */
         return result;
     }
 }
@@ -1819,11 +1904,17 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
                 if (rankLast[nBitsToDecrease-1] == noOne)
                     rankLast[nBitsToDecrease-1] = rankLast[nBitsToDecrease];   // now there is one elt
                 huffNode[rankLast[nBitsToDecrease]].nbBits ++;
-                rankLast[nBitsToDecrease]--;
-				if (huffNode[rankLast[nBitsToDecrease]].nbBits != maxNbBits-nBitsToDecrease)
-                    rankLast[nBitsToDecrease] = noOne;   // rank list emptied
+                if (rankLast[nBitsToDecrease] == 0)
+                    rankLast[nBitsToDecrease] = noOne;
+                else
+                {
+                    rankLast[nBitsToDecrease]--;
+                    if (huffNode[rankLast[nBitsToDecrease]].nbBits != maxNbBits-nBitsToDecrease)
+                        rankLast[nBitsToDecrease] = noOne;   // rank list emptied
+                }
             }
-			while (totalCost < 0)   // Sometimes, cost correction overshoot
+
+			while (totalCost < 0)   /* Sometimes, cost correction overshoot */
 			{
 				if (rankLast[1] == noOne)   /* special case, no weight 1, let's find it back at n */
 				{
@@ -1972,6 +2063,7 @@ size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size
     FSE_CStream_t bitC;
 
     /* init */
+	if (dstSize < 8) return 0;
     op += 6;   /* jump Table -- could be optimized by delta / deviation */
     errorCode = FSE_initCStream(&bitC, op, oend-op);
     if (FSE_isError(errorCode)) return 0;

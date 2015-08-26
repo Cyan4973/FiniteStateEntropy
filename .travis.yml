@@ -10,11 +10,11 @@ before_install:
   - sudo apt-get install -qq valgrind
 
 env:
-  - TravisCi_FseTest=test
-  - TravisCi_FseTest=test32
-  - TravisCi_FseTest=memtest
-  - TravisCi_FseTest=gpptest
-  - TravisCi_FseTest=armtest
   - TravisCi_FseTest=clangtest
+  - TravisCi_FseTest=armtest
+  - TravisCi_FseTest=gpptest
+  - TravisCi_FseTest=test
   - TravisCi_FseTest=sanitize
+  - TravisCi_FseTest="-C test test32"
+  - TravisCi_FseTest="-C test memtest"
 

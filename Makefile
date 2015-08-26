@@ -30,42 +30,33 @@ PROGDIR?= test
 default: test
 
 all:
-	@cd $(PROGDIR); $(MAKE) all
+	$(MAKE) -C $(PROGDIR) all
 
 test:
-	@cd $(PROGDIR); $(MAKE) test
-
-test32:
-	@cd $(PROGDIR); $(MAKE) test32
-
-memtest:
-	@cd $(PROGDIR); $(MAKE) memtest
+	$(MAKE) -C $(PROGDIR) test
 
 clean:
-	@cd $(PROGDIR); $(MAKE) clean
-
-test-all: clean
-	@cd $(PROGDIR); $(MAKE) test-all
+	$(MAKE) -C $(PROGDIR) clean
 
 gpptest: clean
 	@echo ---- test g++ compilation ----
-	@cd $(PROGDIR); $(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 armtest: clean
 	@echo ---- test ARM compilation ----
-	@cd $(PROGDIR); $(MAKE) bin CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
+	$(MAKE) -C $(PROGDIR) bin CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
 
 clangtest: clean
 	@echo ---- test clang compilation ----
-	@cd $(PROGDIR); $(MAKE) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
+	$(MAKE) -C $(PROGDIR) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
 
 staticAnalyze: clean
 	@echo ---- static analyzer - scan-build ----
-	@cd $(PROGDIR); scan-build --status-bugs -v $(MAKE) all CFLAGS=-g   # does not work well; too many false positives
+	scan-build --status-bugs -v $(MAKE) -C $(PROGDIR) all CFLAGS=-g   # does not work well; too many false positives
 
 sanitize: clean
 	@echo ---- check undefined behavior - sanitize ----
-	@cd $(PROGDIR); $(MAKE) test   CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
-	@cd $(PROGDIR); $(MAKE) test32 CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	$(MAKE) test   -C $(PROGDIR) CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	$(MAKE) test32 -C $(PROGDIR) CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
 
 

@@ -463,6 +463,20 @@ static void unitTest(void)
         CHECK(crcOrig != crcVerif, "Raw regenerated data is corrupted");
     }
 
+    /* known corner case */
+    {
+        BYTE sample8[8] = { 0, 0, 0, 2, 0, 0, 0, 0 };
+        BYTE* rBuff;
+        errorCode = FSE_compress(cBuff, TBSIZE, sample8, 8);
+        CHECK(FSE_isError(errorCode), "FSE_compress failed compressing sample8");
+        rBuff = (BYTE*)malloc(errorCode);   /* in order to catch read overflow with Valgrind */
+        CHECK(rBuff==NULL, "Not enough memory for rBuff");
+        memcpy(rBuff, cBuff, errorCode);
+        errorCode = FSE_decompress(verifBuff, sizeof(sample8), rBuff, errorCode);
+        CHECK(errorCode != sizeof(sample8), "FSE_decompress failed regenerating sample8");
+        free(rBuff);
+    }
+
     free(testBuff);
     free(cBuff);
     free(verifBuff);
