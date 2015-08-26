@@ -235,13 +235,15 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 }
 
                 /* decompression test */
-                U32 hashEnd;
-                BYTE saved = (bufferVerif[sizeOrig] = 253);
-                size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                CHECK(bufferVerif[sizeOrig] != saved, "(bufferVerif) Output buffer overflow");
-                CHECK(FSE_isError(result), "Decompression failed");
-                hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
+                {
+                    U32 hashEnd;
+                    BYTE saved = (bufferVerif[sizeOrig] = 253);
+                    size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                    CHECK(bufferVerif[sizeOrig] != saved, "(bufferVerif) Output buffer overflow");
+                    CHECK(FSE_isError(result), "Decompression failed");
+                    hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                    CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
+                }
             }
         }
 
