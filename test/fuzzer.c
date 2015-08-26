@@ -474,6 +474,7 @@ static void unitTest(void)
         memcpy(rBuff, cBuff, errorCode);
         errorCode = FSE_decompress(verifBuff, sizeof(sample8), rBuff, errorCode);
         CHECK(errorCode != sizeof(sample8), "FSE_decompress failed regenerating sample8");
+        free(rBuff);
     }
 
     free(testBuff);
