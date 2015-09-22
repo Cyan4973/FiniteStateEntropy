@@ -267,8 +267,7 @@ int main(int argc, char** argv)
         if (!output_filename) { output_filename=argument; continue; }
     }
 
-    /* executing commands */
-    DISPLAYLEVEL(3, WELCOME_MESSAGE);
+    /* DISPLAYLEVEL(3, WELCOME_MESSAGE); */
 
     /* No input filename ==> use stdin */
     if(!input_filename) { input_filename=stdinmark; }

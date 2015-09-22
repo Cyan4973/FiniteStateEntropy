@@ -63,9 +63,9 @@ extern "C" {
 #define HUF_COMPRESSBOUND(size) (HUF_CTABLEBOUND + HUF_BLOCKBOUND(size))   /* Macro version, useful for static allocation */
 
 /* You can statically allocate Huff0 DTable as a table of unsigned short using below macro */
-#define HUF_DTABLE_SIZE_U16(maxTableLog)   (1 + (1<<maxTableLog))
+#define HUF_DTABLE_SIZE_U32(maxTableLog)   ((1 + (1<<maxTableLog)))
 #define HUF_CREATE_STATIC_DTABLE(DTable, maxTableLog) \
-        unsigned short DTable[HUF_DTABLE_SIZE_U16(maxTableLog)] = { maxTableLog }
+        unsigned int DTable[HUF_DTABLE_SIZE_U32(maxTableLog)] = { maxTableLog }
 
 
 /******************************************

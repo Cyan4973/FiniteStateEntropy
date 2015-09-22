@@ -216,7 +216,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     default : bufferTest = bufferP100 + offset; break;
                 }
             }
-            DISPLAYLEVEL (4,"%3i ", tag++);;
+            DISPLAYLEVEL (4,"%3i ", tag++);
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
 
             /* compression test */
@@ -226,12 +226,11 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             {
                 /* failed compression test */
                 {
+                    BYTE saved = (bufferVerif[sizeCompressed-1] = 253);
                     size_t errorCode;
-                    void* tooSmallDBuffer = malloc(sizeCompressed-1);   /* overflow will be detected by Valgrind */
-                    CHECK(tooSmallDBuffer==NULL, "not enough memory for test tooSmallDBuffer");
-                    errorCode = HUF_compress (tooSmallDBuffer, sizeCompressed-1, bufferTest, sizeOrig);
+                    errorCode = HUF_compress (bufferVerif, sizeCompressed-1, bufferTest, sizeOrig);
                     CHECK(errorCode!=0, "compression should have failed (too small destination buffer)")
-                    free(tooSmallDBuffer);
+                    CHECK(bufferVerif[sizeCompressed-1] != saved, "HUF_compress w/ too small dst : bufferVerif overflow");
                 }
 
                 /* decompression test */
@@ -239,10 +238,26 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     U32 hashEnd;
                     BYTE saved = (bufferVerif[sizeOrig] = 253);
                     size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
-                    CHECK(bufferVerif[sizeOrig] != saved, "(bufferVerif) Output buffer overflow");
+                    CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress : bufferVerif overflow");
                     CHECK(FSE_isError(result), "Decompression failed");
                     hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
                     CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
+                }
+
+                /* truncated src decompression test */
+                if (sizeCompressed>4)
+                {
+                    /* note : in some rare cases, the truncated bitStream may still generate by chance a valid output of correct size.
+                              It typically requires `missing` to be small; hence a minimum value of `missing` for this test */
+                    size_t errorCode;
+                    const size_t missing = (FUZ_rand(&roundSeed) % (sizeCompressed-3)) + 2;   /* no problem, as sizeCompressed > 4 */
+                    const size_t tooSmallSize = sizeCompressed - missing;
+                    void* cBufferTooSmall = malloc(tooSmallSize);   /* valgrind will catch read overflows */
+                    CHECK(cBufferTooSmall == NULL, "not enough memory !");
+                    memcpy(cBufferTooSmall, bufferDst, tooSmallSize);
+                    errorCode = HUF_decompress(bufferVerif, sizeOrig, cBufferTooSmall, tooSmallSize);
+                    CHECK(!FSE_isError(errorCode) && (errorCode!=sizeOrig), "HUF_decompress should have failed ! (truncated src buffer)");
+                    free(cBufferTooSmall);
                 }
             }
         }
@@ -256,7 +271,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = HUF_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
             CHECK(!FSE_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
-            CHECK(bufferDst[maxDstSize] != saved, "Decompression output buffer overflow");
+            CHECK(bufferDst[maxDstSize] != saved, "HUF_decompress noise : bufferDst overflow");
         }
     }
 

@@ -30,25 +30,25 @@ PROGDIR?= test
 default: test
 
 all:
-	$(MAKE) -C $(PROGDIR) all
+	$(MAKE) -C $(PROGDIR) $@
 
 test:
-	$(MAKE) -C $(PROGDIR) test
+	$(MAKE) -C $(PROGDIR) $@
 
 clean:
-	$(MAKE) -C $(PROGDIR) clean
+	$(MAKE) -C $(PROGDIR) $@
 
 gpptest: clean
 	@echo ---- test g++ compilation ----
-	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -I.. -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 armtest: clean
 	@echo ---- test ARM compilation ----
-	$(MAKE) -C $(PROGDIR) bin CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror"
+	CFLAGS="-O3 -Werror" $(MAKE) -C $(PROGDIR) bin CC=arm-linux-gnueabi-gcc
 
 clangtest: clean
 	@echo ---- test clang compilation ----
-	$(MAKE) -C $(PROGDIR) all CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" CC=clang $(MAKE) -C $(PROGDIR) all
 
 staticAnalyze: clean
 	@echo ---- static analyzer - scan-build ----
@@ -56,7 +56,7 @@ staticAnalyze: clean
 
 sanitize: clean
 	@echo ---- check undefined behavior - sanitize ----
-	$(MAKE) test   -C $(PROGDIR) CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
-	$(MAKE) test32 -C $(PROGDIR) CC=clang MOREFLAGS="-g -fsanitize=undefined" FSETEST="-i5000" FSEU16TEST=-i2000
+	CC=clang CFLAGS="-g -O3 -fsanitize=undefined" $(MAKE) -C $(PROGDIR) test   FSETEST="-i5000" FSEU16TEST=-i2000
+	CC=clang CFLAGS="-g -O3 -fsanitize=undefined" $(MAKE) -C $(PROGDIR) test32 FSETEST="-i5000" FSEU16TEST=-i2000
 
 

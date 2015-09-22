@@ -26,10 +26,8 @@
 RELEASE    = v0.3.0
 
 DESTDIR   ?=
-CFLAGS    ?= -O3
-MOREFLAGS ?=
-CFLAGS    += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
-LDFLAGS    = -I..
+CFLAGS    ?= -O3 -falign-loops=32
+CFLAGS    += -I.. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
 FLAGS      = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(MOREFLAGS)
 CF32       = -m32
 FSETEST   ?=
@@ -98,15 +96,15 @@ clean:
 
 test-fse: probagen fse
 	./probagen 20%
-	@echo compress using fse
+	@echo "**** compress using fse ****"
 	./fse -f proba.bin tmp
 	./fse -df tmp result
 	diff proba.bin result
-	@echo compress using huff0
+	@echo "**** compress using huff0 ****"
 	./fse -fh proba.bin tmp
 	./fse -df tmp result
 	diff proba.bin result
-	@echo compress using zlibh
+	@echo "**** compress using zlibh ****"
 	./fse -fz proba.bin tmp
 	./fse -df tmp result
 	diff proba.bin result

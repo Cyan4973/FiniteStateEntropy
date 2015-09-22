@@ -730,6 +730,7 @@ static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
 static size_t g_skip;
 static size_t g_cSize;
+static size_t g_oSize;
 HUF_CREATE_STATIC_DTABLE(g_huff_dtable, 16);
 
 size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
@@ -746,7 +747,7 @@ static int local_HUF_writeCTable(void* dst, size_t dstSize, const void* src, siz
     return (int)HUF_writeCTable(dst, dstSize, g_tree, g_max, g_tableLog);
 }
 
-size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable);
+size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, const HUF_CElt* CTable);
 static int local_HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)HUF_compress_usingCTable(dst, dstSize, src, srcSize, g_tree);
@@ -786,7 +787,7 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
 static int local_FSE_compress_usingCTable_tooSmall(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return (int)FSE_compress_usingCTable(dst, FSE_compressBound(srcSize)-1, src, srcSize, g_CTable);
+    return (int)FSE_compress_usingCTable(dst, FSE_BLOCKBOUND(srcSize)-1, src, srcSize, g_CTable);
 }
 
 static int local_FSE_readNCount(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
@@ -817,11 +818,11 @@ static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, s
 
 static int local_HUF_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    (void)srcSize;
-    return (int)HUF_decompress(dst, maxDstSize, src, g_cSize);
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress(dst, g_oSize, src, g_cSize);
 }
 
-size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize);
+size_t HUF_readDTable (U32* DTable, const void* src, size_t srcSize);
 static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)maxDstSize; (void)srcSize;
@@ -829,7 +830,7 @@ static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, s
 }
 
 // unimplemented
-size_t HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable)
+size_t HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U32* DTable)
 { (void)dst; (void)maxDstSize; (void)cSrc; (void)cSrcSize; (void)DTable; return 0; }
 static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
@@ -847,10 +848,10 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     const char* funcName;
     int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
 
-    // init
+    /* Init */
     memcpy(oBuffer, buffer, blockSize);
 
-    // Bench selection
+    /* Bench selection */
     switch (algNb)
     {
     case 1:
@@ -917,7 +918,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
-            funcName = "FSE_compress_usingCTable_tooSmall";
+            funcName = "FSE_compress_usingCTable_smallDst";
             func = local_FSE_compress_usingCTable_tooSmall;
             break;
         }
@@ -1004,6 +1005,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 30:
         {
+            g_oSize = benchedSize;
             g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             memcpy(oBuffer, cBuffer, g_cSize);
             funcName = "HUF_decompress";
@@ -1089,13 +1091,13 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         goto _end;
     }
 
-    // Bench
+    /* Bench */
     DISPLAY("\r%79s\r", "");
     {
         double bestTime = 999.;
         U32 benchNb=1;
         size_t errorCode = 0;
-        DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
+        DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -1114,9 +1116,9 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-26.26s : %8.1f MB/s \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2u-%-34.34s : %8.1f MB/s \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
         }
-        DISPLAY("%2u#%-26.26s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#%-34.34s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
 _end:
