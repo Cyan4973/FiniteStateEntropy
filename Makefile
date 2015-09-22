@@ -23,7 +23,7 @@
 # This is just a launcher for the Makefile within test directory
 # #####################################################################
 
-PROGDIR?= test
+PROGDIR?= programs
 
 .PHONY: clean test
 
