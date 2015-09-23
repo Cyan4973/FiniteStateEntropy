@@ -40,7 +40,7 @@ clean:
 
 gpptest: clean
 	@echo ---- test g++ compilation ----
-	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -I.. -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 armtest: clean
 	@echo ---- test ARM compilation ----
@@ -52,7 +52,7 @@ clangtest: clean
 
 staticAnalyze: clean
 	@echo ---- static analyzer - scan-build ----
-	scan-build --status-bugs -v $(MAKE) -C $(PROGDIR) all CFLAGS=-g   # does not work well; too many false positives
+	scan-build --status-bugs -v $(MAKE) -C $(PROGDIR) all CFLAGS="-g -I../lib"   # does not work well; too many false positives
 
 sanitize: clean
 	@echo ---- check undefined behavior - sanitize ----

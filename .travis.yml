@@ -15,6 +15,6 @@ env:
   - TravisCi_FseTest=gpptest
   - TravisCi_FseTest=test
   - TravisCi_FseTest=sanitize
-  - TravisCi_FseTest="-C test test32"
-  - TravisCi_FseTest="-C test memtest"
+  - TravisCi_FseTest="-C programs test32"
+  - TravisCi_FseTest="-C programs memtest"
 

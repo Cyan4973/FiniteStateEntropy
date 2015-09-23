@@ -2109,6 +2109,7 @@ static size_t HUF_compress_into4Segments(void* dst, size_t dstSize, const void* 
     BYTE* const oend = ostart + dstSize;
 
     if (dstSize < 6 + 1 + 1 + 1 + 8) return 0;   /* minimum space to compress successfully */
+    if (srcSize < 12) return 0;   /* no saving possible : too small input */
     op += 6;   /* jumpTable */
 
     errorCode = HUF_compress_usingCTable(op, oend-op, ip, segmentSize, CTable);
@@ -2173,6 +2174,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
     /* Write table description header */
     errorCode = HUF_writeCTable (op, dstSize, CTable, maxSymbolValue, huffLog);
     if (FSE_isError(errorCode)) return errorCode;
+    if (errorCode + 12 >= srcSize) return 0;   /* not useful to try compression */
     op += errorCode;
 
     /* Compress */
