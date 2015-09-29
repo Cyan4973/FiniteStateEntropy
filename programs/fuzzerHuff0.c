@@ -38,29 +38,9 @@ You can contact the author at :
 #include <stdio.h>      /* printf */
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
-#include "fse_static.h"
+#include "mem.h"
+#include "huff0_static.h"
 #include "xxhash.h"
-
-
-/****************************************************************
-*  Basic Types
-****************************************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef  int16_t S16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef   signed short      S16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-#endif
 
 
 /***************************************************
@@ -81,7 +61,7 @@ typedef unsigned long long  U64;
 ***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
+static unsigned displayLevel = 2;   /* 0 : no display; 1: errors; 2 : + result + interaction + warnings; 3 : + progression; 4 : + information */
 
 
 /***************************************************
@@ -221,7 +201,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 
             /* compression test */
             sizeCompressed = HUF_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            CHECK(FSE_isError(sizeCompressed), "Compression failed");
+            CHECK(HUF_isError(sizeCompressed), "Compression failed");
             if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
             {
                 /* failed compression test */
@@ -239,7 +219,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     BYTE saved = (bufferVerif[sizeOrig] = 253);
                     size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress : bufferVerif overflow");
-                    CHECK(FSE_isError(result), "Decompression failed");
+                    CHECK(HUF_isError(result), "Decompression failed");
                     hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
                     CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
                 }
@@ -256,7 +236,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     CHECK(cBufferTooSmall == NULL, "not enough memory !");
                     memcpy(cBufferTooSmall, bufferDst, tooSmallSize);
                     errorCode = HUF_decompress(bufferVerif, sizeOrig, cBufferTooSmall, tooSmallSize);
-                    CHECK(!FSE_isError(errorCode) && (errorCode!=sizeOrig), "HUF_decompress should have failed ! (truncated src buffer)");
+                    CHECK(!HUF_isError(errorCode) && (errorCode!=sizeOrig), "HUF_decompress should have failed ! (truncated src buffer)");
                     free(cBufferTooSmall);
                 }
             }
@@ -270,7 +250,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = HUF_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
-            CHECK(!FSE_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
+            CHECK(!HUF_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
             CHECK(bufferDst[maxDstSize] != saved, "HUF_decompress noise : bufferDst overflow");
         }
     }
@@ -293,7 +273,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 static void unitTest(void)
 {
     BYTE* testBuff = (BYTE*)malloc(TBSIZE);
-    BYTE* cBuff = (BYTE*)malloc(FSE_COMPRESSBOUND(TBSIZE));
+    BYTE* cBuff = (BYTE*)malloc(HUF_COMPRESSBOUND(TBSIZE));
     BYTE* verifBuff = (BYTE*)malloc(TBSIZE);
 
     if ((!testBuff) || (!cBuff) || (!verifBuff))

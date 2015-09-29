@@ -54,6 +54,7 @@
 #include <time.h>     /* clock */
 #include "fileio.h"
 #include "fse.h"
+#include "huff0.h"
 #include "zlibh.h"    /*ZLIBH_compress */
 #include "xxhash.h"
 

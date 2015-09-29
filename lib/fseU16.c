@@ -99,12 +99,12 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     const U16* ip;
 
     BYTE* op = (BYTE*) dst;
-    FSE_CStream_t bitC;
+    BIT_CStream_t bitC;
     FSE_CState_t CState;
 
 
     /* init */
-    FSE_initCStream(&bitC, op, maxDstSize);
+    BIT_initCStream(&bitC, op, maxDstSize);
     FSE_initCState(&CState, ct);
 
     ip=iend;
@@ -113,7 +113,7 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     if (srcSize & 1)
     {
         FSE_encodeSymbol(&bitC, &CState, *--ip);
-        FSE_flushBits(&bitC);
+        BIT_flushBits(&bitC);
     }
 
     /* join to mod 4 */
@@ -121,7 +121,7 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     {
         FSE_encodeSymbol(&bitC, &CState, *--ip);
         FSE_encodeSymbol(&bitC, &CState, *--ip);
-        FSE_flushBits(&bitC);
+        BIT_flushBits(&bitC);
     }
 
     /* 2 or 4 encoding per loop */
@@ -130,7 +130,7 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
         FSE_encodeSymbol(&bitC, &CState, *--ip);
 
         if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* This test must be static */
-            FSE_flushBits(&bitC);
+            BIT_flushBits(&bitC);
 
         FSE_encodeSymbol(&bitC, &CState, *--ip);
 
@@ -140,11 +140,11 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
             FSE_encodeSymbol(&bitC, &CState, *--ip);
         }
 
-        FSE_flushBits(&bitC);
+        BIT_flushBits(&bitC);
     }
 
     FSE_flushCState(&bitC, &CState);
-    return FSE_closeCStream(&bitC);
+    return BIT_closeCStream(&bitC);
 }
 
 
@@ -170,8 +170,8 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     if (srcSize <= 1) return srcSize;
     if (!maxSymbolValue) maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
-    if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return (size_t)-FSE_ERROR_maxSymbolValue_tooLarge;
-    if (tableLog > FSE_MAX_TABLELOG) return (size_t)-FSE_ERROR_tableLog_tooLarge;
+    if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return ERROR(maxSymbolValue_tooLarge);
+    if (tableLog > FSE_MAX_TABLELOG) return ERROR(tableLog_tooLarge);
 
     /* Scan for stats */
     errorCode = FSE_countU16 (counting, &maxSymbolValue, ip, srcSize);
@@ -205,7 +205,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 *  U16 Decompression functions
 *********************************************************/
 
-U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
+U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD)
 {
     const FSE_decode_tU16 DInfo = ((const FSE_decode_tU16*)(DStatePtr->table))[DStatePtr->state];
     U16 symbol;
@@ -213,7 +213,7 @@ U16 FSE_decodeSymbolU16(FSE_DState_t* DStatePtr, FSE_DStream_t* bitD)
     const U32 nbBits = DInfo.nbBits;
 
     symbol = (U16)(DInfo.symbol);
-    lowBits = FSE_readBits(bitD, nbBits);
+    lowBits = BIT_readBits(bitD, nbBits);
     DStatePtr->state = DInfo.newState + lowBits;
 
     return symbol;
@@ -227,20 +227,20 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     U16* const ostart = dst;
     U16* op = ostart;
     U16* const oend = ostart + maxDstSize;
-    FSE_DStream_t bitD;
+    BIT_DStream_t bitD;
     FSE_DState_t state;
 
     /* Init */
     memset(&bitD, 0, sizeof(bitD));
-    FSE_initDStream(&bitD, cSrc, cSrcSize);
+    BIT_initDStream(&bitD, cSrc, cSrcSize);
     FSE_initDState(&state, &bitD, dt);
 
-    while((FSE_reloadDStream(&bitD) < 2) && (op<oend))
+    while((BIT_reloadDStream(&bitD) < 2) && (op<oend))
     {
         *op++ = FSE_decodeSymbolU16(&state, &bitD);
     }
 
-    if (!FSE_endOfDStream(&bitD)) return (size_t)-FSE_ERROR_GENERIC;
+    if (!BIT_endOfDStream(&bitD)) return ERROR(GENERIC);
 
     return op-ostart;
 }
@@ -258,7 +258,7 @@ size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
     size_t errorCode;
 
     /* Sanity check */
-    if (cSrcSize<2) return (size_t)-FSE_ERROR_srcSize_wrong;   /* specific corner cases (uncompressed & rle) */
+    if (cSrcSize<2) return ERROR(srcSize_wrong);   /* specific corner cases (uncompressed & rle) */
 
     /* normal FSE decoding mode */
     errorCode = FSE_readNCount (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);

@@ -38,29 +38,9 @@ You can contact the author at :
 #include <stdio.h>      /* printf */
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
+#include "mem.h"
 #include "fse_static.h"
 #include "xxhash.h"
-
-
-/****************************************************************
-*  Basic Types
-****************************************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef  int16_t S16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef   signed short      S16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-#endif
 
 
 /***************************************************
