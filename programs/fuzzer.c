@@ -367,6 +367,7 @@ static void unitTest(void)
 
     /* FSE_writeNCount, FSE_readNCount */
     {
+        #define MAXNCOUNTSIZE 513
         S16 norm[129];
         BYTE header[513];
         U32 max, tableLog, i;
@@ -381,8 +382,9 @@ static void unitTest(void)
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
         headerSize = FSE_NCountWriteBound(max, tableLog);
+        CHECK(headerSize > MAXNCOUNTSIZE, "Error : not enough memory for NCount");
 
-        headerSize = FSE_writeNCount(header, 513, norm, max, tableLog);
+        headerSize = FSE_writeNCount(header, headerSize, norm, max, tableLog);
         CHECK(FSE_isError(headerSize), "Error : FSE_writeNCount() should have worked");
 
         header[headerSize-1] = 0;

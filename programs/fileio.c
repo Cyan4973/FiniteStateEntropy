@@ -322,6 +322,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
     }
 
     /* Allocate Memory */
+	if (inputBlockSize==0) EXM_THROW(0, "impossible problem, to please static analyzer");
     in_buff  = (char*)malloc(inputBlockSize);
     out_buff = (char*)malloc(FSE_compressBound(inputBlockSize) + 5);
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");

@@ -1644,8 +1644,8 @@ dolen:
                     goto dolen;
                 }
                 else if (codebits & 32) {                     /* end-of-block */
-                    len = bits >> 3;                            /* restitute unused bytes */
-                    next -= len;
+                    len = bits >> 3;                          /* restitute unused bytes */
+                    //next -= len;
                     break;
                 }
             } while (1);

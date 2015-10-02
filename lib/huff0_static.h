@@ -46,17 +46,26 @@ extern "C" {
 
 
 /******************************************
-*  Static allocation
+*  Static allocation macros
 ******************************************/
 /* Huff0 buffer bounds */
 #define HUF_CTABLEBOUND 129
-#define HUF_BLOCKBOUND(size) (size + (size>>8) + 8)   /* only true if pre-filtered with fast heuristic */
+#define HUF_BLOCKBOUND(size) (size + (size>>8) + 8)   /* only true if incompressible pre-filtered with fast heuristic */
 #define HUF_COMPRESSBOUND(size) (HUF_CTABLEBOUND + HUF_BLOCKBOUND(size))   /* Macro version, useful for static allocation */
 
-/* You can statically allocate Huff0's DTable using below macro */
-#define HUF_DTABLE_SIZE_U32(maxTableLog)   ((1 + (1<<maxTableLog)))
-#define HUF_CREATE_STATIC_DTABLE(DTable, maxTableLog) \
-        unsigned int DTable[HUF_DTABLE_SIZE_U32(maxTableLog)] = { maxTableLog }
+/* static allocation of Huff0's DTable */
+#define HUF_DTABLE_SIZE(maxTableLog)   ((1 + (1<<maxTableLog)))  /* nb Cells; use unsigned short for X2, unsigned int for X4 */
+#define HUF_CREATE_STATIC_DTABLEX2(DTable, maxTableLog) \
+        unsigned short DTable[HUF_DTABLE_SIZE(maxTableLog)] = { maxTableLog }
+#define HUF_CREATE_STATIC_DTABLEX4(DTable, maxTableLog) \
+        unsigned int DTable[HUF_DTABLE_SIZE(maxTableLog)] = { maxTableLog }
+
+
+/******************************************
+*  Advanced functions
+******************************************/
+size_t HUF_decompress4X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* multi-symbols decoder */
+size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
 
 
 #if defined (__cplusplus)

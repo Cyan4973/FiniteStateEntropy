@@ -265,7 +265,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     const unsigned step = FSE_tableStep(tableSize);
     unsigned cumul[FSE_MAX_SYMBOL_VALUE+2];
     U32 position = 0;
-    FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE]; /* init not necessary, but analyzer complain about it */
+    FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE]; /* init isn't necessary, even if static analyzer complain about it */
     U32 highThreshold = tableSize-1;
     unsigned symbol;
     unsigned i;
