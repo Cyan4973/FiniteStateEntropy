@@ -56,14 +56,14 @@ extern "C" {
 /******************************************
 *  Error Management
 ******************************************/
-#define PREFIX(name) FSE_ERROR_##name
+#define PREFIX(name) NewGenEntropyLib_error_##name
 
 #define ERROR(name) (size_t)-PREFIX(name)
 
 #define ERROR_LIST(ITEM) \
         ITEM(PREFIX(No_Error)) ITEM(PREFIX(GENERIC)) \
         ITEM(PREFIX(dstSize_tooSmall)) ITEM(PREFIX(srcSize_wrong)) \
-        ITEM(PREFIX(corruptionDetected)) \
+        ITEM(PREFIX(corruption_detected)) \
         ITEM(PREFIX(tableLog_tooLarge)) ITEM(PREFIX(maxSymbolValue_tooLarge)) ITEM(PREFIX(maxSymbolValue_tooSmall)) \
         ITEM(PREFIX(maxCode))
 

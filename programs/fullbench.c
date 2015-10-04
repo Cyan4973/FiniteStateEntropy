@@ -1218,7 +1218,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-34.34s : %8.1f MB/s \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6i) \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
         }
         DISPLAY("%2u#%-34.34s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }

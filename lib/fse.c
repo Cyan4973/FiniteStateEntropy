@@ -1258,7 +1258,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
 
     if (op==omax) return ERROR(dstSize_tooSmall);   /* dst buffer is full, but cSrc unfinished */
 
-    return ERROR(corruptionDetected);
+    return ERROR(corruption_detected);
 }
 
 
