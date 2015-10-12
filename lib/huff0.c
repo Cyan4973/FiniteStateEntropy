@@ -35,11 +35,17 @@
 /****************************************************************
 *  Compiler specifics
 ****************************************************************/
+#if defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+/* inline is defined */
+#elif defined(_MSC_VER)
+#  define inline __inline
+#else
+#  define inline /* disable inline */
+#endif
+
+
 #ifdef _MSC_VER    /* Visual Studio */
 #  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    /* For Visual 2005 */
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
 #else
 #  ifdef __GNUC__
 #    define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
@@ -683,6 +689,30 @@ static BYTE HUF_decodeSymbolX2(BIT_DStream_t* Dstream, const HUF_DEltX2* dt, con
 	if (MEM_64bits()) \
         HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
 
+static inline size_t HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* const bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
+{
+    BYTE* const pStart = p;
+
+    /* up to 4 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-4))
+    {
+        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_1(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+    }
+
+    /* closer to the end */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p < pEnd))
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+
+    /* no more data to retrieve from bitstream, hence no need to reload */
+    while (p < pEnd)
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+
+    return pEnd-pStart;
+}
+
 size_t HUF_decompress1X2_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
@@ -697,21 +727,7 @@ size_t HUF_decompress1X2_usingDTable(
     errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);
     if (HUF_isError(errorCode)) return errorCode;
 
-    for ( ; (BIT_reloadDStream(&bitD)==BIT_DStream_unfinished) && (op<=oend-4) ; )
-    {
-        HUF_DECODE_SYMBOLX2_2(op, &bitD);
-        HUF_DECODE_SYMBOLX2_1(op, &bitD);
-        HUF_DECODE_SYMBOLX2_2(op, &bitD);
-        HUF_DECODE_SYMBOLX2_0(op, &bitD);
-    }
-
-    /* closer to the end */
-    while ((BIT_reloadDStream(&bitD) == BIT_DStream_unfinished) && (op < oend))
-        HUF_DECODE_SYMBOLX2_0(op, &bitD);
-
-    /* no more data to retrieve from bitstream, hence no need to reload */
-    while (op < oend)
-        HUF_DECODE_SYMBOLX2_0(op, &bitD);
+    HUF_decodeStreamX2(op, &bitD, oend, dt, dtLog);
 
     /* check */
     if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
@@ -734,30 +750,6 @@ size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cS
     return HUF_decompress1X2_usingDTable (dst, dstSize, ip, cSrcSize, DTable);
 }
 
-
-static size_t HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
-{
-    BYTE* const pStart = p;
-
-    /* up to 4 symbols at a time */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-4))
-    {
-        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_1(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-    }
-
-    /* closer to the end */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p < pEnd))
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-
-    /* no more data to retrieve from bitstream, hence no need to reload */
-    while (p < pEnd)
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-
-    return p-pStart;
-}
 
 size_t HUF_decompress4X2_usingDTable(
           void* dst,  size_t dstSize,
@@ -1085,7 +1077,7 @@ static U32 HUF_decodeLastSymbolX4(void* op, BIT_DStream_t* DStream, const HUF_DE
 	if (MEM_64bits()) \
         ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
 
-static size_t HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const HUF_DEltX4* const dt, const U32 dtLog)
+static inline size_t HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const HUF_DEltX4* const dt, const U32 dtLog)
 {
     BYTE* const pStart = p;
 
@@ -1462,7 +1454,7 @@ static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStr
 	if (MEM_64bits()) \
         HUF_DECODE_SYMBOLX6_0(ptr, DStreamPtr)
 
-static size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const U32* DTable, const U32 dtLog)
+static inline size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const U32* DTable, const U32 dtLog)
 {
     const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
     const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + (1<<(dtLog-1)));
