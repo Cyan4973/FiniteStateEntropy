@@ -482,6 +482,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
 
     /* early out */
     if (srcSize <= 1) return srcSize;  /* Uncompressed or RLE */
+    if (srcSize > 128 * 1024) return ERROR(srcSize_wrong);
     if (huffLog > HUF_MAX_TABLELOG) return ERROR(tableLog_tooLarge);
     if (!maxSymbolValue) maxSymbolValue = HUF_MAX_SYMBOL_VALUE;
     if (!huffLog) huffLog = HUF_DEFAULT_TABLELOG;
@@ -528,7 +529,7 @@ size_t HUF_compress (void* dst, size_t maxDstSize, const void* src, size_t srcSi
 *********************************************************/
 typedef struct { BYTE byte; BYTE nbBits; } HUF_DEltX2;   /* single-symbol decoding */
 
-typedef struct { U16 sequence; BYTE nbBits; BYTE length; } HUF_DEltX4;  /* multi-symbol decoding */
+typedef struct { U16 sequence; BYTE nbBits; BYTE length; } HUF_DEltX4;  /* double-symbols decoding */
 
 typedef struct { BYTE symbol; BYTE weight; } sortedSymbol_t;
 
@@ -682,6 +683,58 @@ static BYTE HUF_decodeSymbolX2(BIT_DStream_t* Dstream, const HUF_DEltX2* dt, con
 	if (MEM_64bits()) \
         HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
 
+size_t HUF_decompress1X2_usingDTable(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const U16* DTable)
+{
+    BYTE* op = (BYTE*)dst;
+    BYTE* const oend = op + dstSize;
+    size_t errorCode;
+    const U32 dtLog = DTable[0];
+    const HUF_DEltX2* const dt = ((const HUF_DEltX2*)DTable) +1;
+    BIT_DStream_t bitD;
+    errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);
+    if (HUF_isError(errorCode)) return errorCode;
+
+    for ( ; (BIT_reloadDStream(&bitD)==BIT_DStream_unfinished) && (op<=oend-4) ; )
+    {
+        HUF_DECODE_SYMBOLX2_2(op, &bitD);
+        HUF_DECODE_SYMBOLX2_1(op, &bitD);
+        HUF_DECODE_SYMBOLX2_2(op, &bitD);
+        HUF_DECODE_SYMBOLX2_0(op, &bitD);
+    }
+
+    /* closer to the end */
+    while ((BIT_reloadDStream(&bitD) == BIT_DStream_unfinished) && (op < oend))
+        HUF_DECODE_SYMBOLX2_0(op, &bitD);
+
+    /* no more data to retrieve from bitstream, hence no need to reload */
+    while (op < oend)
+        HUF_DECODE_SYMBOLX2_0(op, &bitD);
+
+    /* check */
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    return dstSize;
+}
+
+size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
+{
+    HUF_CREATE_STATIC_DTABLEX2(DTable, HUF_MAX_TABLELOG);
+    const BYTE* ip = (const BYTE*) cSrc;
+    size_t errorCode;
+
+    errorCode = HUF_readDTableX2 (DTable, cSrc, cSrcSize);
+    if (HUF_isError(errorCode)) return errorCode;
+    if (errorCode >= cSrcSize) return ERROR(srcSize_wrong);
+    ip += errorCode;
+    cSrcSize -= errorCode;
+
+    return HUF_decompress1X2_usingDTable (dst, dstSize, ip, cSrcSize, DTable);
+}
+
+
 static size_t HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
 {
     BYTE* const pStart = p;
@@ -705,7 +758,6 @@ static size_t HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pE
 
     return p-pStart;
 }
-
 
 size_t HUF_decompress4X2_usingDTable(
           void* dst,  size_t dstSize,
@@ -819,24 +871,21 @@ size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 }
 
 
-/*************************/
-/* multi-symbol decoding */
-/*************************/
+/***************************/
+/* double-symbols decoding */
+/***************************/
 
 static void HUF_fillDTableX4Level2(HUF_DEltX4* DTable, U32 sizeLog, const U32 consumed,
-                           const U32* rankValOrigin, const int minWeight, const U32 maxWeight,
+                           const U32* rankValOrigin, const int minWeight,
                            const sortedSymbol_t* sortedSymbols, const U32 sortedListSize,
                            U32 nbBitsBaseline, U16 baseSeq)
 {
     HUF_DEltX4 DElt;
-    U32 rankVal[HUF_MAX_TABLELOG + 1];  /* init isn't necessary, even if static analyzer complain about it */
+    U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];
     U32 s;
 
-    /* Scale rankVal */
-    for (s=minWeight; s<=maxWeight; s++)   /* note : minWeight >= 1 */
-    {
-        rankVal[s] = rankValOrigin[s] >> consumed;
-    }
+    /* get pre-calculated rankVal */
+    memcpy(rankVal, rankValOrigin, sizeof(rankVal));
 
     /* fill skipped values */
     if (minWeight>1)
@@ -850,7 +899,7 @@ static void HUF_fillDTableX4Level2(HUF_DEltX4* DTable, U32 sizeLog, const U32 co
     }
 
     /* fill DTable */
-    for (s=0; s<sortedListSize; s++)
+    for (s=0; s<sortedListSize; s++)   /* note : sortedSymbols already skipped */
     {
         const U32 symbol = sortedSymbols[s].symbol;
         const U32 weight = sortedSymbols[s].weight;
@@ -869,19 +918,19 @@ static void HUF_fillDTableX4Level2(HUF_DEltX4* DTable, U32 sizeLog, const U32 co
     }
 }
 
+typedef U32 rankVal_t[HUF_ABSOLUTEMAX_TABLELOG][HUF_ABSOLUTEMAX_TABLELOG + 1];
 
 static void HUF_fillDTableX4(HUF_DEltX4* DTable, const U32 targetLog,
                            const sortedSymbol_t* sortedList, const U32 sortedListSize,
-                           const U32* rankStart, const U32* rankValOrigin, const U32 maxWeight,
+                           const U32* rankStart, rankVal_t rankValOrigin, const U32 maxWeight,
                            const U32 nbBitsBaseline)
 {
-    U32 rankVal[HUF_MAX_TABLELOG + 1];
+    U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];
     const int scaleLog = nbBitsBaseline - targetLog;   /* note : targetLog >= srcLog, hence scaleLog <= 1 */
     const U32 minBits  = nbBitsBaseline - maxWeight;
     U32 s;
 
     memcpy(rankVal, rankValOrigin, sizeof(rankVal));
-    if (maxWeight>HUF_MAX_TABLELOG) return;   /* impossible, just to silence gcc's -Warray-bounds (assert equivalent)*/
 
     /* fill DTable */
     for (s=0; s<sortedListSize; s++)
@@ -899,7 +948,7 @@ static void HUF_fillDTableX4(HUF_DEltX4* DTable, const U32 targetLog,
             if (minWeight < 1) minWeight = 1;
             sortedRank = rankStart[minWeight];
             HUF_fillDTableX4Level2(DTable+start, targetLog-nbBits, nbBits,
-                           rankValOrigin, minWeight, maxWeight,
+                           rankValOrigin[nbBits], minWeight,
                            sortedList+sortedRank, sortedListSize-sortedRank,
                            nbBitsBaseline, symbol);
         }
@@ -919,7 +968,6 @@ static void HUF_fillDTableX4(HUF_DEltX4* DTable, const U32 targetLog,
     }
 }
 
-
 size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
 {
     BYTE weightList[HUF_MAX_SYMBOL_VALUE + 1];
@@ -927,7 +975,7 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
     U32 rankStats[HUF_ABSOLUTEMAX_TABLELOG + 1] = { 0 };
     U32 rankStart0[HUF_ABSOLUTEMAX_TABLELOG + 2] = { 0 };
     U32* const rankStart = rankStart0+1;
-    U32 rankValOrigin[HUF_ABSOLUTEMAX_TABLELOG + 1] = { 0 };
+    rankVal_t rankVal;
     U32 tableLog, maxW, sizeOfSort, nbSymbols;
     const U32 memLog = DTable[0];
     const BYTE* ip = (const BYTE*) src;
@@ -936,13 +984,13 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
 
     HUF_STATIC_ASSERT(sizeof(HUF_DEltX4) == sizeof(U32));   /* if compilation fails here, assertion is false */
     if (memLog > HUF_ABSOLUTEMAX_TABLELOG) return ERROR(tableLog_tooLarge);
-    //memset(huffWeight, 0, sizeof(huffWeight));   /* is not necessary, even though some analyzer complain ... */
+    //memset(weightList, 0, sizeof(weightList));   /* is not necessary, even though some analyzer complain ... */
 
     iSize = HUF_readStats(weightList, HUF_MAX_SYMBOL_VALUE + 1, rankStats, &nbSymbols, &tableLog, src, srcSize);
     if (HUF_isError(iSize)) return iSize;
 
     /* check result */
-    if (tableLog > memLog) return ERROR(tableLog_tooLarge);   /* DTable is too small */
+    if (tableLog > memLog) return ERROR(tableLog_tooLarge);   /* DTable can't fit code depth */
 
     /* find maxWeight */
     for (maxW = tableLog; rankStats[maxW]==0; maxW--) {}  /* necessarily finds a solution before 0 */
@@ -973,23 +1021,27 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
         rankStart[0] = 0;   /* forget 0w symbols; this is beginning of weight(1) */
     }
 
-    /* Build rankValOrigin */
+    /* Build rankVal */
     {
+        const U32 minBits = tableLog+1 - maxW;
         U32 nextRankVal = 0;
-        U32 w;
+        U32 w, consumed;
         const int rescale = (memLog-tableLog) - 1;   /* tableLog <= memLog */
         for (w=1; w<=maxW; w++)
         {
             U32 current = nextRankVal;
             nextRankVal += rankStats[w] << (w+rescale);
-            rankValOrigin[w] = current;
+            rankVal[0][w] = current;
         }
+        for (consumed=minBits; consumed <= memLog-minBits; consumed++)
+            for (w=1; w<=maxW; w++)
+                rankVal[consumed][w] = rankVal[0][w] >> consumed;
     }
 
 
     HUF_fillDTableX4(dt, memLog,
                    sortedSymbol, sizeOfSort,
-                   rankStart0, rankValOrigin, maxW,
+                   rankStart0, rankVal, maxW,
                    tableLog+1);
 
     return iSize;
@@ -1059,6 +1111,48 @@ static size_t HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pE
     return p-pStart;
 }
 
+
+size_t HUF_decompress1X4_usingDTable(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const U32* DTable)
+{
+    const BYTE* const istart = (const BYTE*) cSrc;
+    BYTE* const ostart = (BYTE*) dst;
+    BYTE* const oend = ostart + dstSize;
+
+    const U32 dtLog = DTable[0];
+    const HUF_DEltX4* const dt = ((const HUF_DEltX4*)DTable) +1;
+    size_t errorCode;
+
+    /* Init */
+    BIT_DStream_t bitD;
+    errorCode = BIT_initDStream(&bitD, istart, cSrcSize);
+    if (HUF_isError(errorCode)) return errorCode;
+
+    /* finish bitStreams one by one */
+    HUF_decodeStreamX4(ostart, &bitD, oend,     dt, dtLog);
+
+    /* check */
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    /* decoded size */
+    return dstSize;
+}
+
+size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
+{
+    HUF_CREATE_STATIC_DTABLEX4(DTable, HUF_MAX_TABLELOG);
+    const BYTE* ip = (const BYTE*) cSrc;
+
+    size_t hSize = HUF_readDTableX4 (DTable, cSrc, cSrcSize);
+    if (HUF_isError(hSize)) return hSize;
+    if (hSize >= cSrcSize) return ERROR(srcSize_wrong);
+    ip += hSize;
+    cSrcSize -= hSize;
+
+    return HUF_decompress1X4_usingDTable (dst, dstSize, ip, cSrcSize, DTable);
+}
 
 size_t HUF_decompress4X4_usingDTable(
           void* dst,  size_t dstSize,
@@ -1171,8 +1265,393 @@ size_t HUF_decompress4X4 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 }
 
 
+/**********************************/
+/* quad-symbol decoding           */
+/**********************************/
+typedef struct { BYTE nbBits; BYTE nbBytes; } HUF_DDescX6;
+typedef union { BYTE byte[4]; U32 sequence; } HUF_DSeqX6;
+
+/* recursive, up to level 3; may benefit from <template>-like strategy to nest each level inline */
+static void HUF_fillDTableX6LevelN(HUF_DDescX6* DDescription, HUF_DSeqX6* DSequence, int sizeLog,
+                           const rankVal_t rankValOrigin, const U32 consumed, const int minWeight, const U32 maxWeight,
+                           const sortedSymbol_t* sortedSymbols, const U32 sortedListSize, const U32* rankStart,
+                           const U32 nbBitsBaseline, HUF_DSeqX6 baseSeq, HUF_DDescX6 DDesc)
+{
+    const int scaleLog = nbBitsBaseline - sizeLog;   /* note : targetLog >= (nbBitsBaseline-1), hence scaleLog <= 1 */
+    const int minBits  = nbBitsBaseline - maxWeight;
+    const U32 level = DDesc.nbBytes;
+    U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];
+    U32 symbolStartPos, s;
+
+    /* local rankVal, will be modified */
+    memcpy(rankVal, rankValOrigin[consumed], sizeof(rankVal));
+
+    /* fill skipped values */
+    if (minWeight>1)
+    {
+        U32 i;
+        const U32 skipSize = rankVal[minWeight];
+        for (i = 0; i < skipSize; i++)
+        {
+            DSequence[i] = baseSeq;
+            DDescription[i] = DDesc;
+        }
+    }
+
+    /* fill DTable */
+    DDesc.nbBytes++;
+    symbolStartPos = rankStart[minWeight];
+    for (s=symbolStartPos; s<sortedListSize; s++)
+    {
+        const BYTE symbol = sortedSymbols[s].symbol;
+        const U32  weight = sortedSymbols[s].weight;   /* >= 1 (sorted) */
+        const int  nbBits = nbBitsBaseline - weight;   /* >= 1 (by construction) */
+        const int  totalBits = consumed+nbBits;
+        const U32  start  = rankVal[weight];
+        const U32  length = 1 << (sizeLog-nbBits);
+        baseSeq.byte[level] = symbol;
+        DDesc.nbBits = (BYTE)totalBits;
+
+        if ((level<3) && (sizeLog-totalBits >= minBits))   /* enough room for another symbol */
+        {
+            int nextMinWeight = totalBits + scaleLog;
+            if (nextMinWeight < 1) nextMinWeight = 1;
+            HUF_fillDTableX6LevelN(DDescription+start, DSequence+start, sizeLog-nbBits,
+                           rankValOrigin, totalBits, nextMinWeight, maxWeight,
+                           sortedSymbols, sortedListSize, rankStart,
+                           nbBitsBaseline, baseSeq, DDesc);   /* recursive (max : level 3) */
+        }
+        else
+        {
+            U32 i;
+            const U32 end = start + length;
+            for (i = start; i < end; i++)
+            {
+                DDescription[i] = DDesc;
+                DSequence[i] = baseSeq;
+            }
+        }
+        rankVal[weight] += length;
+    }
+}
+
+
+/* note : same preparation as X4 */
+size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
+{
+    BYTE weightList[HUF_MAX_SYMBOL_VALUE + 1];
+    sortedSymbol_t sortedSymbol[HUF_MAX_SYMBOL_VALUE + 1];
+    U32 rankStats[HUF_ABSOLUTEMAX_TABLELOG + 1] = { 0 };
+    U32 rankStart0[HUF_ABSOLUTEMAX_TABLELOG + 2] = { 0 };
+    U32* const rankStart = rankStart0+1;
+    U32 tableLog, maxW, sizeOfSort, nbSymbols;
+    rankVal_t rankVal;
+    const U32 memLog = DTable[0];
+    const BYTE* ip = (const BYTE*) src;
+    size_t iSize = ip[0];
+
+    if (memLog > HUF_ABSOLUTEMAX_TABLELOG) return ERROR(tableLog_tooLarge);
+    //memset(weightList, 0, sizeof(weightList));   /* is not necessary, even though some analyzer complain ... */
+
+    iSize = HUF_readStats(weightList, HUF_MAX_SYMBOL_VALUE + 1, rankStats, &nbSymbols, &tableLog, src, srcSize);
+    if (HUF_isError(iSize)) return iSize;
+
+    /* check result */
+    if (tableLog > memLog) return ERROR(tableLog_tooLarge);   /* DTable is too small */
+
+    /* find maxWeight */
+    for (maxW = tableLog; rankStats[maxW]==0; maxW--) {}  /* necessarily finds a solution before 0 */
+
+    /* Get start index of each weight */
+    {
+        U32 w, nextRankStart = 0;
+        for (w=1; w<=maxW; w++)
+        {
+            U32 current = nextRankStart;
+            nextRankStart += rankStats[w];
+            rankStart[w] = current;
+        }
+        rankStart[0] = nextRankStart;   /* put all 0w symbols at the end of sorted list*/
+        sizeOfSort = nextRankStart;
+    }
+
+    /* sort symbols by weight */
+    {
+        U32 s;
+        for (s=0; s<nbSymbols; s++)
+        {
+            U32 w = weightList[s];
+            U32 r = rankStart[w]++;
+            sortedSymbol[r].symbol = (BYTE)s;
+            sortedSymbol[r].weight = (BYTE)w;
+        }
+        rankStart[0] = 0;   /* forget 0w symbols; this is beginning of weight(1) */
+    }
+
+    /* Build rankVal */
+    {
+        const U32 minBits = tableLog+1 - maxW;
+        U32 nextRankVal = 0;
+        U32 w, consumed;
+        const int rescale = (memLog-tableLog) - 1;   /* tableLog <= memLog */
+        for (w=1; w<=maxW; w++)
+        {
+            U32 current = nextRankVal;
+            nextRankVal += rankStats[w] << (w+rescale);
+            rankVal[0][w] = current;
+        }
+        for (consumed=minBits; consumed <= memLog-minBits; consumed++)
+            for (w=1; w<=maxW; w++)
+                rankVal[consumed][w] = rankVal[0][w] >> consumed;
+    }
+
+
+    /* fill tables */
+    {
+        HUF_DDescX6* DDescription = (HUF_DDescX6*)(DTable+1);
+        HUF_DSeqX6* DSequence = (HUF_DSeqX6*)(DTable + 1 + (1<<(memLog-1)));
+        HUF_DSeqX6 DSeq;
+        HUF_DDescX6 DDesc;
+        DSeq.sequence = 0;
+        DDesc.nbBits = 0;
+        DDesc.nbBytes = 0;
+        HUF_fillDTableX6LevelN(DDescription, DSequence, memLog,
+                       (const U32 (*)[HUF_ABSOLUTEMAX_TABLELOG + 1])rankVal, 0, 1, maxW,
+                       sortedSymbol, sizeOfSort, rankStart0,
+                       tableLog+1, DSeq, DDesc);
+    }
+
+    return iSize;
+}
+
+
+static U32 HUF_decodeSymbolX6(void* op, BIT_DStream_t* DStream, const HUF_DDescX6* dd, const HUF_DSeqX6* ds, const U32 dtLog)
+{
+    const size_t val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    memcpy(op, ds+val, sizeof(HUF_DSeqX6));
+    BIT_skipBits(DStream, dd[val].nbBits);
+    return dd[val].nbBytes;
+}
+
+static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStream,
+                                  const HUF_DDescX6* dd, const HUF_DSeqX6* ds, const U32 dtLog)
+{
+    const size_t val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    U32 length = dd[val].nbBytes;
+    if (length <= maxL) return HUF_decodeSymbolX6(op, DStream, dd, ds, dtLog);
+    length = maxL;
+    memcpy(op, ds+val, maxL);
+    if (DStream->bitsConsumed < (sizeof(DStream->bitContainer)*8))
+    {
+        BIT_skipBits(DStream, dd[val].nbBits);
+        if (DStream->bitsConsumed > (sizeof(DStream->bitContainer)*8))
+            DStream->bitsConsumed = (sizeof(DStream->bitContainer)*8);   /* ugly hack; works only because it's the last symbol. Note : can't easily extract nbBits from just this symbol */
+    }
+    return length;
+}
+
+
+#define HUF_DECODE_SYMBOLX6_0(ptr, DStreamPtr) \
+    ptr += HUF_decodeSymbolX6(ptr, DStreamPtr, dd, ds, dtLog)
+
+#define HUF_DECODE_SYMBOLX6_1(ptr, DStreamPtr) \
+	if (MEM_64bits() || (HUF_MAX_TABLELOG<=12)) \
+        HUF_DECODE_SYMBOLX6_0(ptr, DStreamPtr)
+
+#define HUF_DECODE_SYMBOLX6_2(ptr, DStreamPtr) \
+	if (MEM_64bits()) \
+        HUF_DECODE_SYMBOLX6_0(ptr, DStreamPtr)
+
+static size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const U32* DTable, const U32 dtLog)
+{
+    const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
+    const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + (1<<(dtLog-1)));
+    BYTE* const pStart = p;
+
+    /* up to 16 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-16))
+    {
+        HUF_DECODE_SYMBOLX6_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX6_1(p, bitDPtr);
+        HUF_DECODE_SYMBOLX6_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX6_0(p, bitDPtr);
+    }
+
+    /* closer to the end, up to 4 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-4))
+        HUF_DECODE_SYMBOLX6_0(p, bitDPtr);
+
+    while (p <= pEnd-4)
+        HUF_DECODE_SYMBOLX6_0(p, bitDPtr);   /* no need to reload : reached the end of DStream */
+
+    while (p < pEnd)
+        p += HUF_decodeLastSymbolsX6(p, (U32)(pEnd-p), bitDPtr, dd, ds, dtLog);
+
+    return p-pStart;
+}
+
+
+size_t HUF_decompress1X6_usingDTable(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const U32* DTable)
+{
+    const BYTE* const istart = (const BYTE*) cSrc;
+    BYTE* const ostart = (BYTE*) dst;
+    BYTE* const oend = ostart + dstSize;
+
+    const U32 dtLog = DTable[0];
+    size_t errorCode;
+
+    /* Init */
+    BIT_DStream_t bitD;
+    errorCode = BIT_initDStream(&bitD, istart, cSrcSize);
+    if (HUF_isError(errorCode)) return errorCode;
+
+    /* finish bitStreams one by one */
+    HUF_decodeStreamX6(ostart, &bitD, oend, DTable, dtLog);
+
+    /* check */
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    /* decoded size */
+    return dstSize;
+}
+
+size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
+{
+    HUF_CREATE_STATIC_DTABLEX6(DTable, HUF_MAX_TABLELOG);
+    const BYTE* ip = (const BYTE*) cSrc;
+
+    size_t hSize = HUF_readDTableX6 (DTable, cSrc, cSrcSize);
+    if (HUF_isError(hSize)) return hSize;
+    if (hSize >= cSrcSize) return ERROR(srcSize_wrong);
+    ip += hSize;
+    cSrcSize -= hSize;
+
+    return HUF_decompress1X6_usingDTable (dst, dstSize, ip, cSrcSize, DTable);
+}
+
+
+size_t HUF_decompress4X6_usingDTable(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const U32* DTable)
+{
+    if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
+
+    {
+        const BYTE* const istart = (const BYTE*) cSrc;
+        BYTE* const ostart = (BYTE*) dst;
+        BYTE* const oend = ostart + dstSize;
+
+        const U32 dtLog = DTable[0];
+        const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
+        const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + (1<<(dtLog-1)));
+        size_t errorCode;
+
+        /* Init */
+        BIT_DStream_t bitD1;
+        BIT_DStream_t bitD2;
+        BIT_DStream_t bitD3;
+        BIT_DStream_t bitD4;
+        const size_t length1 = MEM_readLE16(istart);
+        const size_t length2 = MEM_readLE16(istart+2);
+        const size_t length3 = MEM_readLE16(istart+4);
+        size_t length4;
+        const BYTE* const istart1 = istart + 6;  /* jumpTable */
+        const BYTE* const istart2 = istart1 + length1;
+        const BYTE* const istart3 = istart2 + length2;
+        const BYTE* const istart4 = istart3 + length3;
+        const size_t segmentSize = (dstSize+3) / 4;
+        BYTE* const opStart2 = ostart + segmentSize;
+        BYTE* const opStart3 = opStart2 + segmentSize;
+        BYTE* const opStart4 = opStart3 + segmentSize;
+        BYTE* op1 = ostart;
+        BYTE* op2 = opStart2;
+        BYTE* op3 = opStart3;
+        BYTE* op4 = opStart4;
+        U32 endSignal;
+
+        length4 = cSrcSize - (length1 + length2 + length3 + 6);
+        if (length4 > cSrcSize) return ERROR(corruption_detected);   /* overflow */
+        errorCode = BIT_initDStream(&bitD1, istart1, length1);
+        if (HUF_isError(errorCode)) return errorCode;
+        errorCode = BIT_initDStream(&bitD2, istart2, length2);
+        if (HUF_isError(errorCode)) return errorCode;
+        errorCode = BIT_initDStream(&bitD3, istart3, length3);
+        if (HUF_isError(errorCode)) return errorCode;
+        errorCode = BIT_initDStream(&bitD4, istart4, length4);
+        if (HUF_isError(errorCode)) return errorCode;
+
+        /* 16-64 symbols per loop (4-16 symbols per stream) */
+        endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+        for ( ; (op3 <= opStart4) && (endSignal==BIT_DStream_unfinished) && (op4<=(oend-16)) ; )
+        {
+            HUF_DECODE_SYMBOLX6_2(op1, &bitD1);
+            HUF_DECODE_SYMBOLX6_2(op2, &bitD2);
+            HUF_DECODE_SYMBOLX6_2(op3, &bitD3);
+            HUF_DECODE_SYMBOLX6_2(op4, &bitD4);
+            HUF_DECODE_SYMBOLX6_1(op1, &bitD1);
+            HUF_DECODE_SYMBOLX6_1(op2, &bitD2);
+            HUF_DECODE_SYMBOLX6_1(op3, &bitD3);
+            HUF_DECODE_SYMBOLX6_1(op4, &bitD4);
+            HUF_DECODE_SYMBOLX6_2(op1, &bitD1);
+            HUF_DECODE_SYMBOLX6_2(op2, &bitD2);
+            HUF_DECODE_SYMBOLX6_2(op3, &bitD3);
+            HUF_DECODE_SYMBOLX6_2(op4, &bitD4);
+            HUF_DECODE_SYMBOLX6_0(op1, &bitD1);
+            HUF_DECODE_SYMBOLX6_0(op2, &bitD2);
+            HUF_DECODE_SYMBOLX6_0(op3, &bitD3);
+            HUF_DECODE_SYMBOLX6_0(op4, &bitD4);
+
+            endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+        }
+
+        /* check corruption */
+        if (op1 > opStart2) return ERROR(corruption_detected);
+        if (op2 > opStart3) return ERROR(corruption_detected);
+        if (op3 > opStart4) return ERROR(corruption_detected);
+        /* note : op4 supposed already verified within main loop */
+
+        /* finish bitStreams one by one */
+        HUF_decodeStreamX6(op1, &bitD1, opStart2, DTable, dtLog);
+        HUF_decodeStreamX6(op2, &bitD2, opStart3, DTable, dtLog);
+        HUF_decodeStreamX6(op3, &bitD3, opStart4, DTable, dtLog);
+        HUF_decodeStreamX6(op4, &bitD4, oend,     DTable, dtLog);
+
+        /* check */
+        endSignal = BIT_endOfDStream(&bitD1) & BIT_endOfDStream(&bitD2) & BIT_endOfDStream(&bitD3) & BIT_endOfDStream(&bitD4);
+        if (!endSignal) return ERROR(corruption_detected);
+
+        /* decoded size */
+        return dstSize;
+    }
+}
+
+
+size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
+{
+    HUF_CREATE_STATIC_DTABLEX6(DTable, HUF_MAX_TABLELOG);
+    const BYTE* ip = (const BYTE*) cSrc;
+
+    size_t hSize = HUF_readDTableX6 (DTable, cSrc, cSrcSize);
+    if (HUF_isError(hSize)) return hSize;
+    if (hSize >= cSrcSize) return ERROR(srcSize_wrong);
+    ip += hSize;
+    cSrcSize -= hSize;
+
+    return HUF_decompress4X6_usingDTable (dst, dstSize, ip, cSrcSize, DTable);
+}
+
+
+/**********************************/
+/* Generic decompression selector */
+/**********************************/
+
 size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
 {
-    return HUF_decompress4X4(dst, dstSize, cSrc, cSrcSize);   /* multi-streams multi-symbols decoding */
+    //return HUF_decompress4X6(dst, dstSize, cSrc, cSrcSize);   /* multi-streams quad-symbols decoding */
+    return HUF_decompress4X4(dst, dstSize, cSrc, cSrcSize);   /* multi-streams double-symbols decoding */
     //return HUF_decompress4X2(dst, dstSize, cSrc, cSrcSize);  /* multi-streams single-symbol decoding */
 }

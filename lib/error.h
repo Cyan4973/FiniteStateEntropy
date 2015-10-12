@@ -56,7 +56,7 @@ extern "C" {
 /******************************************
 *  Error Management
 ******************************************/
-#define PREFIX(name) NewGenEntropyLib_error_##name
+#define PREFIX(name) entropyLib_error_##name
 
 #define ERROR(name) (size_t)-PREFIX(name)
 
