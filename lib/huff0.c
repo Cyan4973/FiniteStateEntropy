@@ -46,6 +46,7 @@
 
 #ifdef _MSC_VER    /* Visual Studio */
 #  define FORCE_INLINE static __forceinline
+#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #else
 #  ifdef __GNUC__
 #    define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
