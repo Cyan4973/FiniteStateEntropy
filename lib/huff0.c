@@ -489,7 +489,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
 
     /* early out */
     if (srcSize <= 1) return srcSize;  /* Uncompressed or RLE */
-    if (srcSize > 128 * 1024) return ERROR(srcSize_wrong);
+    if (srcSize > 128 * 1024) return ERROR(srcSize_wrong);   /* current block size limit */
     if (huffLog > HUF_MAX_TABLELOG) return ERROR(tableLog_tooLarge);
     if (!maxSymbolValue) maxSymbolValue = HUF_MAX_SYMBOL_VALUE;
     if (!huffLog) huffLog = HUF_DEFAULT_TABLELOG;

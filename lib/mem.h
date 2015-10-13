@@ -43,6 +43,7 @@ extern "C" {
 *  Includes
 ******************************************/
 #include <stddef.h>    /* size_t, ptrdiff_t */
+#include <string.h>    /* memcpy */
 
 
 /******************************************

@@ -132,6 +132,7 @@ typedef struct
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
+
 /****************************************************************
 *  Templates
 ****************************************************************/
@@ -436,8 +437,9 @@ unsigned FSE_isError(size_t code) { return ERR_isError(code); }
 
 const char* FSE_getErrorName(size_t code) { return ERR_getErrorName(code); }
 
+
 /****************************************************************
-*  FSE NCount encoding
+*  FSE NCount encoding-decoding
 ****************************************************************/
 size_t FSE_NCountWriteBound(unsigned maxSymbolValue, unsigned tableLog)
 {
