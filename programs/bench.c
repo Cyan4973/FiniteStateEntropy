@@ -478,7 +478,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         /* CRC Checking */
         crcCheck = XXH32(chunkP[0].destBuffer, benchedSize, 0);
-        if (0 && crcOrig!=crcCheck)
+        if (crcOrig!=crcCheck)
         {
             const char* src = chunkP[0].origBuffer;
             const char* fin = chunkP[0].destBuffer;
