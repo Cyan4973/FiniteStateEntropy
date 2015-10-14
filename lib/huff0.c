@@ -487,8 +487,9 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
     HUF_CElt CTable[HUF_MAX_SYMBOL_VALUE+1];
     size_t errorCode;
 
-    /* early out */
-    if (srcSize <= 1) return srcSize;  /* Uncompressed or RLE */
+    /* checks & inits */
+    if (srcSize < 1) return 0;  /* Uncompressed */
+    if (dstSize < 1) return 0;  /* not compressible within dst budget */
     if (srcSize > 128 * 1024) return ERROR(srcSize_wrong);   /* current block size limit */
     if (huffLog > HUF_MAX_TABLELOG) return ERROR(tableLog_tooLarge);
     if (!maxSymbolValue) maxSymbolValue = HUF_MAX_SYMBOL_VALUE;
@@ -497,7 +498,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
     /* Scan input and build symbol stats */
     errorCode = FSE_count (count, &maxSymbolValue, (const BYTE*)src, srcSize);
     if (HUF_isError(errorCode)) return errorCode;
-    if (errorCode == srcSize) return 1;
+    if (errorCode == srcSize) { *ostart = ((const BYTE*)src)[0]; return 1; }
     if (errorCode <= (srcSize >> 7)+1) return 0;   /* Heuristic : not compressible enough */
 
     /* Build Huffman Tree */
@@ -520,7 +521,7 @@ size_t HUF_compress2 (void* dst, size_t dstSize,
 
     /* check compressibility */
     if ((size_t)(op-ostart) >= srcSize-1)
-        return op-ostart;
+        return 0;
 
     return op-ostart;
 }
@@ -1431,8 +1432,12 @@ static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStr
 {
     const size_t val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
     U32 length = dd[val].nbBytes;
-    if (length <= maxL) return HUF_decodeSymbolX6(op, DStream, dd, ds, dtLog);
-    length = maxL;
+    if (length <= maxL)
+    {
+        memcpy(op, ds+val, length);
+        BIT_skipBits(DStream, dd[val].nbBits);
+        return length;
+    }
     memcpy(op, ds+val, maxL);
     if (DStream->bitsConsumed < (sizeof(DStream->bitContainer)*8))
     {
@@ -1440,7 +1445,7 @@ static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStr
         if (DStream->bitsConsumed > (sizeof(DStream->bitContainer)*8))
             DStream->bitsConsumed = (sizeof(DStream->bitContainer)*8);   /* ugly hack; works only because it's the last symbol. Note : can't easily extract nbBits from just this symbol */
     }
-    return length;
+    return maxL;
 }
 
 
@@ -1642,9 +1647,55 @@ size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 /* Generic decompression selector */
 /**********************************/
 
+typedef struct { U32 tableTime; U32 decode256Time; } algo_time_t;
+static const algo_time_t algoTime[16 /* Quantization */][3 /* single, double, quad */] =
+{
+    /* single, double, quad */
+    {{0,0}, {1,1}, {2,2}},  /* Q==0 : impossible */
+    {{0,0}, {1,1}, {2,2}},  /* Q==1 : impossible */
+    {{  38,130}, {1313, 74}, {2151, 38}},   /* Q == 2 : 12-18% */
+    {{ 448,128}, {1353, 74}, {2238, 41}},   /* Q == 3 : 18-25% */
+    {{ 556,128}, {1353, 74}, {2238, 47}},   /* Q == 4 : 25-32% */
+    {{ 714,128}, {1418, 74}, {2436, 53}},   /* Q == 5 : 32-38% */
+    {{ 883,128}, {1437, 74}, {2464, 61}},   /* Q == 6 : 38-44% */
+    {{ 897,128}, {1515, 75}, {2622, 68}},   /* Q == 7 : 44-50% */
+    {{ 926,128}, {1613, 75}, {2730, 75}},   /* Q == 8 : 50-56% */
+    {{ 947,128}, {1729, 77}, {3359, 77}},   /* Q == 9 : 56-62% */
+    {{1107,128}, {2083, 81}, {4006, 84}},   /* Q ==10 : 62-69% */
+    {{1177,128}, {2379, 87}, {4785, 88}},   /* Q ==11 : 69-75% */
+    {{1242,128}, {2415, 93}, {5155, 84}},   /* Q ==12 : 75-81% */
+    {{1349,128}, {2644,106}, {5260,106}},   /* Q ==13 : 81-87% */
+    {{1455,128}, {2422,124}, {4174,124}},   /* Q ==14 : 87-93% */
+    {{ 722,128}, {1891,145}, {1936,146}},   /* Q ==15 : 93-99% */
+};
+
+typedef size_t (*decompressionAlgo)(void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);
+
 size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
 {
+    static const decompressionAlgo decompress[3] = { HUF_decompress4X2, HUF_decompress4X4, HUF_decompress4X6 };
+    /* estimate decompression time */
+    const U32 Q = (U32)(cSrcSize * 16 / dstSize);   /* note : cSrcSize <= dstSize <= 128 KB */
+    const U32 D256 = (U32)(dstSize >> 8);
+    U32 Dtime[3];
+    U32 algoNb = 0;
+    int n;
+
+    if (cSrcSize==1) { memset(dst, ((const BYTE*)cSrc)[0], dstSize); return dstSize; }   /* RLE */
+    if (cSrcSize==dstSize) { memcpy(dst, cSrc, dstSize); return dstSize; }   /* not compressed */
+    if (cSrcSize>dstSize) return ERROR(corruption_detected);   /* invalid */
+
+    for (n=0; n<3; n++)
+        Dtime[n] = algoTime[Q][n].tableTime + (algoTime[Q][n].decode256Time * D256);
+
+    // Dtime[1] += Dtime[1] >> 4; Dtime[2] += Dtime[2] >> 3; /* advantage to algorithms using less memory */
+
+    if (Dtime[1] < Dtime[0]) algoNb = 1;
+    if (Dtime[2] < Dtime[algoNb]) algoNb = 2;
+
+    return decompress[algoNb](dst, dstSize, cSrc, cSrcSize);
+
+    //return HUF_decompress4X2(dst, dstSize, cSrc, cSrcSize);   /* multi-streams single-symbol decoding */
+    //return HUF_decompress4X4(dst, dstSize, cSrc, cSrcSize);   /* multi-streams double-symbols decoding */
     //return HUF_decompress4X6(dst, dstSize, cSrc, cSrcSize);   /* multi-streams quad-symbols decoding */
-    return HUF_decompress4X4(dst, dstSize, cSrc, cSrcSize);   /* multi-streams double-symbols decoding */
-    //return HUF_decompress4X2(dst, dstSize, cSrc, cSrcSize);  /* multi-streams single-symbol decoding */
 }

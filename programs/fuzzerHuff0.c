@@ -219,9 +219,10 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     BYTE saved = (bufferVerif[sizeOrig] = 253);
                     size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress : bufferVerif overflow");
-                    CHECK(HUF_isError(result), "Decompression failed");
+                    CHECK(HUF_isError(result), "Decompression failed : %s", HUF_getErrorName(result));
                     hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
                     CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
+                    CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress overwrite dst buffer !");
                 }
 
                 /* truncated src decompression test */
