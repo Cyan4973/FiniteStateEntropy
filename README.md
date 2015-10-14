@@ -32,7 +32,7 @@ Test files are generated using the provided `probagen` program.
 |         | zlibh |  6.38  |  265 MB/s   |   300 MB/s    |
 | Proba14 |       |        |             |               |
 |         | Huff0 |  1.90  |  595 MB/s   |   860 MB/s    |
-|         | FSE   |  1.91  |  325 MB/s   |   440 MB/s    |
+|         | FSE   |  1.91  |  330 MB/s   |   460 MB/s    |
 |         | zlibh |  1.90  |  255 MB/s   |   250 MB/s    |
 | Proba02 |       |        |             |               |
 |         | Huff0 |  1.13  |  525 MB/s   |   555 MB/s    |
