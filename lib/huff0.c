@@ -1675,16 +1675,20 @@ size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcS
 {
     static const decompressionAlgo decompress[3] = { HUF_decompress4X2, HUF_decompress4X4, HUF_decompress4X6 };
     /* estimate decompression time */
-    const U32 Q = (U32)(cSrcSize * 16 / dstSize);   /* note : cSrcSize <= dstSize <= 128 KB */
+    U32 Q;
     const U32 D256 = (U32)(dstSize >> 8);
     U32 Dtime[3];
     U32 algoNb = 0;
     int n;
 
-    if (cSrcSize==1) { memset(dst, ((const BYTE*)cSrc)[0], dstSize); return dstSize; }   /* RLE */
-    if (cSrcSize==dstSize) { memcpy(dst, cSrc, dstSize); return dstSize; }   /* not compressed */
-    if (cSrcSize>dstSize) return ERROR(corruption_detected);   /* invalid */
+    /* validation checks */
+    if (dstSize == 0) return ERROR(dstSize_tooSmall);
+    if (cSrcSize > dstSize) return ERROR(corruption_detected);   /* invalid */
+    if (cSrcSize == dstSize) { memcpy(dst, cSrc, dstSize); return dstSize; }   /* not compressed */
+    if (cSrcSize == 1) { memset(dst, ((const BYTE*)cSrc)[0], dstSize); return dstSize; }   /* RLE */
 
+    /* decoder timing evaluation */
+    Q = (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 since dstSize > cSrcSize */
     for (n=0; n<3; n++)
         Dtime[n] = algoTime[Q][n].tableTime + (algoTime[Q][n].decode256Time * D256);
 
