@@ -15,24 +15,24 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\fse.c">
+    <ClCompile Include="..\..\..\lib\fse.c">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\test\fuzzer.c">
+    <ClCompile Include="..\..\..\programs\fuzzer.c">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\test\xxhash.c">
+    <ClCompile Include="..\..\..\programs\xxhash.c">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\fse.h">
+    <ClInclude Include="..\..\..\lib\fse.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\fse_static.h">
+    <ClInclude Include="..\..\..\lib\fse_static.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\test\xxhash.h">
+    <ClInclude Include="..\..\..\programs\xxhash.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
   </ItemGroup>

@@ -18,6 +18,30 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\lib\fse.c" />
+    <ClCompile Include="..\..\..\lib\fseU16.c" />
+    <ClCompile Include="..\..\..\lib\huff0.c" />
+    <ClCompile Include="..\..\..\programs\bench.c" />
+    <ClCompile Include="..\..\..\programs\commandline.c" />
+    <ClCompile Include="..\..\..\programs\fileio.c" />
+    <ClCompile Include="..\..\..\programs\xxhash.c" />
+    <ClCompile Include="..\..\..\programs\zlibh.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\lib\bitstream.h" />
+    <ClInclude Include="..\..\..\lib\error.h" />
+    <ClInclude Include="..\..\..\lib\fse.h" />
+    <ClInclude Include="..\..\..\lib\fseU16.h" />
+    <ClInclude Include="..\..\..\lib\fse_static.h" />
+    <ClInclude Include="..\..\..\lib\huff0.h" />
+    <ClInclude Include="..\..\..\lib\huff0_static.h" />
+    <ClInclude Include="..\..\..\lib\mem.h" />
+    <ClInclude Include="..\..\..\programs\bench.h" />
+    <ClInclude Include="..\..\..\programs\fileio.h" />
+    <ClInclude Include="..\..\..\programs\xxhash.h" />
+    <ClInclude Include="..\..\..\programs\zlibh.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{69038E19-1F9B-4086-A6E4-C8076F51EB22}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -68,22 +92,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\..;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\..\lib;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath)</IncludePath>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\..;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\..\lib;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath)</IncludePath>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\..;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)..\..\lib;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);</IncludePath>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\..;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)..\..\lib;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);</IncludePath>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -157,24 +181,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\fse.c" />
-    <ClCompile Include="..\..\..\fseU16.c" />
-    <ClCompile Include="..\..\..\test\bench.c" />
-    <ClCompile Include="..\..\..\test\commandline.c" />
-    <ClCompile Include="..\..\..\test\fileio.c" />
-    <ClCompile Include="..\..\..\test\xxhash.c" />
-    <ClCompile Include="..\..\..\test\zlibh.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\fse.h" />
-    <ClInclude Include="..\..\..\fseU16.h" />
-    <ClInclude Include="..\..\..\fse_static.h" />
-    <ClInclude Include="..\..\..\test\bench.h" />
-    <ClInclude Include="..\..\..\test\fileio.h" />
-    <ClInclude Include="..\..\..\test\xxhash.h" />
-    <ClInclude Include="..\..\..\test\zlibh.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

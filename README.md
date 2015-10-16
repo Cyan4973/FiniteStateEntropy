@@ -1,19 +1,14 @@
-Finite State Entropy coder
-===========================
+New Generation Entropy coders
+=============================
 
-FSE is a new kind of [Entropy encoder](http://en.wikipedia.org/wiki/Entropy_encoding),
-based on [ANS theory, from Jarek Duda](http://arxiv.org/abs/1311.2540).
+This library proposes two high speed entropy coders :
 
-It is designed to compete with [Huffman encoder](http://en.wikipedia.org/wiki/Huffman_coding)
-and [Arithmetic ones](http://en.wikipedia.org/wiki/Arithmetic_coding).
+__Huff0__, a Huffman codec designed for modern CPU, featuring OoO (Out of Order) operations on multiple ALU (Arithmetic Logic Unit),
+achieving extremely fast compression and decompression speeds.
 
-While huffman is fast but can only represent probabilities in power of 2 (50%, 25%, etc.)
-arithmetic coding can represent probabilities with much better accuracy, but requires multiplications and divisions.
-
-FSE solves this dilemna by providing precise probabilities, like arithmetic does,
-but using only *additions, masks and shifts*.
-
-This makes FSE faster, on par with Huffman speed, and suitable for low-power CPU environment.
+__FSE__ is a new kind of [Entropy encoder](http://en.wikipedia.org/wiki/Entropy_encoding),
+based on [ANS theory, from Jarek Duda](http://arxiv.org/abs/1311.2540),
+achieving precise compression accuracy (like [Arithmetic coding](http://en.wikipedia.org/wiki/Arithmetic_coding)) at much higher speeds.
 
 |Branch      |Status   |
 |------------|---------|
@@ -21,50 +16,37 @@ This makes FSE faster, on par with Huffman speed, and suitable for low-power CPU
 |dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/FiniteStateEntropy) |
 
 
-
 Benchmarks
 -------------------------
 
-Benchmarks are run on an Intel Core i5-3340M (oc'ed to 3.0GHz), with Window Seven 64-bits.
-Source code is compiled using MSVC 2012, 64-bits mode.
-Core loop results are reported ( FSE_compress_usingCTable() & FSE_decompress_usingDTable() )
+Benchmarks are run on an Intel Core i7-5600U, with Linux Mint 64-bits.
+Source code is compiled using GCC 4.8.4, 64-bits mode.
+Test files are generated using the provided `probagen` program.
+`Huff0` and `FSE` are compared to `zlibh`, the huffman encoder within zlib, provided by Frederic Kayser.
 
-<table>
-  <tr>
-    <th>Filename</th><th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
-  </tr>
-  <tr>
-    <th>book1</th><th>FSE</th><th>1.766</th><th>430 MS/s</th><th>540 MS/s</th>
-  </tr>
-  <tr>
-    <th></th><th></th><th></th><th></th><th></th>
-  </tr>
-  <tr>
-    <th>win98-lz4-run</th><th>FSE</th><th>2.688</th><th>430 MS/s</th><th>540 MS/s</th>
-  </tr>
-  <tr>
-    <th></th><th></th><th></th><th></th><th></th>
-  </tr>
-  <tr>
-    <th>proba70.bin</th><th>FSE</th><th>6.337</th><th>430 MS/s</th><th>520 MS/s</th>
-  </tr>
-  <tr>
-    <th></th><th></th><th></th><th></th><th></th>
-  </tr>
-  <tr>
-    <th>proba90.bin</th><th>FSE</th><th>15.29</th><th>430 MS/s</th><th>520 MS/s</th>
-  </tr>
-</table>
+| File    | Codec | Ratio  | Compression | Decompression |
+| ------- | ----- |:------:| -----------:| -------------:|
+| Proba80 |       |        |             |               |
+|         | Huff0 |  6.38  |__600 MB/s__ |__1350 MB/s__  |
+|         | FSE   |__8.84__|  325 MB/s   |   440 MB/s    |
+|         | zlibh |  6.38  |  265 MB/s   |   300 MB/s    |
+| Proba14 |       |        |             |               |
+|         | Huff0 |  1.90  |  595 MB/s   |   860 MB/s    |
+|         | FSE   |  1.91  |  330 MB/s   |   460 MB/s    |
+|         | zlibh |  1.90  |  255 MB/s   |   250 MB/s    |
+| Proba02 |       |        |             |               |
+|         | Huff0 |  1.13  |  525 MB/s   |   555 MB/s    |
+|         | FSE   |  1.13  |  325 MB/s   |   445 MB/s    |
+|         | zlibh |  1.13  |  180 MB/s   |   210 MB/s    |
 
-*Speed is provided in MS/s (Millions of Symbols per second).
-For more detailed results, browse the [benchmark results](benchmarkResults)*
-
-As an obvious outcome, speed of FSE is stable accross all tested file.
-By design, Huffman can't break the "1 bit per symbol" limit.
-FSE is free of such limit, so its performance increase with probability, remaining close to Shannon limit.
+By design, Huffman can't break the "1 bit per symbol" limit, hence lose efficiency on squeezed distributions, such as `Proba80`.
+FSE is free of such limit, and its compression efficiency remains close to Shannon limit in all circumstances.
+However, this accuracy is not always necessary, and less compressible distributions show little difference with Huffman.
+On its side, Huff0 delivers in the form of a massive speed advantage.
 
 Branch Policy
 -------------------------
-The "master" branch will reflect the status of stable releases of FSE.
-The "dev" branch is the one where all contributions will be merged. If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted. Feature branches will also exist, typically to introduce new requirements, and be temporarily available for testing before merge into "dev" branch.
+External contribution are welcomed and encouraged.
+The "master" branch is only meant to host stable releases.
+The "dev" branch is the one where all contributions are merged. If you want to propose a patch, please commit into "dev" branch or dedicated feature branch. Direct commit to "master" are not permitted.
 

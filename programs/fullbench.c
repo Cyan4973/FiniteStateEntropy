@@ -31,27 +31,10 @@
 #include <string.h>      /* strcmp */
 #include <sys/timeb.h>   /* timeb */
 
+#include "mem.h"
 #include "fse_static.h"
+#include "huff0_static.h"
 #include "xxhash.h"
-
-
-/**************************************
-*  Basic Types
-**************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-  typedef uint8_t  BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
-#else
-  typedef unsigned char       BYTE;
-  typedef unsigned short      U16;
-  typedef unsigned int        U32;
-  typedef   signed int        S32;
-  typedef unsigned long long  U64;
-#endif
 
 
 /**************************************
@@ -730,7 +713,9 @@ static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
 static size_t g_skip;
 static size_t g_cSize;
-HUF_CREATE_STATIC_DTABLE(g_huff_dtable, 16);
+static size_t g_oSize;
+#define DTABLE_LOG 12
+HUF_CREATE_STATIC_DTABLEX6(g_huff_dtable, DTABLE_LOG);
 
 size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U32 maxNbBits);
 static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -746,7 +731,7 @@ static int local_HUF_writeCTable(void* dst, size_t dstSize, const void* src, siz
     return (int)HUF_writeCTable(dst, dstSize, g_tree, g_max, g_tableLog);
 }
 
-size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, HUF_CElt* CTable);
+size_t HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize, const HUF_CElt* CTable);
 static int local_HUF_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)HUF_compress_usingCTable(dst, dstSize, src, srcSize, g_tree);
@@ -786,7 +771,7 @@ static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void*
 static int local_FSE_compress_usingCTable_tooSmall(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dstSize;
-    return (int)FSE_compress_usingCTable(dst, FSE_compressBound(srcSize)-1, src, srcSize, g_CTable);
+    return (int)FSE_compress_usingCTable(dst, FSE_BLOCKBOUND(srcSize)-1, src, srcSize, g_CTable);
 }
 
 static int local_FSE_readNCount(void* src, size_t srcSize, const void* initialBuffer, size_t initialBufferSize)
@@ -817,26 +802,102 @@ static int local_FSE_decompress(void* dst, size_t maxDstSize, const void* src, s
 
 static int local_HUF_decompress(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    (void)srcSize;
-    return (int)HUF_decompress(dst, maxDstSize, src, g_cSize);
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress(dst, g_oSize, src, g_cSize);
 }
 
-size_t HUF_readDTable (U16* DTable, const void* src, size_t srcSize);
-static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+static int local_HUF_decompress4X2(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X2(dst, g_oSize, src, g_cSize);
+}
+
+static int local_HUF_decompress4X4(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X4(dst, g_oSize, src, g_cSize);
+}
+
+static int local_HUF_decompress4X6(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X6(dst, g_oSize, src, g_cSize);
+}
+
+size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
+static int local_HUF_decompress1X2(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress1X2(dst, g_oSize, src, g_cSize);
+}
+
+size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbol decoder */
+static int local_HUF_decompress1X4(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress1X4(dst, g_oSize, src, g_cSize);
+}
+
+size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* quad-symbol decoder */
+static int local_HUF_decompress1X6(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress1X6(dst, g_oSize, src, g_cSize);
+}
+
+size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize);
+static int local_HUF_readDTableX4(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)maxDstSize; (void)srcSize;
-    return (int)HUF_readDTable(g_huff_dtable, src, g_cSize);
+    g_huff_dtable[0] = DTABLE_LOG;
+    return (int)HUF_readDTableX4(g_huff_dtable, src, g_cSize);
 }
 
-// unimplemented
-size_t HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable)
-{ (void)dst; (void)maxDstSize; (void)cSrc; (void)cSrcSize; (void)DTable; return 0; }
+static int local_HUF_readDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    return local_HUF_readDTableX4(dst, maxDstSize, src, srcSize);
+}
+
+size_t HUF_readDTableX2 (U16* DTable, const void* src, size_t srcSize);
+static int local_HUF_readDTableX2(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)maxDstSize; (void)srcSize;
+    g_huff_dtable[0] = DTABLE_LOG;
+    return (int)HUF_readDTableX2((U16*)g_huff_dtable, src, g_cSize);
+}
+
+size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize);
+static int local_HUF_readDTableX6(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)maxDstSize; (void)srcSize;
+    g_huff_dtable[0] = DTABLE_LOG;
+    return (int)HUF_readDTableX6((U32*)g_huff_dtable, src, g_cSize);
+}
+
+size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U32* DTable);
+static int local_HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X4_usingDTable(dst, g_oSize, src, g_cSize, g_huff_dtable);
+}
 static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
-    (void)srcSize;
-    return (int)HUF_decompress_usingDTable(dst, maxDstSize, src, g_cSize, g_huff_dtable);
+    return local_HUF_decompress4X4_usingDTable(dst, maxDstSize, src, srcSize);
 }
 
+size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable);
+static int local_HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X2_usingDTable(dst, g_oSize, src, g_cSize, (const U16*)g_huff_dtable);
+}
+
+size_t HUF_decompress4X6_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U32* DTable);
+static int local_HUF_decompress4X6_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    (void)srcSize; (void)maxDstSize;
+    return (int)HUF_decompress4X6_usingDTable(dst, g_oSize, src, g_cSize, g_huff_dtable);
+}
 
 int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 {
@@ -847,10 +908,10 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     const char* funcName;
     int (*func)(void* dst, size_t dstSize, const void* src, size_t srcSize);
 
-    // init
+    /* Init */
     memcpy(oBuffer, buffer, blockSize);
 
-    // Bench selection
+    /* Bench selection */
     switch (algNb)
     {
     case 1:
@@ -917,7 +978,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
-            funcName = "FSE_compress_usingCTable_tooSmall";
+            funcName = "FSE_compress_usingCTable_smallDst";
             func = local_FSE_compress_usingCTable_tooSmall;
             break;
         }
@@ -1004,6 +1065,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 30:
         {
+            g_oSize = benchedSize;
             g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             memcpy(oBuffer, cBuffer, g_cSize);
             funcName = "HUF_decompress";
@@ -1020,11 +1082,170 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             break;
         }
 
+    case 32:
+        {
+            size_t hSize;
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_huff_dtable[0] = DTABLE_LOG;
+            hSize = HUF_readDTableX4(g_huff_dtable, cBuffer, g_cSize);
+            g_cSize -= hSize;
+            memcpy(oBuffer, ((char*)cBuffer)+hSize, g_cSize);
+            funcName = "HUF_decompress_usingDTable";
+            func = local_HUF_decompress_usingDTable;
+            break;
+        }
+
+    case 40:
+        {
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress4X2";
+            func = local_HUF_decompress4X2;
+            break;
+        }
+
+
+    case 41:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readDTableX2";
+            func = local_HUF_readDTableX2;
+            break;
+        }
+
+    case 42:
+        {
+            size_t hSize;
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_huff_dtable[0] = DTABLE_LOG;
+            hSize = HUF_readDTableX2((U16*)g_huff_dtable, cBuffer, g_cSize);
+            g_cSize -= hSize;
+            memcpy(oBuffer, ((char*)cBuffer)+hSize, g_cSize);
+            funcName = "HUF_decompress4X2_usingDTable";
+            func = local_HUF_decompress4X2_usingDTable;
+            break;
+        }
+
+    case 43:
+        {
+            g_oSize = benchedSize;
+            g_max = 255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            g_cSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
+            g_cSize += HUF_compress_usingCTable(((BYTE*)cBuffer) + g_cSize, cBuffSize, oBuffer, benchedSize, g_tree);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress1X2";
+            func = local_HUF_decompress1X2;
+            break;
+        }
+
+
+    case 50:
+        {
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress4X4";
+            func = local_HUF_decompress4X4;
+            break;
+        }
+
+    case 51:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readDTableX4";
+            func = local_HUF_readDTableX4;
+            break;
+        }
+
+    case 52:
+        {
+            size_t hSize;
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_huff_dtable[0] = DTABLE_LOG;
+            hSize = HUF_readDTableX4(g_huff_dtable, cBuffer, g_cSize);
+            g_cSize -= hSize;
+            memcpy(oBuffer, ((char*)cBuffer)+hSize, g_cSize);
+            funcName = "HUF_decompress4X4_usingDTable";
+            func = local_HUF_decompress4X4_usingDTable;
+            break;
+        }
+
+    case 53:
+        {
+            g_oSize = benchedSize;
+            g_max = 255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            g_cSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
+            g_cSize += HUF_compress_usingCTable(((BYTE*)cBuffer) + g_cSize, cBuffSize, oBuffer, benchedSize, g_tree);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress1X4";
+            func = local_HUF_decompress1X4;
+            break;
+        }
+
+
+    case 60:
+        {
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress4X6";
+            func = local_HUF_decompress4X6;
+            break;
+        }
+
+    case 61:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readDTableX6";
+            func = local_HUF_readDTableX6;
+            break;
+        }
+
+    case 62:
+        {
+            size_t hSize;
+            g_oSize = benchedSize;
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            g_huff_dtable[0] = DTABLE_LOG;
+            hSize = HUF_readDTableX6(g_huff_dtable, cBuffer, g_cSize);
+            g_cSize -= hSize;
+            memcpy(oBuffer, ((char*)cBuffer)+hSize, g_cSize);
+            funcName = "HUF_decompress4X6_usingDTable";
+            func = local_HUF_decompress4X6_usingDTable;
+            break;
+        }
+
+    case 63:
+        {
+            g_oSize = benchedSize;
+            g_max = 255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            g_cSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
+            g_cSize += HUF_compress_usingCTable(((BYTE*)cBuffer) + g_cSize, cBuffSize, oBuffer, benchedSize, g_tree);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_decompress1X6";
+            func = local_HUF_decompress1X6;
+            break;
+        }
+
+
     case 132:  // unimplemented yet
         {
             size_t hhsize;
             g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
-            hhsize = HUF_readDTable(g_huff_dtable, cBuffer, g_cSize);
+            hhsize = HUF_readDTableX4(g_huff_dtable, cBuffer, g_cSize);
             g_cSize -= hhsize;
             memcpy(oBuffer, ((char*)cBuffer) + hhsize, g_cSize);
             funcName = "HUF_decompress_usingDTable";
@@ -1089,13 +1310,13 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         goto _end;
     }
 
-    // Bench
+    /* Bench */
     DISPLAY("\r%79s\r", "");
     {
         double bestTime = 999.;
         U32 benchNb=1;
         size_t errorCode = 0;
-        DISPLAY("%2u-%-26.26s : \r", benchNb, funcName);
+        DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++)
         {
             U32 milliTime;
@@ -1114,9 +1335,9 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-26.26s : %8.1f MB/s \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6i) \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
         }
-        DISPLAY("%2u#%-26.26s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#%-34.34s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
     }
 
 _end:
@@ -1127,7 +1348,7 @@ _end:
 }
 
 
-static int fullbench(const char* filename, size_t blockSize, double p, U32 algNb, U32 nbLoops)
+static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb, U32 nbLoops)
 {
     int result = 0;
     void* buffer = malloc(blockSize);
@@ -1153,6 +1374,19 @@ static int fullbench(const char* filename, size_t blockSize, double p, U32 algNb
         result = runBench(buffer, blockSize, algNb, nbLoops);
 
     free(buffer);
+    return result;
+}
+
+
+static int benchMultipleFiles(const char** fnTable, int nbFn, int startFn, double p, size_t blockSize, U32 algNb, U32 nbLoops)
+{
+    int i, result=0;
+    if (startFn==0)
+        return fullbench(NULL, p, blockSize, algNb, nbLoops);
+
+    for (i=startFn; i<nbFn; i++)
+        result += fullbench(fnTable[i], p, blockSize, algNb, nbLoops);
+
     return result;
 }
 
@@ -1187,7 +1421,6 @@ static int badusage(const char* exename)
 int main(int argc, const char** argv)
 {
     const char* exename = argv[0];
-    const char* filename = NULL;
     U32 proba = DEFAULT_PROBA;
     U32 nbLoops = NBLOOPS;
     U32 pause = 0;
@@ -1195,6 +1428,7 @@ int main(int argc, const char** argv)
     U32 blockSize = DEFAULT_BLOCKSIZE;
     int i;
     int result;
+    int fnStart=0;
 
     // Welcome message
     DISPLAY(WELCOME_MESSAGE);
@@ -1268,11 +1502,11 @@ int main(int argc, const char** argv)
             continue;
         }
 
-        // note : non-command are filenames
-        filename = argument;
+        // note : non-command are filenames; all filenames should be at end of line
+        if (fnStart==0) fnStart = i;
     }
 
-    result = fullbench(filename, blockSize, (double)proba / 100, algNb, nbLoops);
+    result = benchMultipleFiles(argv, argc, fnStart, (double)proba / 100, blockSize, algNb, nbLoops);
 
     if (pause) { DISPLAY("press enter...\n"); getchar(); }
 

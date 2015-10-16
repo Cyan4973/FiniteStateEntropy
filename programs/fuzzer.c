@@ -38,29 +38,9 @@ You can contact the author at :
 #include <stdio.h>      /* printf */
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
+#include "mem.h"
 #include "fse_static.h"
 #include "xxhash.h"
-
-
-/****************************************************************
-*  Basic Types
-****************************************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef  int16_t S16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef   signed short      S16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-#endif
 
 
 /***************************************************
@@ -387,6 +367,7 @@ static void unitTest(void)
 
     /* FSE_writeNCount, FSE_readNCount */
     {
+        #define MAXNCOUNTSIZE 513
         S16 norm[129];
         BYTE header[513];
         U32 max, tableLog, i;
@@ -401,8 +382,9 @@ static void unitTest(void)
         CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
 
         headerSize = FSE_NCountWriteBound(max, tableLog);
+        CHECK(headerSize > MAXNCOUNTSIZE, "Error : not enough memory for NCount");
 
-        headerSize = FSE_writeNCount(header, 513, norm, max, tableLog);
+        headerSize = FSE_writeNCount(header, headerSize, norm, max, tableLog);
         CHECK(FSE_isError(headerSize), "Error : FSE_writeNCount() should have worked");
 
         header[headerSize-1] = 0;
