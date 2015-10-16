@@ -22,6 +22,7 @@ Benchmarks
 Benchmarks are run on an Intel Core i7-5600U, with Linux Mint 64-bits.
 Source code is compiled using GCC 4.8.4, 64-bits mode.
 Test files are generated using the provided `probagen` program.
+Benchmark breaks sample files into blocks of 32 KB.
 `Huff0` and `FSE` are compared to `zlibh`, the huffman encoder within zlib, provided by Frederic Kayser.
 
 | File    | Codec | Ratio  | Compression | Decompression |
@@ -46,7 +47,7 @@ On its side, Huff0 delivers in the form of a massive speed advantage.
 
 Branch Policy
 -------------------------
-External contribution are welcomed and encouraged.
+External contributions are welcomed and encouraged.
 The "master" branch is only meant to host stable releases.
 The "dev" branch is the one where all contributions are merged. If you want to propose a patch, please commit into "dev" branch or dedicated feature branch. Direct commit to "master" are not permitted.
 
