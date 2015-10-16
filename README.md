@@ -3,7 +3,8 @@ New Generation Entropy coders
 
 This library proposes two high speed entropy coders :
 
-__Huff0__, a Huffman codec designed for modern CPU, featuring OoO (Out of Order) operations on multiple ALU (Arithmetic Logic Unit),
+__Huff0__, a [Huffman codec](https://en.wikipedia.org/wiki/Huffman_coding) designed for modern CPU, 
+featuring OoO (Out of Order) operations on multiple ALU (Arithmetic Logic Unit),
 achieving extremely fast compression and decompression speeds.
 
 __FSE__ is a new kind of [Entropy encoder](http://en.wikipedia.org/wiki/Entropy_encoding),
@@ -40,7 +41,7 @@ Benchmark breaks sample files into blocks of 32 KB.
 |         | FSE   |  1.13  |  325 MB/s   |   445 MB/s    |
 |         | zlibh |  1.13  |  180 MB/s   |   210 MB/s    |
 
-By design, Huffman can't break the "1 bit per symbol" limit, hence lose efficiency on squeezed distributions, such as `Proba80`.
+By design, Huffman can't break the "1 bit per symbol" limit, hence loses efficiency on squeezed distributions, such as `Proba80`.
 FSE is free of such limit, and its compression efficiency remains close to Shannon limit in all circumstances.
 However, this accuracy is not always necessary, and less compressible distributions show little difference with Huffman.
 On its side, Huff0 delivers in the form of a massive speed advantage.

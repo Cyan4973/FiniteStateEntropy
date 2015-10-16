@@ -145,7 +145,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
     size_t bufferDstSize = BUFFERSIZE+64;
     unsigned testNb;
-    const size_t maxTestSizeMask = 0x1FFFF;
+    const size_t maxTestSizeMask = 0x1FFFF;   /* 128 KB - 1 */
     U32 rootSeed = seed;
     U32 time = FUZ_GetMilliStart();
 
