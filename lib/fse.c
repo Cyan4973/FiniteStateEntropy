@@ -61,13 +61,6 @@
 /****************************************************************
 *  Byte symbol type
 ****************************************************************/
-typedef struct
-{
-    unsigned short newState;
-    unsigned char  symbol;
-    unsigned char  nbBits;
-} FSE_decode_t;   /* size == U32 */
-
 #endif   /* !FSE_COMMONDEFS_ONLY */
 
 
@@ -123,12 +116,6 @@ typedef struct
 /****************************************************************
 *  Complex types
 ****************************************************************/
-typedef struct
-{
-    int deltaFindState;
-    U32 deltaNbBits;
-} FSE_symbolCompressionTransform; /* total 8 bytes */
-
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
@@ -357,11 +344,6 @@ void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (FSE_DTable* dt)
 {
     free(dt);
 }
-
-typedef struct {
-    U16 tableLog;
-    U16 fastMode;
-} FSE_DTableHeader;   /* sizeof U32 */
 
 size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
 (FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
@@ -957,31 +939,6 @@ size_t FSE_buildCTable_rle (FSE_CTable* ct, BYTE symbolValue)
 }
 
 
-void FSE_initCState(FSE_CState_t* statePtr, const FSE_CTable* ct)
-{
-    const U32 tableLog = ( (const U16*) ct) [0];
-    statePtr->value = (ptrdiff_t)1<<tableLog;
-    statePtr->stateTable = ((const U16*) ct) + 2;
-    statePtr->symbolTT = (const FSE_symbolCompressionTransform*)((const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1));
-    statePtr->stateLog = tableLog;
-}
-
-void FSE_encodeSymbol(BIT_CStream_t* bitC, FSE_CState_t* statePtr, U32 symbol)
-{
-    const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
-    const U16* const stateTable = (const U16*)(statePtr->stateTable);
-    U32 nbBitsOut  = (U32)((statePtr->value + symbolTT.deltaNbBits) >> 16);
-    BIT_addBits(bitC, statePtr->value, nbBitsOut);
-    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
-}
-
-void FSE_flushCState(BIT_CStream_t* bitC, const FSE_CState_t* statePtr)
-{
-    BIT_addBits(bitC, statePtr->value, statePtr->stateLog);
-    BIT_flushBits(bitC);
-}
-
-
 static size_t FSE_compress_usingCTable_generic (void* dst, size_t dstSize,
                            const void* src, size_t srcSize,
                            const FSE_CTable* ct, const unsigned fast)
@@ -1157,42 +1114,6 @@ size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
 
     return 0;
 }
-
-void FSE_initDState(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD, const FSE_DTable* dt)
-{
-    const FSE_DTableHeader* const DTableH = (const FSE_DTableHeader*)dt;
-    DStatePtr->state = BIT_readBits(bitD, DTableH->tableLog);
-    BIT_reloadDStream(bitD);
-    DStatePtr->table = dt + 1;
-}
-
-BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD)
-{
-    const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
-    const U32  nbBits = DInfo.nbBits;
-    BYTE symbol = DInfo.symbol;
-    size_t lowBits = BIT_readBits(bitD, nbBits);
-
-    DStatePtr->state = DInfo.newState + lowBits;
-    return symbol;
-}
-
-BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD)
-{
-    const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
-    const U32 nbBits = DInfo.nbBits;
-    BYTE symbol = DInfo.symbol;
-    size_t lowBits = BIT_readBitsFast(bitD, nbBits);
-
-    DStatePtr->state = DInfo.newState + lowBits;
-    return symbol;
-}
-
-unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr)
-{
-    return DStatePtr->state == 0;
-}
-
 
 FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
           void* dst, size_t maxDstSize,

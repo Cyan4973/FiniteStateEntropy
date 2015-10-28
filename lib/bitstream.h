@@ -176,12 +176,12 @@ MEM_STATIC unsigned BIT_highbit32 (register U32 val)
 
 MEM_STATIC size_t BIT_initCStream(BIT_CStream_t* bitC, void* startPtr, size_t maxSize)
 {
-    if (maxSize < sizeof(bitC->ptr)) return ERROR(dstSize_tooSmall);
     bitC->bitContainer = 0;
     bitC->bitPos = 0;
     bitC->startPtr = (char*)startPtr;
     bitC->ptr = bitC->startPtr;
     bitC->endPtr = bitC->startPtr + maxSize - sizeof(bitC->ptr);
+    if (maxSize < sizeof(bitC->ptr)) return ERROR(dstSize_tooSmall);
     return 0;
 }
 
@@ -253,7 +253,7 @@ MEM_STATIC size_t BIT_closeCStream(BIT_CStream_t* bitC)
 */
 MEM_STATIC size_t BIT_initDStream(BIT_DStream_t* bitD, const void* srcBuffer, size_t srcSize)
 {
-    if (srcSize < 1) return ERROR(srcSize_wrong);
+    if (srcSize < 1) { memset(bitD, 0, sizeof(*bitD)); return ERROR(srcSize_wrong); }
 
     if (srcSize >=  sizeof(size_t))   /* normal case */
     {

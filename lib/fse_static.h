@@ -96,11 +96,11 @@ typedef struct
     unsigned    stateLog;
 } FSE_CState_t;
 
-void FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable* ct);
+static void FSE_initCState(FSE_CState_t* CStatePtr, const FSE_CTable* ct);
 
-void FSE_encodeSymbol(BIT_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned symbol);
+static void FSE_encodeSymbol(BIT_CStream_t* bitC, FSE_CState_t* CStatePtr, unsigned symbol);
 
-void FSE_flushCState(BIT_CStream_t* bitC, const FSE_CState_t* CStatePtr);
+static void FSE_flushCState(BIT_CStream_t* bitC, const FSE_CState_t* CStatePtr);
 
 /*
 These functions are inner components of FSE_compress_usingCTable().
@@ -156,11 +156,11 @@ typedef struct
 } FSE_DState_t;
 
 
-void     FSE_initDState(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD, const FSE_DTable* dt);
+static void     FSE_initDState(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD, const FSE_DTable* dt);
 
-unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD);
+static unsigned char FSE_decodeSymbol(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD);
 
-unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
+static unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr);
 
 /*
 Let's now decompose FSE_decompress_usingDTable() into its unitary components.
@@ -215,8 +215,91 @@ Check also the states. There might be some symbols left there, if some high prob
 /******************************************
 *  FSE unsafe API
 ******************************************/
-unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD);
+static unsigned char FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD);
 /* faster, but works only if nbBits is always >= 1 (otherwise, result will be corrupted) */
+
+
+/******************************************
+*  Implementation of inline functions
+******************************************/
+typedef struct
+{
+    int deltaFindState;
+    U32 deltaNbBits;
+} FSE_symbolCompressionTransform; /* total 8 bytes */
+
+MEM_STATIC void FSE_initCState(FSE_CState_t* statePtr, const FSE_CTable* ct)
+{
+    const U32 tableLog = ( (const U16*) ct) [0];
+    statePtr->value = (ptrdiff_t)1<<tableLog;
+    statePtr->stateTable = ((const U16*) ct) + 2;
+    statePtr->symbolTT = (const void*)((const U32*)ct + 1 + (tableLog ? (1<<(tableLog-1)) : 1));
+    statePtr->stateLog = tableLog;
+}
+
+MEM_STATIC void FSE_encodeSymbol(BIT_CStream_t* bitC, FSE_CState_t* statePtr, U32 symbol)
+{
+    const FSE_symbolCompressionTransform symbolTT = ((const FSE_symbolCompressionTransform*)(statePtr->symbolTT))[symbol];
+    const U16* const stateTable = (const U16*)(statePtr->stateTable);
+    U32 nbBitsOut  = (U32)((statePtr->value + symbolTT.deltaNbBits) >> 16);
+    BIT_addBits(bitC, statePtr->value, nbBitsOut);
+    statePtr->value = stateTable[ (statePtr->value >> nbBitsOut) + symbolTT.deltaFindState];
+}
+
+MEM_STATIC void FSE_flushCState(BIT_CStream_t* bitC, const FSE_CState_t* statePtr)
+{
+    BIT_addBits(bitC, statePtr->value, statePtr->stateLog);
+    BIT_flushBits(bitC);
+}
+
+/* decompression */
+
+typedef struct {
+    U16 tableLog;
+    U16 fastMode;
+} FSE_DTableHeader;   /* sizeof U32 */
+
+typedef struct
+{
+    unsigned short newState;
+    unsigned char  symbol;
+    unsigned char  nbBits;
+} FSE_decode_t;   /* size == U32 */
+
+MEM_STATIC void FSE_initDState(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD, const FSE_DTable* dt)
+{
+    const FSE_DTableHeader* const DTableH = (const FSE_DTableHeader*)dt;
+    DStatePtr->state = BIT_readBits(bitD, DTableH->tableLog);
+    BIT_reloadDStream(bitD);
+    DStatePtr->table = dt + 1;
+}
+
+MEM_STATIC BYTE FSE_decodeSymbol(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD)
+{
+    const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
+    const U32  nbBits = DInfo.nbBits;
+    BYTE symbol = DInfo.symbol;
+    size_t lowBits = BIT_readBits(bitD, nbBits);
+
+    DStatePtr->state = DInfo.newState + lowBits;
+    return symbol;
+}
+
+MEM_STATIC BYTE FSE_decodeSymbolFast(FSE_DState_t* DStatePtr, BIT_DStream_t* bitD)
+{
+    const FSE_decode_t DInfo = ((const FSE_decode_t*)(DStatePtr->table))[DStatePtr->state];
+    const U32 nbBits = DInfo.nbBits;
+    BYTE symbol = DInfo.symbol;
+    size_t lowBits = BIT_readBitsFast(bitD, nbBits);
+
+    DStatePtr->state = DInfo.newState + lowBits;
+    return symbol;
+}
+
+MEM_STATIC unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr)
+{
+    return DStatePtr->state == 0;
+}
 
 
 #if defined (__cplusplus)
