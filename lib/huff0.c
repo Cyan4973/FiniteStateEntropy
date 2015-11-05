@@ -69,6 +69,18 @@
 
 
 /****************************************************************
+*  Constants
+****************************************************************/
+#define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code does not work */
+#define HUF_MAX_TABLELOG  12           /* max configured tableLog (for static allocation); can be modified up to HUF_ABSOLUTEMAX_TABLELOG */
+#define HUF_DEFAULT_TABLELOG  HUF_MAX_TABLELOG   /* tableLog by default, when not specified */
+#define HUF_MAX_SYMBOL_VALUE 255
+#if (HUF_MAX_TABLELOG > HUF_ABSOLUTEMAX_TABLELOG)
+#  error "HUF_MAX_TABLELOG is too large !"
+#endif
+
+
+/****************************************************************
 *  Error Management
 ****************************************************************/
 #define HUF_STATIC_ASSERT(c) { enum { HUF_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
@@ -85,14 +97,6 @@ const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 /*********************************************************
 *  Huff0 : Huffman block compression
 *********************************************************/
-#define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code does not work */
-#define HUF_MAX_TABLELOG  12           /* max configured tableLog (for static allocation); can be modified up to HUF_ABSOLUTEMAX_TABLELOG */
-#define HUF_DEFAULT_TABLELOG  HUF_MAX_TABLELOG   /* tableLog by default, when not specified */
-#define HUF_MAX_SYMBOL_VALUE 255
-#if (HUF_MAX_TABLELOG > HUF_ABSOLUTEMAX_TABLELOG)
-#  error "HUF_MAX_TABLELOG is too large !"
-#endif
-
 typedef struct HUF_CElt_s {
   U16  val;
   BYTE nbBits;
@@ -358,7 +362,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
             U16 min = 0;
             for (n=maxNbBits; n>0; n--)
             {
-                valPerRank[n] = min;      // get starting value within each rank
+                valPerRank[n] = min;      /* get starting value within each rank */
                 min += nbPerRank[n];
                 min >>= 1;
             }
@@ -1017,7 +1021,7 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
         rankStart[0] = 0;   /* forget 0w symbols; this is beginning of weight(1) */
     }
 
-	/* Build rankVal */
+    /* Build rankVal */
     {
         const U32 minBits = tableLog+1 - maxW;
         U32 nextRankVal = 0;
@@ -1389,7 +1393,7 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
         rankStart[0] = 0;   /* forget 0w symbols; this is beginning of weight(1) */
     }
 
-	/* Build rankVal */
+    /* Build rankVal */
     {
         const U32 minBits = tableLog+1 - maxW;
         U32 nextRankVal = 0;
@@ -1412,11 +1416,10 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
         }
     }
 
-
     /* fill tables */
     {
         HUF_DDescX6* DDescription = (HUF_DDescX6*)(DTable+1);
-        HUF_DSeqX6* DSequence = (HUF_DSeqX6*)(DTable + 1 + (1<<(memLog-1)));
+        HUF_DSeqX6* DSequence = (HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(memLog-1)));
         HUF_DSeqX6 DSeq;
         HUF_DDescX6 DDesc;
         DSeq.sequence = 0;
@@ -1476,7 +1479,7 @@ static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStr
 static inline size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const U32* DTable, const U32 dtLog)
 {
     const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
-    const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + (1<<(dtLog-1)));
+    const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(dtLog-1)));
     BYTE* const pStart = p;
 
     /* up to 16 symbols at a time */
@@ -1558,7 +1561,7 @@ size_t HUF_decompress4X6_usingDTable(
 
         const U32 dtLog = DTable[0];
         const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
-        const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + (1<<(dtLog-1)));
+        const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(dtLog-1)));
         size_t errorCode;
 
         /* Init */
