@@ -32,7 +32,7 @@
     - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
-/****************************************************************
+/* **************************************************************
 *  Compiler specifics
 ****************************************************************/
 #if defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
@@ -57,7 +57,7 @@
 #endif
 
 
-/****************************************************************
+/* **************************************************************
 *  Includes
 ****************************************************************/
 #include <stdlib.h>     /* malloc, free, qsort */
@@ -68,7 +68,7 @@
 #include "fse.h"        /* header compression */
 
 
-/****************************************************************
+/* **************************************************************
 *  Constants
 ****************************************************************/
 #define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code does not work */
@@ -80,27 +80,21 @@
 #endif
 
 
-/****************************************************************
+/* **************************************************************
 *  Error Management
 ****************************************************************/
+unsigned HUF_isError(size_t code) { return ERR_isError(code); }
+const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 #define HUF_STATIC_ASSERT(c) { enum { HUF_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
-/******************************************
-*  Helper functions
-******************************************/
-unsigned HUF_isError(size_t code) { return ERR_isError(code); }
-
-const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
-
-
-/*********************************************************
+/* *******************************************************
 *  Huff0 : Huffman block compression
 *********************************************************/
-typedef struct HUF_CElt_s {
+struct HUF_CElt_s {
   U16  val;
   BYTE nbBits;
-} HUF_CElt ;
+};   /* typedef'd to HUF_CElt within huff0_static.h */
 
 typedef struct nodeElt_s {
     U32 count;
@@ -320,7 +314,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     /* sort, decreasing order */
     HUF_sort(huffNode, count, maxSymbolValue);
 
-    // init for parents
+    /* init for parents */
     nonNullRank = maxSymbolValue;
     while(huffNode[nonNullRank].count == 0) nonNullRank--;
     lowS = nonNullRank; nodeRoot = nodeNb + lowS - 1; lowN = nodeNb;
@@ -330,7 +324,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     for (n=nodeNb; n<=nodeRoot; n++) huffNode[n].count = (U32)(1U<<30);
     huffNode0[0].count = (U32)(1U<<31);
 
-    // create parents
+    /* create parents */
     while (nodeNb <= nodeRoot)
     {
         U32 n1 = (huffNode[lowS].count < huffNode[lowN].count) ? lowS-- : lowN++;
@@ -340,7 +334,7 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
         nodeNb++;
     }
 
-    // distribute weights (unlimited tree height)
+    /* distribute weights (unlimited tree height) */
     huffNode[nodeRoot].nbBits = 0;
     for (n=nodeRoot-1; n>=STARTNODE; n--)
         huffNode[n].nbBits = huffNode[ huffNode[n].parent ].nbBits + 1;
@@ -368,9 +362,9 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
             }
         }
         for (n=0; n<=maxSymbolValue; n++)
-            tree[huffNode[n].byte].nbBits = huffNode[n].nbBits;   // push nbBits per symbol, symbol order
+            tree[huffNode[n].byte].nbBits = huffNode[n].nbBits;   /* push nbBits per symbol, symbol order */
         for (n=0; n<=maxSymbolValue; n++)
-            tree[n].val = valPerRank[tree[n].nbBits]++;   // assign value within rank, symbol order
+            tree[n].val = valPerRank[tree[n].nbBits]++;   /* assign value within rank, symbol order */
     }
 
     return maxNbBits;
