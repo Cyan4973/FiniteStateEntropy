@@ -630,12 +630,12 @@ size_t HUF_readDTableX2 (U16* DTable, const void* src, size_t srcSize)
     BYTE huffWeight[HUF_MAX_SYMBOL_VALUE + 1];
     U32 rankVal[HUF_ABSOLUTEMAX_TABLELOG + 1];   /* large enough for values from 0 to 16 */
     U32 tableLog = 0;
-    const BYTE* ip = (const BYTE*) src;
-    size_t iSize = ip[0];
+    size_t iSize;
     U32 nbSymbols = 0;
     U32 n;
     U32 nextRankStart;
-    HUF_DEltX2* const dt = (HUF_DEltX2*)(DTable + 1);
+    void* const dtPtr = DTable + 1;
+    HUF_DEltX2* const dt = (HUF_DEltX2*)dtPtr;
 
     HUF_STATIC_ASSERT(sizeof(HUF_DEltX2) == sizeof(U16));   /* if compilation fails here, assertion is false */
     //memset(huffWeight, 0, sizeof(huffWeight));   /* is not necessary, even though some analyzer complain ... */
@@ -724,7 +724,8 @@ size_t HUF_decompress1X2_usingDTable(
     BYTE* const oend = op + dstSize;
     size_t errorCode;
     const U32 dtLog = DTable[0];
-    const HUF_DEltX2* const dt = ((const HUF_DEltX2*)DTable) +1;
+    const void* dtPtr = DTable;
+    const HUF_DEltX2* const dt = ((const HUF_DEltX2*)dtPtr)+1;
     BIT_DStream_t bitD;
     errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);
     if (HUF_isError(errorCode)) return errorCode;
@@ -764,8 +765,8 @@ size_t HUF_decompress4X2_usingDTable(
         const BYTE* const istart = (const BYTE*) cSrc;
         BYTE* const ostart = (BYTE*) dst;
         BYTE* const oend = ostart + dstSize;
-
-        const HUF_DEltX2* const dt = ((const HUF_DEltX2*)DTable) +1;
+        const void* const dtPtr = DTable;
+        const HUF_DEltX2* const dt = ((const HUF_DEltX2*)dtPtr) +1;
         const U32 dtLog = DTable[0];
         size_t errorCode;
 
@@ -972,9 +973,9 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
     rankVal_t rankVal;
     U32 tableLog, maxW, sizeOfSort, nbSymbols;
     const U32 memLog = DTable[0];
-    const BYTE* ip = (const BYTE*) src;
-    size_t iSize = ip[0];
-    HUF_DEltX4* const dt = ((HUF_DEltX4*)DTable) + 1;
+    size_t iSize;
+    void* dtPtr = DTable;
+    HUF_DEltX4* const dt = ((HUF_DEltX4*)dtPtr) + 1;
 
     HUF_STATIC_ASSERT(sizeof(HUF_DEltX4) == sizeof(U32));   /* if compilation fails here, assertion is false */
     if (memLog > HUF_ABSOLUTEMAX_TABLELOG) return ERROR(tableLog_tooLarge);
@@ -1121,7 +1122,8 @@ size_t HUF_decompress1X4_usingDTable(
     BYTE* const oend = ostart + dstSize;
 
     const U32 dtLog = DTable[0];
-    const HUF_DEltX4* const dt = ((const HUF_DEltX4*)DTable) +1;
+    const void* const dtPtr = DTable;
+    const HUF_DEltX4* const dt = ((const HUF_DEltX4*)dtPtr) +1;
     size_t errorCode;
 
     /* Init */
@@ -1164,8 +1166,8 @@ size_t HUF_decompress4X4_usingDTable(
         const BYTE* const istart = (const BYTE*) cSrc;
         BYTE* const ostart = (BYTE*) dst;
         BYTE* const oend = ostart + dstSize;
-
-        const HUF_DEltX4* const dt = ((const HUF_DEltX4*)DTable) +1;
+        const void* const dtPtr = DTable;
+        const HUF_DEltX4* const dt = ((const HUF_DEltX4*)dtPtr) +1;
         const U32 dtLog = DTable[0];
         size_t errorCode;
 
@@ -1346,8 +1348,7 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
     U32 tableLog, maxW, sizeOfSort, nbSymbols;
     rankVal_t rankVal;
     const U32 memLog = DTable[0];
-    const BYTE* ip = (const BYTE*) src;
-    size_t iSize = ip[0];
+    size_t iSize;
 
     if (memLog > HUF_ABSOLUTEMAX_TABLELOG) return ERROR(tableLog_tooLarge);
     //memset(weightList, 0, sizeof(weightList));   /* is not necessary, even though some analyzer complain ... */
@@ -1412,8 +1413,10 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
 
     /* fill tables */
     {
-        HUF_DDescX6* DDescription = (HUF_DDescX6*)(DTable+1);
-        HUF_DSeqX6* DSequence = (HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(memLog-1)));
+        void* ddPtr = DTable+1;
+        HUF_DDescX6* DDescription = (HUF_DDescX6*)ddPtr;
+        void* dsPtr = DTable + 1 + ((size_t)1<<(memLog-1));
+        HUF_DSeqX6* DSequence = (HUF_DSeqX6*)dsPtr;
         HUF_DSeqX6 DSeq;
         HUF_DDescX6 DDesc;
         DSeq.sequence = 0;
@@ -1472,8 +1475,10 @@ static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStr
 
 static inline size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const U32* DTable, const U32 dtLog)
 {
-    const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
-    const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(dtLog-1)));
+    const void* const ddPtr = DTable+1;
+    const HUF_DDescX6* dd = (const HUF_DDescX6*)ddPtr;
+    const void* const dsPtr = DTable + 1 + ((size_t)1<<(dtLog-1));
+    const HUF_DSeqX6* ds = (const HUF_DSeqX6*)dsPtr;
     BYTE* const pStart = p;
 
     /* up to 16 symbols at a time */
@@ -1551,8 +1556,10 @@ size_t HUF_decompress4X6_usingDTable(
         BYTE* const oend = ostart + dstSize;
 
         const U32 dtLog = DTable[0];
-        const HUF_DDescX6* dd = (const HUF_DDescX6*)(DTable+1);
-        const HUF_DSeqX6* ds = (const HUF_DSeqX6*)(DTable + 1 + ((size_t)1<<(dtLog-1)));
+        const void* const ddPtr = DTable+1;
+        const HUF_DDescX6* dd = (const HUF_DDescX6*)ddPtr;
+        const void* const dsPtr = DTable + 1 + ((size_t)1<<(dtLog-1));
+        const HUF_DSeqX6* ds = (const HUF_DSeqX6*)dsPtr;
         size_t errorCode;
 
         /* Init */

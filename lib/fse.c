@@ -248,12 +248,14 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 {
     const unsigned tableSize = 1 << tableLog;
     const unsigned tableMask = tableSize - 1;
-    U16* tableU16 = ( (U16*) ct) + 2;
-    FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) (((U32*)ct) + 1 + (tableLog ? tableSize>>1 : 1) );
+    void* const ptr = ct;
+    U16* const tableU16 = ( (U16*) ptr) + 2;
+    void* const FSCT = ((U32*)ptr) + 1 /* header */ + (tableLog ? tableSize>>1 : 1) ;
+    FSE_symbolCompressionTransform* const symbolTT = (FSE_symbolCompressionTransform*) (FSCT);
     const unsigned step = FSE_tableStep(tableSize);
     unsigned cumul[FSE_MAX_SYMBOL_VALUE+2];
     U32 position = 0;
-    FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE]; /* init isn't necessary, even if static analyzer complain about it */
+    FSE_FUNCTION_TYPE tableSymbol[FSE_MAX_TABLESIZE]; /* memset() is not necessary, even if static analyzer complain about it */
     U32 highThreshold = tableSize-1;
     unsigned symbol;
     unsigned i;
@@ -269,7 +271,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     cumul[0] = 0;
     for (i=1; i<=maxSymbolValue+1; i++)
     {
-        if (normalizedCounter[i-1]==-1)   /* Low prob symbol */
+        if (normalizedCounter[i-1]==-1)   /* Low proba symbol */
         {
             cumul[i] = cumul[i-1] + 1;
             tableSymbol[highThreshold--] = (FSE_FUNCTION_TYPE)(i-1);
@@ -287,7 +289,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
         {
             tableSymbol[position] = (FSE_FUNCTION_TYPE)symbol;
             position = (position + step) & tableMask;
-            while (position > highThreshold) position = (position + step) & tableMask;   /* Lowprob area */
+            while (position > highThreshold) position = (position + step) & tableMask;   /* Low proba area */
         }
     }
 
@@ -296,7 +298,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
     /* Build table */
     for (i=0; i<tableSize; i++)
     {
-        FSE_FUNCTION_TYPE s = tableSymbol[i];   /* static analyzer doesn't understand tableSymbol is properly initialized */
+        FSE_FUNCTION_TYPE s = tableSymbol[i];   /* note : static analyzer may not understand tableSymbol is properly initialized */
         tableU16[cumul[s]++] = (U16) (tableSize+i);   /* TableU16 : sorted by symbol order; gives next state value */
     }
 
@@ -348,8 +350,10 @@ void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (FSE_DTable* dt)
 size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
 (FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
-    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
-    FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (dt+1);   /* because dt is unsigned, 32-bits aligned on 32-bits */
+    void* const dPtr = dt;
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dPtr;
+    void* const tdPtr = dt+1;   /* because dt is unsigned, 32-bits aligned on 32-bits */
+    FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (tdPtr);
     const U32 tableSize = 1 << tableLog;
     const U32 tableMask = tableSize-1;
     const U32 step = FSE_tableStep(tableSize);
@@ -890,8 +894,10 @@ size_t FSE_buildCTable_raw (FSE_CTable* ct, unsigned nbBits)
     const unsigned tableSize = 1 << nbBits;
     const unsigned tableMask = tableSize - 1;
     const unsigned maxSymbolValue = tableMask;
-    U16* tableU16 = ( (U16*) ct) + 2;
-    FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) ((((U32*)ct)+1) + (tableSize>>1));
+    void* const ptr = ct;
+    U16* const tableU16 = ( (U16*) ptr) + 2;
+    void* const FSCT = ((U32*)ptr) + 1 /* header */ + (tableSize>>1);   /* assumption : tableLog >= 1 */
+    FSE_symbolCompressionTransform* const symbolTT = (FSE_symbolCompressionTransform*) (FSCT);
     unsigned s;
 
     /* Sanity checks */
@@ -918,8 +924,10 @@ size_t FSE_buildCTable_raw (FSE_CTable* ct, unsigned nbBits)
 /* fake FSE_CTable, for rle (100% always same symbol) input */
 size_t FSE_buildCTable_rle (FSE_CTable* ct, BYTE symbolValue)
 {
-    U16* tableU16 = ( (U16*) ct) + 2;
-    FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) ((U32*)ct + 2);
+    void* ptr = ct;
+    U16* tableU16 = ( (U16*) ptr) + 2;
+    void* FSCTptr = (U32*)ptr + 2;
+    FSE_symbolCompressionTransform* symbolTT = (FSE_symbolCompressionTransform*) FSCTptr;
 
     /* header */
     tableU16[-2] = (U16) 0;
@@ -1076,8 +1084,10 @@ size_t FSE_compress (void* dst, size_t dstSize, const void* src, size_t srcSize)
 *********************************************************/
 size_t FSE_buildDTable_rle (FSE_DTable* dt, BYTE symbolValue)
 {
-    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
-    FSE_decode_t* const cell = (FSE_decode_t*)(dt + 1);   /* because dt is unsigned */
+    void* ptr = dt;
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)ptr;
+    void* dPtr = dt + 1;
+    FSE_decode_t* const cell = (FSE_decode_t*)dPtr;
 
     DTableH->tableLog = 0;
     DTableH->fastMode = 0;
@@ -1092,8 +1102,10 @@ size_t FSE_buildDTable_rle (FSE_DTable* dt, BYTE symbolValue)
 
 size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
 {
-    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dt;
-    FSE_decode_t* const dinfo = (FSE_decode_t*)(dt + 1);   /* because dt is unsigned */
+    void* ptr = dt;
+    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)ptr;
+    void* dPtr = dt + 1;
+    FSE_decode_t* const dinfo = (FSE_decode_t*)dPtr;
     const unsigned tableSize = 1 << nbBits;
     const unsigned tableMask = tableSize - 1;
     const unsigned maxSymbolValue = tableMask;
@@ -1189,7 +1201,8 @@ size_t FSE_decompress_usingDTable(void* dst, size_t originalSize,
                             const void* cSrc, size_t cSrcSize,
                             const FSE_DTable* dt)
 {
-    const FSE_DTableHeader* DTableH = (const FSE_DTableHeader*)dt;
+    const void* ptr = dt;
+    const FSE_DTableHeader* DTableH = (const FSE_DTableHeader*)ptr;
     const U32 fastMode = DTableH->fastMode;
 
     /* select fast mode (static) */
