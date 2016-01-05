@@ -34,10 +34,10 @@
 
 #ifndef FSE_COMMONDEFS_ONLY
 
-/****************************************************************
+/* **************************************************************
 *  Tuning parameters
 ****************************************************************/
-/* MEMORY_USAGE :
+/*!MEMORY_USAGE :
 *  Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
 *  Increasing memory usage improves compression ratio
 *  Reduced memory usage can improve speed, due to cache effect
@@ -45,26 +45,23 @@
 #define FSE_MAX_MEMORY_USAGE 14
 #define FSE_DEFAULT_MEMORY_USAGE 13
 
-/* FSE_MAX_SYMBOL_VALUE :
+/*!FSE_MAX_SYMBOL_VALUE :
 *  Maximum symbol value authorized.
 *  Required for proper stack allocation */
 #define FSE_MAX_SYMBOL_VALUE 255
 
 
-/****************************************************************
+/* **************************************************************
 *  template functions type & suffix
 ****************************************************************/
 #define FSE_FUNCTION_TYPE BYTE
 #define FSE_FUNCTION_EXTENSION
+#define FSE_DECODE_TYPE FSE_decode_t
 
 
-/****************************************************************
-*  Byte symbol type
-****************************************************************/
 #endif   /* !FSE_COMMONDEFS_ONLY */
 
-
-/****************************************************************
+/* **************************************************************
 *  Compiler specifics
 ****************************************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -82,7 +79,7 @@
 #endif
 
 
-/****************************************************************
+/* **************************************************************
 *  Includes
 ****************************************************************/
 #include <stdlib.h>     /* malloc, free, qsort */
@@ -92,7 +89,7 @@
 #include "fse_static.h"
 
 
-/****************************************************************
+/* ***************************************************************
 *  Constants
 *****************************************************************/
 #define FSE_MAX_TABLELOG  (FSE_MAX_MEMORY_USAGE-2)
@@ -107,20 +104,20 @@
 #endif
 
 
-/****************************************************************
+/* **************************************************************
 *  Error Management
 ****************************************************************/
 #define FSE_STATIC_ASSERT(c) { enum { FSE_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
-/****************************************************************
+/* **************************************************************
 *  Complex types
 ****************************************************************/
 typedef U32 CTable_max_t[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
 typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
 
-/****************************************************************
+/* **************************************************************
 *  Templates
 ****************************************************************/
 /*
@@ -144,8 +141,7 @@ typedef U32 DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
 
 /* Function templates */
-size_t FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION)
-(unsigned* count, unsigned* maxSymbolValuePtr, const FSE_FUNCTION_TYPE* source, size_t sourceSize, unsigned safe)
+size_t FSE_count_generic(unsigned* count, unsigned* maxSymbolValuePtr, const FSE_FUNCTION_TYPE* source, size_t sourceSize, unsigned safe)
 {
     const FSE_FUNCTION_TYPE* ip = source;
     const FSE_FUNCTION_TYPE* const iend = ip+sourceSize;
@@ -226,7 +222,7 @@ size_t FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION)
 size_t FSE_FUNCTION_NAME(FSE_countFast, FSE_FUNCTION_EXTENSION)
 (unsigned* count, unsigned* maxSymbolValuePtr, const FSE_FUNCTION_TYPE* source, size_t sourceSize)
 {
-    return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, maxSymbolValuePtr, source, sourceSize, 0);
+    return FSE_count_generic(count, maxSymbolValuePtr, source, sourceSize, 0);
 }
 
 size_t FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION)
@@ -235,16 +231,15 @@ size_t FSE_FUNCTION_NAME(FSE_count, FSE_FUNCTION_EXTENSION)
     if ((sizeof(FSE_FUNCTION_TYPE)==1) && (*maxSymbolValuePtr >= 255))
     {
         *maxSymbolValuePtr = 255;
-        return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, maxSymbolValuePtr, source, sourceSize, 0);
+        return FSE_count_generic(count, maxSymbolValuePtr, source, sourceSize, 0);
     }
-    return FSE_FUNCTION_NAME(FSE_count_generic, FSE_FUNCTION_EXTENSION) (count, maxSymbolValuePtr, source, sourceSize, 1);
+    return FSE_count_generic(count, maxSymbolValuePtr, source, sourceSize, 1);
 }
 
 
 static U32 FSE_tableStep(U32 tableSize) { return (tableSize>>1) + (tableSize>>3) + 3; }
 
-size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
-(FSE_CTable* ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+size_t FSE_buildCTable(FSE_CTable* ct, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     const unsigned tableSize = 1 << tableLog;
     const unsigned tableMask = tableSize - 1;
@@ -334,24 +329,20 @@ size_t FSE_FUNCTION_NAME(FSE_buildCTable, FSE_FUNCTION_EXTENSION)
 }
 
 
-#define FSE_DECODE_TYPE FSE_TYPE_NAME(FSE_decode_t, FSE_FUNCTION_EXTENSION)
-
-FSE_DTable* FSE_FUNCTION_NAME(FSE_createDTable, FSE_FUNCTION_EXTENSION) (unsigned tableLog)
+FSE_DTable* FSE_createDTable (unsigned tableLog)
 {
     if (tableLog > FSE_TABLELOG_ABSOLUTE_MAX) tableLog = FSE_TABLELOG_ABSOLUTE_MAX;
     return (FSE_DTable*)malloc( FSE_DTABLE_SIZE_U32(tableLog) * sizeof (U32) );
 }
 
-void FSE_FUNCTION_NAME(FSE_freeDTable, FSE_FUNCTION_EXTENSION) (FSE_DTable* dt)
+void FSE_freeDTable (FSE_DTable* dt)
 {
     free(dt);
 }
 
-size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
-(FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
+size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
-    void* const dPtr = dt;
-    FSE_DTableHeader* const DTableH = (FSE_DTableHeader*)dPtr;
+    FSE_DTableHeader DTableH;
     void* const tdPtr = dt+1;   /* because dt is unsigned, 32-bits aligned on 32-bits */
     FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (tdPtr);
     const U32 tableSize = 1 << tableLog;
@@ -369,7 +360,7 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
     if (tableLog > FSE_MAX_TABLELOG) return ERROR(tableLog_tooLarge);
 
     /* Init, lay down lowprob symbols */
-    DTableH[0].tableLog = (U16)tableLog;
+    DTableH.tableLog = (U16)tableLog;
     for (s=0; s<=maxSymbolValue; s++)
     {
         if (normalizedCounter[s]==-1)
@@ -410,7 +401,8 @@ size_t FSE_FUNCTION_NAME(FSE_buildDTable, FSE_FUNCTION_EXTENSION)
         }
     }
 
-    DTableH->fastMode = (U16)noLarge;
+    DTableH.fastMode = (U16)noLarge;
+    memcpy(dt, &DTableH, sizeof(DTableH));
     return 0;
 }
 
