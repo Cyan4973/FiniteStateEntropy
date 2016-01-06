@@ -1,6 +1,6 @@
 /* ******************************************************************
    FSEU16 : Finite State Entropy coder for 16-bits input
-   Copyright (C) 2013-2015, Yann Collet.
+   Copyright (C) 2013-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -32,10 +32,10 @@
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
-/****************************************************************
+/* *************************************************************
 *  Tuning parameters
 *****************************************************************/
-/* MEMORY_USAGE :
+/*!MEMORY_USAGE :
 *  Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
 *  Increasing memory usage improves compression ratio
 *  Reduced memory usage can improve speed, due to cache effect
@@ -44,13 +44,13 @@
 #define FSE_DEFAULT_MEMORY_USAGE 13
 
 
-/****************************************************************
+/* **************************************************************
 *  Includes
 *****************************************************************/
 #include "fseU16.h"
 
 
-/****************************************************************
+/* **************************************************************
 *  Compiler specifics
 *****************************************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -66,7 +66,7 @@
 #endif
 
 
-/****************************************************************
+/* **************************************************************
 *  Local type
 ****************************************************************/
 typedef struct
@@ -74,20 +74,31 @@ typedef struct
     unsigned short newState;
     unsigned nbBits : 4;
     unsigned symbol : 12;
-} FSE_decode_tU16;    /* Note : the size of this struct should be 4 */
+} FSE_decode_tU16;    /* Note : the size of this struct must be 4 */
 
 
-/********************************************************************
+/* *******************************************************************
 *  Include type-specific functions from fse.c (C template emulation)
-********************************************************************/
+*********************************************************************/
 #define FSE_COMMONDEFS_ONLY
 
 #define FSE_FUNCTION_TYPE U16
 #define FSE_FUNCTION_EXTENSION U16
+
+#define FSE_count_generic FSE_count_genericU16
+//#define FSE_countFast     FSE_countFastU16
+//#define FSE_count         FSE_countU16
+#define FSE_buildCTable   FSE_buildCTableU16
+
+#define FSE_DECODE_TYPE   FSE_decode_tU16
+#define FSE_createDTable  FSE_createDTableU16
+#define FSE_freeDTable    FSE_freeDTableU16
+#define FSE_buildDTable   FSE_buildDTableU16
+
 #include "fse.c"   /* FSE_countU16, FSE_buildCTableU16, FSE_buildDTableU16 */
 
 
-/*********************************************************
+/* *******************************************************
 *  U16 Compression functions
 *********************************************************/
 size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
@@ -201,7 +212,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 }
 
 
-/*********************************************************
+/* *******************************************************
 *  U16 Decompression functions
 *********************************************************/
 

@@ -294,14 +294,14 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
     FILE* foutput;
     size_t sizeCheck;
     size_t inputBlockSize  = FIO_blockID_to_blockSize(g_blockSizeId);
-    XXH32_state_t xxhState;
+    XXH32_CREATESTATE_STATIC(xxhState);
     typedef size_t (*compressor_t) (void* dst, size_t dstSize, const void* src, size_t srcSize);
     compressor_t compressor;
     unsigned magicNumber;
 
 
     /* Init */
-    XXH32_reset (&xxhState, FSE_CHECKSUM_SEED);
+    XXH32_reset (xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     switch (g_compressor)
     {
@@ -342,7 +342,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
         size_t inSize = fread(in_buff, (size_t)1, (size_t)inputBlockSize, finput);
         if (inSize==0) break;
         filesize += inSize;
-        XXH32_update(&xxhState, in_buff, inSize);
+        XXH32_update(xxhState, in_buff, inSize);
         DISPLAYUPDATE(2, "\rRead : %u MB   ", (U32)(filesize>>20));
 
         /* Compress Block */
@@ -418,7 +418,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
 
     /* Checksum */
     {
-        U32 checksum = XXH32_digest(&xxhState);
+        U32 checksum = XXH32_digest(xxhState);
         checksum = (checksum >> 5) & ((1U<<22)-1);
         out_buff[2] = (BYTE)checksum;
         out_buff[1] = (BYTE)(checksum >> 8);
@@ -484,13 +484,13 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     U32   magicNumber;
     U32*  magicNumberP = header32;
     size_t inputBufferSize;
-    XXH32_state_t xxhState;
+    XXH32_CREATESTATE_STATIC(xxhState);
     typedef size_t (*decompressor_t) (void* dst, size_t dstSize, const void* src, size_t srcSize);
     decompressor_t decompressor = FSE_decompress;
 
 
     /* Init */
-    XXH32_reset(&xxhState, FSE_CHECKSUM_SEED);
+    XXH32_reset(xxhState, FSE_CHECKSUM_SEED);
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     /* check header */
@@ -596,13 +596,13 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
           case bt_rle :
             writeSizeCheck = fwrite(out_buff, 1, rSize, foutput);
             if (writeSizeCheck != rSize) EXM_THROW(41, "Write error : unable to write data block to destination file");
-            XXH32_update(&xxhState, out_buff, rSize);
+            XXH32_update(xxhState, out_buff, rSize);
             filesize += rSize;
             break;
           case bt_raw :
             writeSizeCheck = fwrite(in_buff, 1, cSize, foutput);
             if (writeSizeCheck != cSize) EXM_THROW(42, "Write error : unable to write data block to destination file");
-            XXH32_update(&xxhState, in_buff, cSize);
+            XXH32_update(xxhState, in_buff, cSize);
             filesize += cSize;
             break;
           default :
@@ -615,7 +615,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     if (sizeCheck != 2) EXM_THROW(43, "Read error");
     {
         U32 CRCsaved = ip[2] + (ip[1]<<8) + ((ip[0] & _6BITS) << 16);
-        U32 CRCcalculated = (XXH32_digest(&xxhState) >> 5) & ((1U<<22)-1);
+        U32 CRCcalculated = (XXH32_digest(xxhState) >> 5) & ((1U<<22)-1);
         if (CRCsaved != CRCcalculated) EXM_THROW(44, "CRC error : wrong checksum, corrupted data");
     }
 
