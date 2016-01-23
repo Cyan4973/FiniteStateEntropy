@@ -100,7 +100,6 @@ HUF_decompress() does the following:
 1. select the decompression algorithm (X2, X4, X6) based on pre-computed heuristics
 2. build Huffman table from save, using HUF_readDTableXn()
 3. decode 1 or 4 segments in parallel using HUF_decompressSXn_usingDTable
-
 */
 size_t HUF_readDTableX2 (unsigned short* DTable, const void* src, size_t srcSize);
 size_t HUF_readDTableX4 (unsigned* DTable, const void* src, size_t srcSize);
@@ -113,6 +112,10 @@ size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned short* DTable);
 size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
 size_t HUF_decompress4X6_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
+
+size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned short* DTable);
+size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
+size_t HUF_decompress1X6_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
 
 
 #if defined (__cplusplus)
