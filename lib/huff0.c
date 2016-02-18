@@ -810,6 +810,9 @@ size_t HUF_decompress4X2_usingDTable(
     const void* cSrc, size_t cSrcSize,
     const U16* DTable)
 {
+/* Check */
+if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
+{
     const BYTE* const istart = (const BYTE*) cSrc;
     BYTE* const ostart = (BYTE*) dst;
     BYTE* const oend = ostart + dstSize;
@@ -817,9 +820,6 @@ size_t HUF_decompress4X2_usingDTable(
     const HUF_DEltX2* const dt = ((const HUF_DEltX2*)dtPtr) +1;
     const U32 dtLog = DTable[0];
     size_t errorCode;
-
-    /* Check */
-    if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
 
     /* Init */
     BIT_DStream_t bitD1;
@@ -895,7 +895,7 @@ size_t HUF_decompress4X2_usingDTable(
 
     /* decoded size */
     return dstSize;
-}
+}}
 
 
 size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
@@ -1046,8 +1046,7 @@ size_t HUF_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
 
     /* sort symbols by weight */
     {
-        U32 s;
-        for (s=0; s<nbSymbols; s++) {
+        U32 s; for (s=0; s<nbSymbols; s++) {
             U32 w = weightList[s];
             U32 r = rankStart[w]++;
             sortedSymbol[r].symbol = (BYTE)s;
@@ -1397,8 +1396,7 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
 
     /* sort symbols by weight */
     {
-        U32 s;
-        for (s=0; s<nbSymbols; s++) {
+        U32 s; for (s=0; s<nbSymbols; s++) {
             U32 w = weightList[s];
             U32 r = rankStart[w]++;
             sortedSymbol[r].symbol = (BYTE)s;
@@ -1559,6 +1557,9 @@ size_t HUF_decompress4X6_usingDTable(
     const void* cSrc, size_t cSrcSize,
     const U32* DTable)
 {
+/* Check */
+if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
+{
     const BYTE* const istart = (const BYTE*) cSrc;
     BYTE* const ostart = (BYTE*) dst;
     BYTE* const oend = ostart + dstSize;
@@ -1569,9 +1570,6 @@ size_t HUF_decompress4X6_usingDTable(
     const void* const dsPtr = DTable + 1 + ((size_t)1<<(dtLog-1));
     const HUF_DSeqX6* ds = (const HUF_DSeqX6*)dsPtr;
     size_t errorCode;
-
-    /* Check */
-    if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
 
     /* Init */
     BIT_DStream_t bitD1;
@@ -1648,7 +1646,7 @@ size_t HUF_decompress4X6_usingDTable(
 
     /* decoded size */
     return dstSize;
-}
+}}
 
 
 size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
