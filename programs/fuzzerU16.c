@@ -64,7 +64,7 @@ typedef unsigned long long  U64;
 #endif
 
 
-/******************************
+/*-****************************
 *  Constants
 ******************************/
 #define KB *(1<<10)
@@ -77,7 +77,7 @@ typedef unsigned long long  U64;
 #define PRIME2   2246822519U
 
 
-/***************************************************
+/*-*************************************************
 *  Macros
 ***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
@@ -85,7 +85,7 @@ typedef unsigned long long  U64;
 static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 
 
-/***************************************************
+/*-*************************************************
 *  Local functions
 ***************************************************/
 static int FUZ_GetMilliStart(void)
@@ -126,8 +126,7 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32 seedSrc)
     U32 seed = seedSrc;
 
     /* Build Symbol Table */
-    while (remaining)
-    {
+    while (remaining) {
         const U32 n = (U32) (remaining * p) + 1;
         const U32 end = pos + n;
         while (pos<end) tableU16[pos++] = val16;
@@ -137,8 +136,7 @@ static void generateU16 (U16* buffer, size_t buffSize, double p, U32 seedSrc)
     }
 
     /* Fill buffer */
-    while (op<oend)
-    {
+    while (op<oend) {
         const U32 r = FUZ_rand(&seed) & (PROBATABLESIZE-1);
         *op++ = tableU16[r];
     }
@@ -161,23 +159,20 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 
     generateU16 (bufferP8, BUFFERSIZE, 0.08, seed);
 
-    if (startTestNb)
-    {
+    if (startTestNb) {
         U32 i;
         for (i=0; i<startTestNb; i++)
             FUZ_rand (&seed);
     }
 
-    for (testNb=startTestNb; testNb<totalTest; testNb++)
-    {
+    for (testNb=startTestNb; testNb<totalTest; testNb++) {
         U16* bufferTest;
         int tag=0;
         U32 roundSeed = seed ^ 0xEDA5B371;
         FUZ_rand(&seed);
 
         DISPLAYLEVEL (4, "\r test %5u      ", testNb);
-        if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
-        {
+        if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE) {
             DISPLAY ("\r test %5u      ", testNb);
             time = FUZ_GetMilliStart();
         }
@@ -194,8 +189,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
             hashOrig = XXH64 (bufferTest, sizeOrig * sizeof(U16), 0);
             sizeCompressed = FSE_compressU16 (bufferDst, bufferDstSize, bufferTest, sizeOrig, FSE_MAX_SYMBOL_VALUE, 12);
             CHECK(FSE_isError(sizeCompressed), "\r test %5u : FSE_compressU16 failed !", testNb);
-            if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
-            {
+            if (sizeCompressed > 1) {  /* don't check uncompressed & rle corner cases */
                 U64 hashEnd;
                 U16 saved = (bufferVerif[sizeOrig] = 1024 + 250);
                 size_t dstSize;
@@ -225,9 +219,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
                 result = FSE_decompressU16 (bufferVerif, dstSize, bufferDst, sizeCompressed);
                 CHECK(bufferVerif[dstSize] != saved, "\r test %5u : FSE_decompressU16 overrun output buffer (write beyond specified end) !", testNb);
                 CHECK(!FSE_isError(result), "\r test %5u : FSE_decompressU16 should have failed ! (origSize = %u shorts, dstSize = %u bytes)", testNb, (U32)sizeOrig, (U32)dstSize);
-            }
-        }
-    }
+    }   }   }
 
     /* clean */
     free (bufferP8);
@@ -236,7 +228,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
 }
 
 
-/*****************************************************************
+/*-***************************************************************
 *  Unitary tests
 *****************************************************************/
 
@@ -260,10 +252,6 @@ static void unitTest(void)
         errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(FSE_isError(errorCode), "FSE_countU16() should have worked");
 
-        max = FSE_MAX_SYMBOL_VALUE+1;
-        errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
-        CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too large");
-
         max = FSE_MAX_SYMBOL_VALUE-1;
         errorCode = FSE_countU16(table, &max, testBuffU16, TBSIZE);
         CHECK(!FSE_isError(errorCode), "FSE_countU16() should have failed : max too low");
@@ -283,22 +271,18 @@ int main (int argc, char** argv)
 
     seed = FUZ_GetMilliStart() % 10000;
     DISPLAYLEVEL (1, "FSE U16 (%2i bits) automated test\n", (int)sizeof(void*)*8);
-    for (argNb=1; argNb<argc; argNb++)
-    {
+    for (argNb=1; argNb<argc; argNb++) {
         char* argument = argv[argNb];
-        if (argument[0]=='-')
-        {
+        if (argument[0]=='-') {
             argument++;
-            while (argument[0]!=0)
-            {
+            while (argument[0]!=0) {
                 switch (argument[0])
                 {
                 /* seed setting */
                 case 's':
                     argument++;
                     seed=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         seed *= 10;
                         seed += *argument - '0';
                         argument++;
@@ -309,8 +293,7 @@ int main (int argc, char** argv)
                 case 'i':
                     argument++;
                     totalTest=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         totalTest *= 10;
                         totalTest += *argument - '0';
                         argument++;
@@ -321,8 +304,7 @@ int main (int argc, char** argv)
                 case 't':
                     argument++;
                     startTestNb=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         startTestNb *= 10;
                         startTestNb += *argument - '0';
                         argument++;
@@ -344,9 +326,7 @@ int main (int argc, char** argv)
                 default:
                     ;
                 }
-            }
-        }
-    }
+    }   }   }   /* for (argNb=1; argNb<argc; argNb++) */
 
     unitTest();
 
@@ -354,8 +334,7 @@ int main (int argc, char** argv)
     FUZ_tests (seed, totalTest, startTestNb);
 
     DISPLAY ("\rAll %u tests passed               \n", totalTest);
-    if (pause)
-    {
+    if (pause) {
         DISPLAY("press enter ...\n");
         getchar();
     }
