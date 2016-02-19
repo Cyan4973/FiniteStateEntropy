@@ -1286,6 +1286,7 @@ int inflate_table(codetype type, unsigned short * lens, unsigned codes, code * *
         extra -= 257;
         end = 256;
         break;
+    case DISTS:
     default:            /* DISTS */
         base = dbase;
         extra = dext;
