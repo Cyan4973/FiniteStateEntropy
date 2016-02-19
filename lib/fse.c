@@ -1104,7 +1104,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     /* tail */
     /* note : BIT_reloadDStream(&bitD) >= FSE_DStream_partiallyFilled; Ends at exactly BIT_DStream_completed */
     while (1) {
-        if (op>=omax) { op=omax+1; break; }
+        if (op>(omax-2)) return ERROR(dstSize_tooSmall);
 
         *op++ = FSE_GETSYMBOL(&state1);
 
@@ -1113,7 +1113,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
             break;
         }
 
-        if (op>=omax) { op=omax+1; break; }
+        if (op>(omax-2)) return ERROR(dstSize_tooSmall);
 
         *op++ = FSE_GETSYMBOL(&state2);
 
@@ -1122,7 +1122,6 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
             break;
     }   }
 
-    if (op>omax) return ERROR(dstSize_tooSmall);
     return op-ostart;
 }
 
