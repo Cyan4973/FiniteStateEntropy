@@ -35,7 +35,7 @@
 /* *************************************************************
 *  Tuning parameters
 *****************************************************************/
-/*!MEMORY_USAGE :
+/* MEMORY_USAGE :
 *  Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
 *  Increasing memory usage improves compression ratio
 *  Reduced memory usage can improve speed, due to cache effect
@@ -86,8 +86,6 @@ typedef struct
 #define FSE_FUNCTION_EXTENSION U16
 
 #define FSE_count_generic FSE_count_genericU16
-//#define FSE_countFast     FSE_countFastU16
-//#define FSE_count         FSE_countU16
 #define FSE_buildCTable   FSE_buildCTableU16
 
 #define FSE_DECODE_TYPE   FSE_decode_tU16
@@ -97,6 +95,38 @@ typedef struct
 
 #include "fse.c"   /* FSE_countU16, FSE_buildCTableU16, FSE_buildDTableU16 */
 
+
+/*! FSE_countU16
+    This function just counts U16 values within `src`,
+    and store the histogram into `count`.
+    This function is unsafe : it doesn't check that all values within `src` can fit into `count`.
+    For this reason, prefer using a table `count` with 256 elements.
+    @return : highest count for a single element
+*/
+size_t FSE_countU16(unsigned* count, unsigned* maxSymbolValuePtr,
+                    const U16* src, size_t srcSize)
+{
+    const U16* ip16 = (const U16*)src;
+    const U16* const end = src + srcSize;
+    unsigned maxSymbolValue = *maxSymbolValuePtr;
+    unsigned max=0;
+    U32 s;
+
+    memset(count, 0, (maxSymbolValue+1)*sizeof(*count));
+    if (srcSize==0) { *maxSymbolValuePtr = 0; return 0; }
+
+    while (ip16<end) {
+        if (*ip16 > maxSymbolValue) return ERROR(maxSymbolValue_tooSmall);
+        count[*ip16++]++;
+    }
+
+    while (!count[maxSymbolValue]) maxSymbolValue--;
+    *maxSymbolValuePtr = maxSymbolValue;
+
+    for (s=0; s<=maxSymbolValue; s++) if (count[s] > max) max = count[s];
+
+    return (size_t)max;
+}
 
 /* *******************************************************
 *  U16 Compression functions

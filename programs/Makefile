@@ -23,13 +23,13 @@
 # fse : Command Line Utility, featuring benchmark and validation tools
 # #####################################################################
 
-RELEASE    = v0.3.1
+RELEASE    = v0.3.2
 FSEDIR     = ../lib
 
 DESTDIR   ?=
 CPPFLAGS   = -I$(FSEDIR)
 CFLAGS    ?= -O3 -falign-loops=32
-CFLAGS    += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -Wstrict-aliasing=1 -pedantic
+CFLAGS    += -std=c99 -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 -Wswitch-enum -Wstrict-prototypes -Wundef -pedantic
 FLAGS      = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(MOREFLAGS)
 CF32       = -m32
 FSETEST   ?=
@@ -41,7 +41,7 @@ EXT =.exe
 else
 EXT =
 endif
-
+             
 
 default: fse
 

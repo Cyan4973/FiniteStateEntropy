@@ -266,7 +266,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = FSE_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
             CHECK(!FSE_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
-            CHECK(bufferDst[maxDstSize] != saved, "Output buffer bufferDst corrupted");
+            CHECK(bufferDst[maxDstSize] != saved, "FSE_decompress on bogus data : bufferDst write overflow");
         }
     }
 

@@ -386,8 +386,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
     }
 
     DISPLAY("\r%79s\r", "");
-    for (loopNb = 1; loopNb <= nbIterations; loopNb++)
-    {
+    for (loopNb = 1; loopNb <= nbIterations; loopNb++) {
         int nbLoops;
         int milliTime;
 
@@ -399,10 +398,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliStart() == milliTime);
         milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-        {
-            for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-            {
+        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+            for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 size_t cBSize = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize),
                                            chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
                 if (FSE_isError(cBSize)) { DISPLAY("!!! Error compressing block %i  !!!!    \n", chunkNb); return; }
@@ -427,10 +424,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
         milliTime = BMK_GetMilliStart();
         while(BMK_GetMilliStart() == milliTime);
         milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-        {
-            for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-            {
+        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+            for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 size_t regenSize;
 
                 switch(chunkP[chunkNb].compressedSize)
@@ -448,27 +443,21 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
                                              chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].compressedSize);
                 }
 
-                if (0)   /* debugging => find bad bytes */
-                {
+                if (0) {  /* debugging => find bad bytes */
                     const char* src = chunkP[chunkNb].origBuffer;
                     const char* regen = chunkP[chunkNb].destBuffer;
                     size_t n;
                     size_t origSize = chunkP[chunkNb].origSize;
                     for (n=0; (n<origSize) && (src[n]==regen[n]); n++);
-                    if (n<origSize)
-                    {
+                    if (n<origSize) {
                         DISPLAY("\n!!! %15s : Invalid block %i !!! pos %u/%u\n", inFileName, chunkNb, (U32)n, (U32)origSize);
                         break;
-                    }
-                }
+                }   }
 
-                if (regenSize != chunkP[chunkNb].origSize)
-                {
+                if (regenSize != chunkP[chunkNb].origSize) {
                     DISPLAY("!!! Error decompressing block %i !!!! => (%s)   \n", chunkNb, FSE_getErrorName(regenSize));
                     return;
-                }
-
-            }
+            }   }
             nbLoops++;
         }
         milliTime = BMK_GetMilliSpan(milliTime);
@@ -478,8 +467,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
 
         /* CRC Checking */
         crcCheck = XXH32(chunkP[0].destBuffer, benchedSize, 0);
-        if (crcOrig!=crcCheck)
-        {
+        if (crcOrig!=crcCheck) {
             const char* src = chunkP[0].origBuffer;
             const char* fin = chunkP[0].destBuffer;
             const char* const srcStart = src;
@@ -487,12 +475,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, char* inFileName, int
                 src++, fin++;
             DISPLAY("\n!!! %15s : Invalid Checksum !!! pos %i/%i\n", inFileName, (int)(src-srcStart), benchedSize);
             break;
-        }
+    }   }
 
-    }
-
-    if (crcOrig==crcCheck)
-    {
+    if (crcOrig==crcCheck) {
         if (ratio<100.)
             DISPLAY("%-17.17s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
         else
@@ -515,8 +500,7 @@ int BMK_benchFiles(char** fileNamesTable, int nbFiles)
     double totald = 0.;
 
 
-    while (fileIdx<nbFiles)
-    {
+    while (fileIdx<nbFiles) {
         FILE*  inFile;
         char*  inFileName;
         U64    inFileSize;
