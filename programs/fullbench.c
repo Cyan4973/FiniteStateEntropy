@@ -1327,6 +1327,28 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     case 80:
         {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(10, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
+            funcName = "FSE_buildDTable(10)";
+            func = local_FSE_buildDTable;
+            break;
+        }
+
+    case 81:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(9, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
+            funcName = "FSE_buildDTable(9)";
+            func = local_FSE_buildDTable;
+            break;
+        }
+
+    case 82:
+        {
             funcName = "FSE_buildDTable_raw(6)";
             func = local_FSE_buildDTable_raw;
             break;
