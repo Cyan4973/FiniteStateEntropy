@@ -1,5 +1,6 @@
 fse
 fse32
 probagen
+fullbench
 fuzzer
 *.bin

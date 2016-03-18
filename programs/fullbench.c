@@ -764,6 +764,12 @@ static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, siz
     return (int)FSE_buildCTable(g_CTable, g_normTable, g_max, g_tableLog);
 }
 
+static int local_FSE_buildCTable_raw(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_buildCTable_raw(g_CTable, 6);
+}
+
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
@@ -786,6 +792,12 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
     return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
+}
+
+static int local_FSE_buildDTable_raw(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_buildDTable_raw(g_DTable, 6);
 }
 
 static int local_FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
@@ -1306,6 +1318,19 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             break;
         }
 
+    case 70:
+        {
+            funcName = "FSE_buildCTable_raw(6)";
+            func = local_FSE_buildCTable_raw;
+            break;
+        }
+
+    case 80:
+        {
+            funcName = "FSE_buildDTable_raw(6)";
+            func = local_FSE_buildDTable_raw;
+            break;
+        }
 
     case 132:  // unimplemented yet
         {
@@ -1381,29 +1406,27 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     {
         double bestTime = 999.;
         U32 benchNb=1;
-        size_t errorCode = 0;
         DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
-        for (benchNb=1; benchNb <= nbBenchs; benchNb++)
-        {
+        for (benchNb=1; benchNb <= nbBenchs; benchNb++) {
             U32 milliTime;
             double averageTime;
             U32 loopNb=0;
+            size_t resultCode = 0;
 
             milliTime = BMK_GetMilliStart();
             while(BMK_GetMilliStart() == milliTime);
             milliTime = BMK_GetMilliStart();
-            while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-            {
-                errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                if (FSE_isError(errorCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(errorCode)); exit(-1); }
+            while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+                resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
+                if (FSE_isError(resultCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(resultCode)); exit(-1); }
                 loopNb++;
             }
             milliTime = BMK_GetMilliSpan(milliTime);
             averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6i) \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6u) \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., (U32)resultCode);
         }
-        DISPLAY("%2u#%-34.34s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#\n", algNb);
     }
 
 _end:
@@ -1421,8 +1444,7 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
 
     if (filename==NULL)
         BMK_genData(buffer, blockSize, p);
-    else
-    {
+    else {
         FILE* f = fopen( filename, "rb" );
         DISPLAY("Loading %u KB from %s \n", (U32)(blockSize>>10), filename);
         if (f==NULL) { DISPLAY( "Pb opening %s\n", filename); return 11; }
@@ -1430,8 +1452,7 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
         fclose(f);
     }
 
-    if (algNb==0)
-    {
+    if (algNb==0) {
         int i;
         for (i=1; i<=99; i++)
             result += runBench(buffer, blockSize, i, nbLoops);
@@ -1502,19 +1523,16 @@ int main(int argc, const char** argv)
     DISPLAY(WELCOME_MESSAGE);
     if (argc<1) return badusage(exename);
 
-    for(i=1; i<argc; i++)
-    {
+    for(i=1; i<argc; i++) {
         const char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
         if (!strcmp(argument, "--no-prompt")) { no_prompt = 1; continue; }
 
         // Decode command (note : aggregated commands are allowed)
-        if (*argument=='-')
-        {
+        if (*argument=='-') {
             argument ++;
-            while (*argument!=0)
-            {
+            while (*argument!=0) {
 
                 switch(*argument)
                 {
