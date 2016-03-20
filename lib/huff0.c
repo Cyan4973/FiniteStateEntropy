@@ -103,8 +103,8 @@ typedef struct nodeElt_s {
 } nodeElt;
 
 /*! HUF_writeCTable() :
-    @dst : destination buffer
-    @CTable : huffman tree to save, using huff0 representation
+    `dst` : destination buffer.
+    `CTable` : huffman tree to save, using huff0 representation.
     @return : size of saved CTable */
 size_t HUF_writeCTable (void* dst, size_t maxDstSize,
                         const HUF_CElt* CTable, U32 maxSymbolValue, U32 huffLog)
@@ -215,9 +215,8 @@ size_t HUF_readCTable (HUF_CElt* CTable, U32 maxSymbolValue, const void* src, si
         U16 valPerRank[HUF_MAX_TABLELOG+1] = {0};
         for (n=0; n<nbSymbols; n++)
             nbPerRank[CTable[n].nbBits]++;
-        {
-            /* determine stating value per rank */
-            U16 min = 0;
+        /* determine stating value per rank */
+        {   U16 min = 0;
             for (n=HUF_MAX_TABLELOG; n>0; n--) {
                 valPerRank[n] = min;      /* get starting value within each rank */
                 min += nbPerRank[n];
@@ -240,8 +239,7 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
     if (largestBits <= maxNbBits) return largestBits;
 
     /* there are several too large elements (at least >= 2) */
-    {
-        const U32 baseCost = 1 << (largestBits - maxNbBits);
+    {   const U32 baseCost = 1 << (largestBits - maxNbBits);
         U32 n = lastNonNull;
 
         while (huffNode[n].nbBits > maxNbBits) {
@@ -255,8 +253,7 @@ static U32 HUF_setMaxHeight(nodeElt* huffNode, U32 lastNonNull, U32 maxNbBits)
         totalCost >>= (largestBits - maxNbBits);  /* note : totalCost is necessarily a multiple of baseCost */
 
         /* repay normalized cost */
-        {
-            const U32 noSymbol = 0xF0F0F0F0;
+        {   const U32 noSymbol = 0xF0F0F0F0;
             U32 rankLast[HUF_MAX_TABLELOG+1];
             U32 currentNbBits = maxNbBits;
             int pos;
@@ -389,21 +386,18 @@ size_t HUF_buildCTable (HUF_CElt* tree, const U32* count, U32 maxSymbolValue, U3
     maxNbBits = HUF_setMaxHeight(huffNode, nonNullRank, maxNbBits);
 
     /* fill result into tree (val, nbBits) */
-    {
-        U16 nbPerRank[HUF_MAX_TABLELOG+1] = {0};
+    {   U16 nbPerRank[HUF_MAX_TABLELOG+1] = {0};
         U16 valPerRank[HUF_MAX_TABLELOG+1] = {0};
         if (maxNbBits > HUF_MAX_TABLELOG) return ERROR(GENERIC);   /* check fit into table */
         for (n=0; n<=nonNullRank; n++)
             nbPerRank[huffNode[n].nbBits]++;
-        {
-            /* determine stating value per rank */
-            U16 min = 0;
+        /* determine stating value per rank */
+        {   U16 min = 0;
             for (n=maxNbBits; n>0; n--) {
                 valPerRank[n] = min;      /* get starting value within each rank */
                 min += nbPerRank[n];
                 min >>= 1;
-            }
-        }
+        }   }
         for (n=0; n<=maxSymbolValue; n++)
             tree[huffNode[n].byte].nbBits = huffNode[n].nbBits;   /* push nbBits per symbol, symbol order */
         for (n=0; n<=maxSymbolValue; n++)

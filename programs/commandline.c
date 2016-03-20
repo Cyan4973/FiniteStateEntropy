@@ -278,8 +278,7 @@ int main(int argc, const char** argv)
             size_t l = strlen(input_filename);
             if (tmpFilenameSize < l+6) tmpFilenameSize = l+6;
             tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
-			if (tmpFilenameBuffer==NULL)
-			{
+			if (tmpFilenameBuffer==NULL) {
 				DISPLAY("Not enough memory, exiting ... \n");
 				exit(1);
 			}
@@ -302,7 +301,7 @@ int main(int argc, const char** argv)
             output_filename = tmpFilenameBuffer;
             DISPLAYLEVEL(2, "Decoding into filename : %s \n", output_filename);
         }
-    }
+    }   /* (!output_filename) */
 
     /* No warning message in pure pipe mode (stdin + stdout) */
     if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
