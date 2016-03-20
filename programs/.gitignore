@@ -2,5 +2,11 @@ fse
 fse32
 probagen
 fullbench
+fullbench32
 fuzzer
+fuzzer32
+fuzzerHuff0
+fuzzerHuff0_32
+fuzzerU16
+fuzzerU16_32
 *.bin
