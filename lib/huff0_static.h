@@ -85,7 +85,7 @@ HUF_compress() does the following:
 1. count symbol occurrence from source[] into table count[] using FSE_count()
 2. build Huffman table from count using HUF_buildCTable()
 3. save Huffman table to memory buffer using HUF_writeCTable()
-4. encode the data stream using HUF_compress_usingCTable()
+4. encode the data stream using HUF_compress4X_usingCTable()
 
 The following API allows targeting specific sub-functions for advanced tasks.
 For example, it's possible to compress several blocks using the same 'CTable',

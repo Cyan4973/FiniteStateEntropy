@@ -23,13 +23,13 @@
     - website : http://fastcompression.blogspot.com/
 */
 
-/**************************************
+/*_************************************
 *  Includes
 **************************************/
 #include <stdlib.h>      /* malloc */
 #include <stdio.h>       /* fprintf, fopen, ftello64 */
 #include <string.h>      /* strcmp */
-#include <sys/timeb.h>   /* timeb */
+#include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 
 #include "mem.h"
 #include "fse_static.h"
@@ -37,7 +37,7 @@
 #include "xxhash.h"
 
 
-/**************************************
+/*_************************************
 *  Constants
 **************************************/
 #define PROGRAM_DESCRIPTION "FSE speed analyzer"
@@ -48,7 +48,8 @@
 #define WELCOME_MESSAGE "*** %s %s %i-bits, by %s (%s) ***\n", PROGRAM_DESCRIPTION, FSE_VERSION, (int)(sizeof(void*)*8), AUTHOR, __DATE__
 
 #define NBLOOPS    6
-#define TIMELOOP   2500
+#define TIMELOOP_S 2
+#define TIMELOOP   (TIMELOOP_S * CLOCKS_PER_SEC)
 #define PROBATABLESIZE 2048
 
 #define KB *(1<<10)
@@ -61,38 +62,25 @@
 #define DEFAULT_PROBA 20
 
 
-/**************************************
+/*_************************************
 *  Macros
 ***************************************/
 #define DISPLAY(...)  fprintf(stderr, __VA_ARGS__)
 #define PROGRESS(...) no_prompt ? 0 : DISPLAY(__VA_ARGS__)
 
 
-/**************************************
+/*_************************************
 *  Benchmark Parameters
 ***************************************/
 static U32 no_prompt = 0;
 
 
-/*********************************************************
+/*_*******************************************************
 *  Private functions
 **********************************************************/
-static U32 BMK_GetMilliStart(void)
+static clock_t BMK_clockSpan( clock_t clockStart )
 {
-    struct timeb tb;
-    U32 nCount;
-    ftime( &tb );
-    nCount = (U32) (((tb.time & 0xFFFFF) * 1000) +  tb.millitm);
-    return nCount;
-}
-
-static U32 BMK_GetMilliSpan(U32 nTimeStart)
-{
-    U32 nCurrent = BMK_GetMilliStart();
-    U32 nSpan = nCurrent - nTimeStart;
-    if (nTimeStart > nCurrent)
-        nSpan += 0x100000 * 1000;
-    return nSpan;
+    return clock() - clockStart;   /* works even if overflow, span limited to <= ~30mn */
 }
 
 static U32 BMK_rand (U32* seed)
@@ -114,15 +102,13 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
 
     if (p<0.01) p = 0.005;
     if (p>1.) p = 1.;
-    if (!done)
-    {
+    if (!done) {
         done = 1;
         DISPLAY("Generating %i KB with P=%.2f%%\n", (int)(buffSize >> 10), p*100);
     }
 
     /* Build Table */
-    while (remaining)
-    {
+    while (remaining) {
         unsigned n = (unsigned)(remaining * p);
         unsigned end;
         if (!n) n=1;
@@ -134,15 +120,14 @@ static void BMK_genData(void* buffer, size_t buffSize, double p)
     }
 
     /* Fill buffer */
-    while (op<oend)
-    {
+    while (op<oend) {
         const unsigned r = BMK_rand(&seed) & (PROBATABLESIZE-1);
         *op++ = table[r];
     }
 }
 
 
-/*********************************************************
+/*_*******************************************************
 *  Benchmark function
 **********************************************************/
 static int local_trivialCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -167,18 +152,17 @@ static int local_count8(void* dst, size_t dstSize, const void* src, size_t srcSi
 
     (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
-    while (ip<end)
-    {
+    while (ip<end) {
         unsigned idx;
         for (idx=0; idx<NBT; idx++)
             count[idx][*ip++]++;
     }
-    {
-        unsigned idx, n;
-        for (n=0; n<256; n++)
+    {   unsigned n;
+        for (n=0; n<256; n++) {
+            unsigned idx;
             for (idx=1; idx<NBT; idx++)
                 count[0][n] += count[idx][n];
-    }
+    }   }
     return (int)count[0][ip[-1]];
 }
 
@@ -194,8 +178,7 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
     (void)dst; (void)dstSize;
     memset(count, 0, sizeof(count));
 
-    while (ptr != end)
-    {
+    while (ptr != end) {
         register U64 bs = next;
         next = *ptr++;
 
@@ -209,15 +192,12 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
         count[ 7][(BYTE)(bs>>56)] ++;
     }
 
-    {
-        unsigned i;
-        for (i = 0; i < 256; i++)
-        {
+    {   unsigned u;
+        for (u = 0; u < 256; u++) {
             unsigned idx;
             for (idx=1; idx<8; idx++)
-                count[0][i] += count[idx][i];
-        }
-    }
+                count[0][u] += count[idx][u];
+    }   }
 
     return count[0][0];
 }
@@ -764,6 +744,12 @@ static int local_FSE_buildCTable(void* dst, size_t dstSize, const void* src, siz
     return (int)FSE_buildCTable(g_CTable, g_normTable, g_max, g_tableLog);
 }
 
+static int local_FSE_buildCTable_raw(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_buildCTable_raw(g_CTable, 6);
+}
+
 static int local_FSE_compress_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)FSE_compress_usingCTable(dst, dstSize, src, srcSize, g_CTable);
@@ -786,6 +772,12 @@ static int local_FSE_buildDTable(void* dst, size_t dstSize, const void* src, siz
 {
     (void)dst; (void)dstSize; (void)src; (void)srcSize;
     return (int)FSE_buildDTable(g_DTable, g_normTable, g_max, g_tableLog);
+}
+
+static int local_FSE_buildDTable_raw(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize; (void)src; (void)srcSize;
+    return (int)FSE_buildDTable_raw(g_DTable, 6);
 }
 
 static int local_FSE_decompress_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
@@ -908,6 +900,7 @@ static int local_HUF_decompress1X6_usingDTable(void* dst, size_t maxDstSize, con
     (void)srcSize; (void)maxDstSize;
     return (int)HUF_decompress1X6_usingDTable(dst, g_oSize, src, g_cSize, g_huff_dtableX6);
 }
+
 
 int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 {
@@ -1306,6 +1299,41 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             break;
         }
 
+    case 70:
+        {
+            funcName = "FSE_buildCTable_raw(6)";
+            func = local_FSE_buildCTable_raw;
+            break;
+        }
+
+    case 80:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(10, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
+            funcName = "FSE_buildDTable(10)";
+            func = local_FSE_buildDTable;
+            break;
+        }
+
+    case 81:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            g_tableLog = FSE_optimalTableLog(9, benchedSize, g_max);
+            FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
+            funcName = "FSE_buildDTable(9)";
+            func = local_FSE_buildDTable;
+            break;
+        }
+
+    case 82:
+        {
+            funcName = "FSE_buildDTable_raw(6)";
+            func = local_FSE_buildDTable_raw;
+            break;
+        }
 
     case 132:  // unimplemented yet
         {
@@ -1381,29 +1409,29 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     {
         double bestTime = 999.;
         U32 benchNb=1;
-        size_t errorCode = 0;
         DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
-        for (benchNb=1; benchNb <= nbBenchs; benchNb++)
-        {
-            U32 milliTime;
+        for (benchNb=1; benchNb <= nbBenchs; benchNb++) {
+            clock_t clockStart;
+            size_t resultCode = 0;
             double averageTime;
-            U32 loopNb=0;
 
-            milliTime = BMK_GetMilliStart();
-            while(BMK_GetMilliStart() == milliTime);
-            milliTime = BMK_GetMilliStart();
-            while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-            {
-                errorCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                if (FSE_isError(errorCode)) { DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(errorCode)); exit(-1); }
-                loopNb++;
+            clockStart = clock();
+            while(clock() == clockStart);
+            clockStart = clock();
+            {   U32 loopNb;
+                for (loopNb=0; BMK_clockSpan(clockStart) < TIMELOOP; loopNb++) {
+                    resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
+                    if (FSE_isError(resultCode)) {
+                            DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(resultCode));
+                            exit(-1);
+                }   }
+                averageTime = (double)BMK_clockSpan(clockStart) / loopNb / CLOCKS_PER_SEC;
             }
-            milliTime = BMK_GetMilliSpan(milliTime);
-            averageTime = (double)milliTime / loopNb;
             if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6i) \r", benchNb+1, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6u) \r",
+                    benchNb+1, funcName, (double)benchedSize / (1 MB) / bestTime, (U32)resultCode);
         }
-        DISPLAY("%2u#%-34.34s : %8.1f MB/s  (%6i) \n", algNb, funcName, (double)benchedSize / bestTime / 1000., (int)errorCode);
+        DISPLAY("%2u#\n", algNb);
     }
 
 _end:
@@ -1421,8 +1449,7 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
 
     if (filename==NULL)
         BMK_genData(buffer, blockSize, p);
-    else
-    {
+    else {
         FILE* f = fopen( filename, "rb" );
         DISPLAY("Loading %u KB from %s \n", (U32)(blockSize>>10), filename);
         if (f==NULL) { DISPLAY( "Pb opening %s\n", filename); return 11; }
@@ -1430,11 +1457,10 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
         fclose(f);
     }
 
-    if (algNb==0)
-    {
-        int i;
-        for (i=1; i<=99; i++)
-            result += runBench(buffer, blockSize, i, nbLoops);
+    if (algNb==0) {
+        U32 u;
+        for (u=1; u<=99; u++)
+            result += runBench(buffer, blockSize, u, nbLoops);
     }
     else
         result = runBench(buffer, blockSize, algNb, nbLoops);
@@ -1446,14 +1472,13 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
 
 static int benchMultipleFiles(const char** fnTable, int nbFn, int startFn, double p, size_t blockSize, U32 algNb, U32 nbLoops)
 {
-    int i, result=0;
-    if (startFn==0)
-        return fullbench(NULL, p, blockSize, algNb, nbLoops);
+    if (startFn==0) return fullbench(NULL, p, blockSize, algNb, nbLoops);
 
-    for (i=startFn; i<nbFn; i++)
-        result += fullbench(fnTable[i], p, blockSize, algNb, nbLoops);
-
-    return result;
+    {   int i, result=0;
+        for (i=startFn; i<nbFn; i++)
+            result += fullbench(fnTable[i], p, blockSize, algNb, nbLoops);
+        return result;
+    }
 }
 
 
@@ -1502,19 +1527,16 @@ int main(int argc, const char** argv)
     DISPLAY(WELCOME_MESSAGE);
     if (argc<1) return badusage(exename);
 
-    for(i=1; i<argc; i++)
-    {
+    for(i=1; i<argc; i++) {
         const char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
         if (!strcmp(argument, "--no-prompt")) { no_prompt = 1; continue; }
 
         // Decode command (note : aggregated commands are allowed)
-        if (*argument=='-')
-        {
+        if (*argument=='-') {
             argument ++;
-            while (*argument!=0)
-            {
+            while (*argument!=0) {
 
                 switch(*argument)
                 {
@@ -1570,7 +1592,7 @@ int main(int argc, const char** argv)
             continue;
         }
 
-        // note : non-command are filenames; all filenames should be at end of line
+        /* note : non-commands are filenames; all filenames should be at end of line */
         if (fnStart==0) fnStart = i;
     }
 
