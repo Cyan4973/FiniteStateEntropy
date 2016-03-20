@@ -27,10 +27,10 @@ extern "C" {
 #endif
 
 
-// Simple functions
-int BMK_benchFiles(char** fileNamesTable, int nbFiles);
-int BMK_benchCore_Files(char** fileNamesTable, int nbFiles);
-int BMK_benchFilesLZ4E(char** fileNamesTable, int nbFiles, int algoNb);
+// bench functions
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles);
+int BMK_benchCore_Files(const char** fileNamesTable, int nbFiles);
+int BMK_benchFilesLZ4E(const char** fileNamesTable, int nbFiles, int algoNb);
 
 
 // Parameters
