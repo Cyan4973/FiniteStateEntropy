@@ -51,7 +51,7 @@ bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
 bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
-fse: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0.c
+fse: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fse_opt:
@@ -60,7 +60,7 @@ fse_opt:
 fse_safe:
 	CFLAGS=-O2 $(MAKE) fse
 
-fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0.c
+fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 fuzzer: fuzzer.c xxhash.c $(FSEDIR)/fse.c
@@ -75,16 +75,16 @@ fuzzerU16: fuzzerU16.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c
 fuzzerU16_32: fuzzerU16.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
-fuzzerHuff0: fuzzerHuff0.c xxhash.c $(FSEDIR)/huff0.c $(FSEDIR)/fse.c
+fuzzerHuff0: fuzzerHuff0.c xxhash.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c $(FSEDIR)/fse.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/huff0.c $(FSEDIR)/fse.c
+fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c $(FSEDIR)/fse.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
-fullbench: fullbench.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0.c
+fullbench: fullbench.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fullbench32: fullbench.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0.c
+fullbench32: fullbench.c xxhash.c $(FSEDIR)/fse.c $(FSEDIR)/fseU16.c $(FSEDIR)/huff0_enc.c $(FSEDIR)/huff0_dec.c
 	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c

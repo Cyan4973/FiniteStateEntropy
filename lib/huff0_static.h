@@ -132,6 +132,18 @@ size_t HUF_decompress1X6_usingDTable(void* dst, size_t maxDstSize, const void* c
 size_t HUF_readCTable (HUF_CElt* CTable, unsigned maxSymbolValue, const void* src, size_t srcSize);
 
 
+/* **************************************************************
+*  Constants
+****************************************************************/
+#define HUF_ABSOLUTEMAX_TABLELOG  16   /* absolute limit of HUF_MAX_TABLELOG. Beyond that value, code does not work */
+#define HUF_MAX_TABLELOG  12           /* max configured tableLog (for static allocation); can be modified up to HUF_ABSOLUTEMAX_TABLELOG */
+#define HUF_DEFAULT_TABLELOG  HUF_MAX_TABLELOG   /* tableLog by default, when not specified */
+#define HUF_MAX_SYMBOL_VALUE 255
+#if (HUF_MAX_TABLELOG > HUF_ABSOLUTEMAX_TABLELOG)
+#  error "HUF_MAX_TABLELOG is too large !"
+#endif
+
+
 #if defined (__cplusplus)
 }
 #endif

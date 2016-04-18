@@ -20,3 +20,6 @@
 # Visual solution files
 *.suo
 *.user
+
+# Other files
+_codelite
