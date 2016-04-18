@@ -1,5 +1,5 @@
 /* ******************************************************************
-   FSE : Finite State Entropy coder
+   FSE : Finite State Entropy decoder
    Copyright (C) 2013-2015, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
@@ -117,9 +117,9 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
     const U32 tableMask = tableSize-1;
     const U32 step = FSE_TABLESTEP(tableSize);
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
-    U32 position = 0;
+
     U32 highThreshold = tableSize-1;
-    const S16 largeLimit= (S16)(1 << (tableLog-1));
+    S16 const largeLimit= (S16)(1 << (tableLog-1));
     U32 noLarge = 1;
     U32 s;
 
@@ -139,30 +139,33 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
     }   }
 
     /* Spread symbols */
-    for (s=0; s<=maxSymbolValue; s++) {
-        int i;
-        for (i=0; i<normalizedCounter[s]; i++) {
-            tableDecode[position].symbol = (FSE_FUNCTION_TYPE)s;
-            position = (position + step) & tableMask;
-            while (position > highThreshold) position = (position + step) & tableMask;   /* lowprob area */
-    }   }
+    {   U32 position = 0;
+        for (s=0; s<=maxSymbolValue; s++) {
+            int i;
+            for (i=0; i<normalizedCounter[s]; i++) {
+                tableDecode[position].symbol = (FSE_FUNCTION_TYPE)s;
+                position = (position + step) & tableMask;
+                while (position > highThreshold) position = (position + step) & tableMask;   /* lowprob area */
+        }   }
 
-    if (position!=0) return ERROR(GENERIC);   /* position must reach all cells once, otherwise normalizedCounter is incorrect */
+        if (position!=0) return ERROR(GENERIC);   /* position must reach all cells once, otherwise normalizedCounter is incorrect */
+    }
 
     /* Build Decoding table */
-    {
-        U32 i;
-        for (i=0; i<tableSize; i++) {
-            FSE_FUNCTION_TYPE symbol = (FSE_FUNCTION_TYPE)(tableDecode[i].symbol);
+    {   U32 u;
+        for (u=0; u<tableSize; u++) {
+            FSE_FUNCTION_TYPE symbol = (FSE_FUNCTION_TYPE)(tableDecode[u].symbol);
+
             U16 nextState = symbolNext[symbol]++;
-            tableDecode[i].nbBits = (BYTE) (tableLog - BIT_highbit32 ((U32)nextState) );
-            tableDecode[i].newState = (U16) ( (nextState << tableDecode[i].nbBits) - tableSize);
+            tableDecode[u].nbBits = (BYTE) (tableLog - BIT_highbit32 ((U32)nextState) );
+            tableDecode[u].newState = (U16) ( (nextState << tableDecode[u].nbBits) - tableSize);
     }   }
 
     DTableH.fastMode = (U16)noLarge;
     memcpy(dt, &DTableH, sizeof(DTableH));
     return 0;
 }
+
 
 
 #ifndef FSE_COMMONDEFS_ONLY
@@ -233,8 +236,7 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
             else
                 bitStream >>= 2;
         }
-        {
-            short const max = (short)((2*threshold-1)-remaining);
+        {   short const max = (short)((2*threshold-1)-remaining);
             short count;
 
             if ((bitStream & (threshold-1)) < (U32)max) {
