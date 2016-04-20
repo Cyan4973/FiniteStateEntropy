@@ -19,9 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\fse.c" />
+    <ClCompile Include="..\..\..\lib\fse_enc.c" />
+    <ClCompile Include="..\..\..\lib\fse_dec.c" />
     <ClCompile Include="..\..\..\lib\fseU16.c" />
-    <ClCompile Include="..\..\..\lib\huff0.c" />
+    <ClCompile Include="..\..\..\lib\huff0_enc.c" />
+    <ClCompile Include="..\..\..\lib\huff0_dec.c" />
     <ClCompile Include="..\..\..\programs\bench.c" />
     <ClCompile Include="..\..\..\programs\commandline.c" />
     <ClCompile Include="..\..\..\programs\fileio.c" />

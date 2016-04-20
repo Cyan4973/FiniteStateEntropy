@@ -19,7 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\fse.c" />
+    <ClCompile Include="..\..\..\lib\fse_enc.c" />
+    <ClCompile Include="..\..\..\lib\fse_dec.c" />
     <ClCompile Include="..\..\..\programs\fuzzer.c" />
     <ClCompile Include="..\..\..\programs\xxhash.c" />
   </ItemGroup>
