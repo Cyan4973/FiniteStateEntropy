@@ -1,6 +1,6 @@
 /*
 FuzzerHuff0.c
-Automated test program for Huff0
+Automated test program for HUF
 Copyright (C) Yann Collet 2015
 
 GPL v2 License
@@ -20,7 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 You can contact the author at :
-- FSE+Huff0 source repository : https://github.com/Cyan4973/FiniteStateEntropy
+- FSE+HUF source repository : https://github.com/Cyan4973/FiniteStateEntropy
 - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -39,7 +39,7 @@ You can contact the author at :
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
 #include "mem.h"
-#include "huff0_static.h"
+#include "huf_static.h"
 #include "xxhash.h"
 
 
@@ -319,7 +319,7 @@ int main (int argc, char** argv)
     int argNb;
 
     seed = FUZ_GetMilliStart() % 10000;
-    DISPLAYLEVEL (1, "Huff0 (%2i bits) automated test\n", (int)sizeof(void*)*8);
+    DISPLAYLEVEL (1, "HUF (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];

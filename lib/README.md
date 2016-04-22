@@ -1,5 +1,5 @@
-Entropy codec library
-===========================
+New Generation Entropy library
+==============================
 
 The __lib__ directory contains several files, but you don't necessarily want them all.
 Here is a detailed list, to help you decide which one you need :
@@ -24,10 +24,10 @@ This codec is able to encode alphabets of size > 256, using 2 bytes per symbol. 
 - __fseU16.c__ implements the codec, while __fseU16.h__ exposes its interfaces.
 
 
-#### Huff0 Huffman codec
+#### Huffman codec
 
 This is the fast huffman codec. This requires the base FSE codec to compress its headers.
-- __huff0.c__ implements the codec, while __huff0.h__ exposes its interfaces.
-- __huff0_static.h__ is an optional header, exposing unsupported and potentially unstable interfaces, for experiments.
+- __huf.c__ implements the codec, while __huf.h__ exposes its interfaces.
+- __huf_static.h__ is an optional header, exposing unsupported and potentially unstable interfaces, for experiments.
 
 

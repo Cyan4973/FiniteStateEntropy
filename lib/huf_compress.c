@@ -1,5 +1,5 @@
 /* ******************************************************************
-   Huff0 : Huffman encoder, part of New Generation Entropy library
+   Huffman encoder, part of New Generation Entropy library
    Copyright (C) 2013-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
@@ -28,7 +28,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     You can contact the author at :
-    - FSE+Huff0 source repository : https://github.com/Cyan4973/FiniteStateEntropy
+    - FSE+HUF source repository : https://github.com/Cyan4973/FiniteStateEntropy
     - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
@@ -62,7 +62,7 @@
 #include <stdlib.h>     /* malloc, free, qsort */
 #include <string.h>     /* memcpy, memset */
 #include <stdio.h>      /* printf (debug) */
-#include "huff0_static.h"
+#include "huf_static.h"
 #include "bitstream.h"
 #include "fse.h"        /* header compression */
 
@@ -78,12 +78,12 @@ const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 
 
 /* *******************************************************
-*  Huff0 : Huffman block compression
+*  HUF : Huffman block compression
 *********************************************************/
 struct HUF_CElt_s {
   U16  val;
   BYTE nbBits;
-};   /* typedef'd to HUF_CElt within huff0_static.h */
+};   /* typedef'd to HUF_CElt within huf_static.h */
 
 typedef struct nodeElt_s {
     U32 count;
@@ -93,7 +93,7 @@ typedef struct nodeElt_s {
 } nodeElt;
 
 /*! HUF_writeCTable() :
-    `CTable` : huffman tree to save, using huff0 representation.
+    `CTable` : huffman tree to save, using huf representation.
     @return : size of saved CTable */
 size_t HUF_writeCTable (void* dst, size_t maxDstSize,
                         const HUF_CElt* CTable, U32 maxSymbolValue, U32 huffLog)

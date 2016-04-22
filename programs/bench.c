@@ -74,7 +74,7 @@
 #include "fse.h"
 #include "fseU16.h"
 #include "zlibh.h"
-#include "huff0.h"
+#include "huf.h"
 #include "xxhash.h"
 
 

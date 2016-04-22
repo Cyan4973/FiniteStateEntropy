@@ -95,8 +95,8 @@ typedef struct {
 #define FSE_freeDTable    FSE_freeDTableU16
 #define FSE_buildDTable   FSE_buildDTableU16
 
-#include "fse_enc.c"   /* FSE_countU16, FSE_buildCTableU16 */
-#include "fse_dec.c"   /* FSE_buildDTableU16 */
+#include "fse_compress.c"   /* FSE_countU16, FSE_buildCTableU16 */
+#include "fse_decompress.c"   /* FSE_buildDTableU16 */
 
 
 /*! FSE_countU16() :
