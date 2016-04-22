@@ -11,6 +11,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\lib\common.c">
+      <Filter>sources</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\lib\fse_compress.c">
       <Filter>sources</Filter>
     </ClCompile>
