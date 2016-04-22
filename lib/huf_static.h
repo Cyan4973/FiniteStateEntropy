@@ -1,5 +1,5 @@
 /* ******************************************************************
-   Huff0 : Huffman codec, part of New Generation Entropy library
+   Huffman codec, part of New Generation Entropy library
    header file, for static linking only
    Copyright (C) 2013-2016, Yann Collet
 
@@ -31,8 +31,8 @@
    You can contact the author at :
    - Source repository : https://github.com/Cyan4973/FiniteStateEntropy
 ****************************************************************** */
-#ifndef HUFF0_STATIC_H
-#define HUFF0_STATIC_H
+#ifndef HUF_STATIC_H
+#define HUF_STATIC_H
 
 #if defined (__cplusplus)
 extern "C" {
@@ -42,7 +42,7 @@ extern "C" {
 /* ****************************************
 *  Dependency
 ******************************************/
-#include "huff0.h"
+#include "huf.h"
 #include "fse.h"
 #include "bitstream.h"
 
@@ -50,18 +50,18 @@ extern "C" {
 /* ****************************************
 *  Static allocation
 ******************************************/
-/* Huff0 buffer bounds */
+/* HUF buffer bounds */
 #define HUF_CTABLEBOUND 129
 #define HUF_BLOCKBOUND(size) (size + (size>>8) + 8)   /* only true if incompressible pre-filtered with fast heuristic */
 #define HUF_COMPRESSBOUND(size) (HUF_CTABLEBOUND + HUF_BLOCKBOUND(size))   /* Macro version, useful for static allocation */
 
-/* static allocation of Huff0's Compression Table */
+/* static allocation of HUF's Compression Table */
 #define HUF_CREATE_STATIC_CTABLE(name, maxSymbolValue) \
     U32 name##hb[maxSymbolValue+1]; \
     void* name##hv = &(name##hb); \
     HUF_CElt* name = (HUF_CElt*)(name##hv)   /* no final ; */
 
-/* static allocation of Huff0's DTable */
+/* static allocation of HUF's DTable */
 #define HUF_DTABLE_SIZE(maxTableLog)   (1 + (1<<maxTableLog))
 #define HUF_CREATE_STATIC_DTABLEX2(DTable, maxTableLog) \
         unsigned short DTable[HUF_DTABLE_SIZE(maxTableLog)] = { maxTableLog }
@@ -80,7 +80,7 @@ size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 
 
 /* ****************************************
-*  Huff0 detailed API
+*  HUF detailed API
 ******************************************/
 /*!
 HUF_compress() does the following:
@@ -225,4 +225,4 @@ MEM_STATIC size_t HUF_readStats(BYTE* huffWeight, size_t hwSize, U32* rankStats,
 }
 #endif
 
-#endif /* HUFF0_STATIC_H */
+#endif /* HUF_STATIC_H */

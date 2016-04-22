@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="headers">
@@ -11,10 +11,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\fse_enc.c">
+    <ClCompile Include="..\..\..\lib\common.c">
       <Filter>sources</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\lib\fse_dec.c">
+    <ClCompile Include="..\..\..\lib\fse_compress.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\lib\fse_decompress.c">
       <Filter>sources</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\lib\fseU16.c">
@@ -35,10 +38,10 @@
     <ClCompile Include="..\..\..\programs\zlibh.c">
       <Filter>sources</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\lib\huff0_enc.c">
+    <ClCompile Include="..\..\..\lib\huf_compress.c">
       <Filter>sources</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\lib\huff0_dec.c">
+    <ClCompile Include="..\..\..\lib\huf_decompress.c">
       <Filter>sources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -70,10 +73,10 @@
     <ClInclude Include="..\..\..\lib\error.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\lib\huff0.h">
+    <ClInclude Include="..\..\..\lib\huf.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\lib\huff0_static.h">
+    <ClInclude Include="..\..\..\lib\huf_static.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\lib\mem.h">

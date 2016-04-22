@@ -1,5 +1,5 @@
 /* ******************************************************************
-   Huff0 : Huffman decoder, part of New Generation Entropy library
+   Huffman decoder, part of New Generation Entropy library
    Copyright (C) 2013-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
@@ -28,7 +28,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     You can contact the author at :
-    - FSE+Huff0 source repository : https://github.com/Cyan4973/FiniteStateEntropy
+    - FSE+HUF source repository : https://github.com/Cyan4973/FiniteStateEntropy
     - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
 
@@ -62,7 +62,7 @@
 #include <stdlib.h>     /* malloc, free, qsort */
 #include <string.h>     /* memcpy, memset */
 #include <stdio.h>      /* printf (debug) */
-#include "huff0_static.h"
+#include "huf_static.h"
 #include "bitstream.h"
 #include "fse.h"        /* header compression */
 
@@ -71,14 +71,12 @@
 /* **************************************************************
 *  Error Management
 ****************************************************************/
-unsigned HUF_isError(size_t code) { return ERR_isError(code); }
-const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 #define HUF_STATIC_ASSERT(c) { enum { HUF_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
 
 /* *******************************************************
-*  Huff0 : Huffman block decompression
+*  HUF : Huffman block decompression
 *********************************************************/
 typedef struct { BYTE byte; BYTE nbBits; } HUF_DEltX2;   /* single-symbol decoding */
 

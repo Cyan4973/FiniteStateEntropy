@@ -95,8 +95,8 @@ static int usage(const char* programName)
     DISPLAY("%s [arg] inputFilename [outputFilename]\n", programName);
     DISPLAY("Arguments :\n");
     DISPLAY("(default): fse core loop timing tests\n");
-    DISPLAY(" -e : use fse (default)\n");
-    DISPLAY(" -h : use huff0\n");
+    DISPLAY(" -e : use FSE (default)\n");
+    DISPLAY(" -h : use HUF\n");
     DISPLAY(" -z : use zlib's huffman\n");
     DISPLAY(" -d : decompression (default for %s extension)\n", FSE_EXTENSION);
     DISPLAY(" -b : benchmark mode\n");
@@ -167,16 +167,16 @@ int main(int argc, const char** argv)
                     // Benchmark full mode
                 case 'b': bench=1; break;
 
-                    // fse selection (default)
+                    // FSE selection (default)
                 case 'e':
                     BMK_SetByteCompressor(1);
                     compressor = FIO_fse;
                     break;
 
-                    // huff0 selection
+                    // HUF selection
                 case 'h':
                     BMK_SetByteCompressor(2);
-                    compressor = FIO_huff0;
+                    compressor = FIO_huf;
                     break;
 
                     // zlib mode

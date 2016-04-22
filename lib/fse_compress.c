@@ -181,16 +181,6 @@ size_t FSE_buildCTable(FSE_CTable* ct, const short* normalizedCounter, unsigned 
 
 
 #ifndef FSE_COMMONDEFS_ONLY
-/*-****************************************
-*  FSE helper functions
-******************************************/
-#define FSE_isError         FSEENC_isError   /* avoid namespace collisions */
-#define FSE_getErrorName    FSEENC_getErrorName
-
-unsigned FSE_isError(size_t code) { return ERR_isError(code); }
-
-const char* FSE_getErrorName(size_t code) { return ERR_getErrorName(code); }
-
 
 /*-**************************************************************
 *  FSE NCount encoding-decoding
