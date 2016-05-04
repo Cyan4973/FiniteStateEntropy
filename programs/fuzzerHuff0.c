@@ -126,6 +126,19 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
     while (op<oend) *op++ = (BYTE)FUZ_rand(seed);
 }
 
+#define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
+static void findDifferentByte(const void* buf1, size_t buf1Size,
+                              const void* buf2, size_t buf2Size)
+{
+    size_t const maxSize = MIN(buf1Size, buf2Size);
+    const BYTE* const B1 = (const BYTE*) buf1;
+    const BYTE* const B2 = (const BYTE*) buf2;
+    size_t n;
+    for (n=0; n<maxSize; n++) if (B1[n]!=B2[n]) break;
+    if (n==maxSize) { DISPLAY("No difference found \n"); return; }
+    DISPLAY("Buffers are different at byte %u / %u \n", (U32)n, (U32)maxSize);
+}
+
 
 #define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                          DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(-1); }
@@ -212,6 +225,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress4X6 : bufferVerif overflow");
                     CHECK(HUF_isError(result), "HUF_decompress4X6 failed : %s", HUF_getErrorName(result));
                     {   U32 const hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                        if (hashEnd!=hashOrig) findDifferentByte(bufferVerif, sizeOrig, bufferTest, sizeOrig);
                         CHECK(hashEnd != hashOrig, "HUF_decompress4X6 : Decompressed data corrupted");
                 }   }
 
