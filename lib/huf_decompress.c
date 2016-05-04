@@ -847,17 +847,17 @@ size_t HUF_readDTableX6 (U32* DTable, const void* src, size_t srcSize)
 
 static U32 HUF_decodeSymbolX6(void* op, BIT_DStream_t* DStream, const HUF_DDescX6* dd, const HUF_DSeqX6* ds, const U32 dtLog)
 {
-    const size_t val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    size_t const val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
     memcpy(op, ds+val, sizeof(HUF_DSeqX6));
     BIT_skipBits(DStream, dd[val].nbBits);
     return dd[val].nbBytes;
 }
 
-static U32 HUF_decodeLastSymbolsX6(void* op, const U32 maxL, BIT_DStream_t* DStream,
+static U32 HUF_decodeLastSymbolsX6(void* op, U32 const maxL, BIT_DStream_t* DStream,
                                   const HUF_DDescX6* dd, const HUF_DSeqX6* ds, const U32 dtLog)
 {
-    const size_t val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
-    U32 length = dd[val].nbBytes;
+    size_t const val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    U32 const length = dd[val].nbBytes;
     if (length <= maxL) {
         memcpy(op, ds+val, length);
         BIT_skipBits(DStream, dd[val].nbBits);
@@ -953,6 +953,24 @@ size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 }
 
 
+#define HUF_DECODE_ROUNDX6 \
+            HUF_DECODE_SYMBOLX6_2(op1, &bitD1); \
+            HUF_DECODE_SYMBOLX6_2(op2, &bitD2); \
+            HUF_DECODE_SYMBOLX6_2(op3, &bitD3); \
+            HUF_DECODE_SYMBOLX6_2(op4, &bitD4); \
+            HUF_DECODE_SYMBOLX6_1(op1, &bitD1); \
+            HUF_DECODE_SYMBOLX6_1(op2, &bitD2); \
+            HUF_DECODE_SYMBOLX6_1(op3, &bitD3); \
+            HUF_DECODE_SYMBOLX6_1(op4, &bitD4); \
+            HUF_DECODE_SYMBOLX6_2(op1, &bitD1); \
+            HUF_DECODE_SYMBOLX6_2(op2, &bitD2); \
+            HUF_DECODE_SYMBOLX6_2(op3, &bitD3); \
+            HUF_DECODE_SYMBOLX6_2(op4, &bitD4); \
+            HUF_DECODE_SYMBOLX6_0(op1, &bitD1); \
+            HUF_DECODE_SYMBOLX6_0(op2, &bitD2); \
+            HUF_DECODE_SYMBOLX6_0(op3, &bitD3); \
+            HUF_DECODE_SYMBOLX6_0(op4, &bitD4);
+
 size_t HUF_decompress4X6_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
@@ -1008,25 +1026,20 @@ size_t HUF_decompress4X6_usingDTable(
 
         /* 16-64 symbols per loop (4-16 symbols per stream) */
         endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
-        for ( ; (op3 <= opStart4) && (endSignal==BIT_DStream_unfinished) && (op4<=(oend-16)) ; ) {
-            HUF_DECODE_SYMBOLX6_2(op1, &bitD1);
-            HUF_DECODE_SYMBOLX6_2(op2, &bitD2);
-            HUF_DECODE_SYMBOLX6_2(op3, &bitD3);
-            HUF_DECODE_SYMBOLX6_2(op4, &bitD4);
-            HUF_DECODE_SYMBOLX6_1(op1, &bitD1);
-            HUF_DECODE_SYMBOLX6_1(op2, &bitD2);
-            HUF_DECODE_SYMBOLX6_1(op3, &bitD3);
-            HUF_DECODE_SYMBOLX6_1(op4, &bitD4);
-            HUF_DECODE_SYMBOLX6_2(op1, &bitD1);
-            HUF_DECODE_SYMBOLX6_2(op2, &bitD2);
-            HUF_DECODE_SYMBOLX6_2(op3, &bitD3);
-            HUF_DECODE_SYMBOLX6_2(op4, &bitD4);
-            HUF_DECODE_SYMBOLX6_0(op1, &bitD1);
-            HUF_DECODE_SYMBOLX6_0(op2, &bitD2);
-            HUF_DECODE_SYMBOLX6_0(op3, &bitD3);
-            HUF_DECODE_SYMBOLX6_0(op4, &bitD4);
-
-            endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+        if ( (endSignal==BIT_DStream_unfinished) && (op4<=(oend-16)) ) {
+            HUF_DECODE_ROUNDX6;
+            {   U32 const saved2 = MEM_read32(opStart2);   /* saved from overwrite */
+                U32 const saved3 = MEM_read32(opStart3);
+                U32 const saved4 = MEM_read32(opStart4);
+                endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+                for ( ; (op3 <= opStart4) && (endSignal==BIT_DStream_unfinished) && (op4<=(oend-16)) ; ) {
+                    HUF_DECODE_ROUNDX6;
+                    endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+                }
+                MEM_write32(opStart2, saved2);
+                MEM_write32(opStart3, saved3);
+                MEM_write32(opStart4, saved4);
+            }
         }
 
         /* check corruption */

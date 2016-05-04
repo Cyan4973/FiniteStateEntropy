@@ -136,7 +136,7 @@ static void findDifferentByte(const void* buf1, size_t buf1Size,
     size_t n;
     for (n=0; n<maxSize; n++) if (B1[n]!=B2[n]) break;
     if (n==maxSize) { DISPLAY("No difference found \n"); return; }
-    DISPLAY("Buffers are different at byte %u / %u \n", (U32)n, (U32)maxSize);
+    DISPLAY("Buffers are different at byte %u / %u : %02X!=%02X\n", (U32)n, (U32)maxSize, B1[n], B2[n]);
 }
 
 
