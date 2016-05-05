@@ -910,7 +910,6 @@ static inline size_t HUF_decodeStreamX6(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* c
     return p-pStart;
 }
 
-
 size_t HUF_decompress1X6_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
@@ -943,7 +942,7 @@ size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cS
     HUF_CREATE_STATIC_DTABLEX6(DTable, HUF_MAX_TABLELOG);
     const BYTE* ip = (const BYTE*) cSrc;
 
-    size_t hSize = HUF_readDTableX6 (DTable, cSrc, cSrcSize);
+    size_t const hSize = HUF_readDTableX6 (DTable, cSrc, cSrcSize);
     if (HUF_isError(hSize)) return hSize;
     if (hSize >= cSrcSize) return ERROR(srcSize_wrong);
     ip += hSize;
@@ -978,6 +977,7 @@ size_t HUF_decompress4X6_usingDTable(
 {
     /* Check */
     if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
+    if (dstSize  < 64) return ERROR(dstSize_tooSmall);      /* only work for dstSize >= 64 */
 
     {   const BYTE* const istart = (const BYTE*) cSrc;
         BYTE* const ostart = (BYTE*) dst;
@@ -988,7 +988,6 @@ size_t HUF_decompress4X6_usingDTable(
         const HUF_DDescX6* dd = (const HUF_DDescX6*)ddPtr;
         const void* const dsPtr = DTable + 1 + ((size_t)1<<(dtLog-1));
         const HUF_DSeqX6* ds = (const HUF_DSeqX6*)dsPtr;
-        size_t errorCode;
 
         /* Init */
         BIT_DStream_t bitD1;
@@ -1015,19 +1014,23 @@ size_t HUF_decompress4X6_usingDTable(
 
         length4 = cSrcSize - (length1 + length2 + length3 + 6);
         if (length4 > cSrcSize) return ERROR(corruption_detected);   /* overflow */
-        errorCode = BIT_initDStream(&bitD1, istart1, length1);
-        if (HUF_isError(errorCode)) return errorCode;
-        errorCode = BIT_initDStream(&bitD2, istart2, length2);
-        if (HUF_isError(errorCode)) return errorCode;
-        errorCode = BIT_initDStream(&bitD3, istart3, length3);
-        if (HUF_isError(errorCode)) return errorCode;
-        errorCode = BIT_initDStream(&bitD4, istart4, length4);
-        if (HUF_isError(errorCode)) return errorCode;
+        { size_t const errorCode = BIT_initDStream(&bitD1, istart1, length1);
+          if (HUF_isError(errorCode)) return errorCode; }
+        { size_t const errorCode = BIT_initDStream(&bitD2, istart2, length2);
+          if (HUF_isError(errorCode)) return errorCode; }
+        { size_t const errorCode = BIT_initDStream(&bitD3, istart3, length3);
+          if (HUF_isError(errorCode)) return errorCode; }
+        { size_t const errorCode = BIT_initDStream(&bitD4, istart4, length4);
+          if (HUF_isError(errorCode)) return errorCode; }
 
-        /* 16-64 symbols per loop (4-16 symbols per stream) */
+        /* 4-64 symbols per loop (1-16 symbols per stream) */
         endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
-        if ( (endSignal==BIT_DStream_unfinished) && (op4<=(oend-16)) ) {
+        if (endSignal==BIT_DStream_unfinished) {
             HUF_DECODE_ROUNDX6;
+            if (sizeof(bitD1.bitContainer)==4) {   /* need to decode at least 4 bytes per stream */
+                    endSignal = BIT_reloadDStream(&bitD1) | BIT_reloadDStream(&bitD2) | BIT_reloadDStream(&bitD3) | BIT_reloadDStream(&bitD4);
+                    HUF_DECODE_ROUNDX6;
+            }
             {   U32 const saved2 = MEM_read32(opStart2);   /* saved from overwrite */
                 U32 const saved3 = MEM_read32(opStart3);
                 U32 const saved4 = MEM_read32(opStart4);
@@ -1039,14 +1042,13 @@ size_t HUF_decompress4X6_usingDTable(
                 MEM_write32(opStart2, saved2);
                 MEM_write32(opStart3, saved3);
                 MEM_write32(opStart4, saved4);
-            }
-        }
+        }   }
 
         /* check corruption */
         if (op1 > opStart2) return ERROR(corruption_detected);
         if (op2 > opStart3) return ERROR(corruption_detected);
         if (op3 > opStart4) return ERROR(corruption_detected);
-        /* note : op4 supposed already verified within main loop */
+        /* note : op4 already verified within main loop */
 
         /* finish bitStreams one by one */
         HUF_decodeStreamX6(op1, &bitD1, opStart2, DTable, dtLog);
@@ -1110,12 +1112,7 @@ typedef size_t (*decompressionAlgo)(void* dst, size_t dstSize, const void* cSrc,
 size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
 {
     static const decompressionAlgo decompress[3] = { HUF_decompress4X2, HUF_decompress4X4, HUF_decompress4X6 };
-    /* estimate decompression time */
-    U32 Q;
-    const U32 D256 = (U32)(dstSize >> 8);
-    U32 Dtime[3];
-    U32 algoNb = 0;
-    int n;
+    U32 Dtime[3];   /* decompression time estimation */
 
     /* validation checks */
     if (dstSize == 0) return ERROR(dstSize_tooSmall);
@@ -1124,16 +1121,19 @@ size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcS
     if (cSrcSize == 1) { memset(dst, *(const BYTE*)cSrc, dstSize); return dstSize; }   /* RLE */
 
     /* decoder timing evaluation */
-    Q = (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 since dstSize > cSrcSize */
-    for (n=0; n<3; n++)
-        Dtime[n] = algoTime[Q][n].tableTime + (algoTime[Q][n].decode256Time * D256);
+    {   U32 const Q = (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 since dstSize > cSrcSize */
+        U32 const D256 = (U32)(dstSize >> 8);
+        U32 n; for (n=0; n<3; n++)
+            Dtime[n] = algoTime[Q][n].tableTime + (algoTime[Q][n].decode256Time * D256);
+    }
 
     Dtime[1] += Dtime[1] >> 4; Dtime[2] += Dtime[2] >> 3; /* advantage to algorithms using less memory, for cache eviction */
 
-    if (Dtime[1] < Dtime[0]) algoNb = 1;
-    if (Dtime[2] < Dtime[algoNb]) algoNb = 2;
-
-    return decompress[algoNb](dst, dstSize, cSrc, cSrcSize);
+    {   U32 algoNb = 0;
+        if (Dtime[1] < Dtime[0]) algoNb = 1;
+        if (Dtime[2] < Dtime[algoNb]) algoNb = 2;
+        return decompress[algoNb](dst, dstSize, cSrc, cSrcSize);
+    }
 
     //return HUF_decompress4X2(dst, dstSize, cSrc, cSrcSize);   /* multi-streams single-symbol decoding */
     //return HUF_decompress4X4(dst, dstSize, cSrc, cSrcSize);   /* multi-streams double-symbols decoding */

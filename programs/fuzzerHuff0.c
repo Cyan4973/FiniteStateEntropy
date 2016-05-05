@@ -220,6 +220,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                 }   }
 
                 /* quad decoder test (more fragile) */
+                if (sizeOrig > 64)
                 {   BYTE const saved = bufferVerif[sizeOrig] = 253;
                     size_t const result = HUF_decompress4X6 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress4X6 : bufferVerif overflow");
