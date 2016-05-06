@@ -918,17 +918,15 @@ size_t HUF_decompress1X6_usingDTable(
     const BYTE* const istart = (const BYTE*) cSrc;
     BYTE* const ostart = (BYTE*) dst;
     BYTE* const oend = ostart + dstSize;
-
-    const U32 dtLog = DTable[0];
-    size_t errorCode;
+    BIT_DStream_t bitD;
 
     /* Init */
-    BIT_DStream_t bitD;
-    errorCode = BIT_initDStream(&bitD, istart, cSrcSize);
-    if (HUF_isError(errorCode)) return errorCode;
+    { size_t const errorCode = BIT_initDStream(&bitD, istart, cSrcSize);
+      if (HUF_isError(errorCode)) return errorCode; }
 
     /* finish bitStreams one by one */
-    HUF_decodeStreamX6(ostart, &bitD, oend, DTable, dtLog);
+    { U32 const dtLog = DTable[0];
+      HUF_decodeStreamX6(ostart, &bitD, oend, DTable, dtLog); }
 
     /* check */
     if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
