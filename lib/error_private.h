@@ -1,6 +1,6 @@
 /* ******************************************************************
    Error codes and messages
-   Copyright (C) 2013-2015, Yann Collet
+   Copyright (C) 2013-2016, Yann Collet
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -31,6 +31,8 @@
    - Source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
+/* Note : this module is expected to remain private, do not expose it */
+
 #ifndef ERROR_H_MODULE
 #define ERROR_H_MODULE
 
@@ -39,48 +41,67 @@ extern "C" {
 #endif
 
 
-/******************************************
+/* ****************************************
+*  Dependencies
+******************************************/
+#include <stddef.h>        /* size_t */
+#include "error_public.h"  /* enum list */
+
+
+/* ****************************************
 *  Compiler-specific
 ******************************************/
-#if defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#if defined(__GNUC__)
+#  define ERR_STATIC static __attribute__((unused))
+#elif defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #  define ERR_STATIC static inline
 #elif defined(_MSC_VER)
 #  define ERR_STATIC static __inline
-#elif defined(__GNUC__)
-#  define ERR_STATIC static __attribute__((unused))
 #else
 #  define ERR_STATIC static  /* this version may generate warnings for unused static functions; disable the relevant warning */
 #endif
 
 
-/******************************************
-*  Error Management
+/*-****************************************
+*  Customization (error_public.h)
 ******************************************/
-#define PREFIX(name) entropyLib_error_##name
+typedef FSE_ErrorCode ERR_enum;
+#define PREFIX(name) FSE_error_##name
 
-#define ERROR(name) (size_t)-PREFIX(name)
 
-#define ERROR_LIST(ITEM) \
-        ITEM(PREFIX(No_Error)) ITEM(PREFIX(GENERIC)) \
-        ITEM(PREFIX(dstSize_tooSmall)) ITEM(PREFIX(srcSize_wrong)) \
-        ITEM(PREFIX(corruption_detected)) \
-        ITEM(PREFIX(tableLog_tooLarge)) ITEM(PREFIX(maxSymbolValue_tooLarge)) ITEM(PREFIX(maxSymbolValue_tooSmall)) \
-        ITEM(PREFIX(maxCode))
-
-#define ERROR_GENERATE_ENUM(ENUM) ENUM,
-typedef enum { ERROR_LIST(ERROR_GENERATE_ENUM) } ERR_codes;  /* enum is exposed, to detect & handle specific errors; compare function result to -enum value */
-
-#define ERROR_CONVERTTOSTRING(STRING) #STRING,
-#define ERROR_GENERATE_STRING(EXPR) ERROR_CONVERTTOSTRING(EXPR)
-static const char* ERR_strings[] = { ERROR_LIST(ERROR_GENERATE_STRING) };
+/*-****************************************
+*  Error codes handling
+******************************************/
+#ifdef ERROR
+#  undef ERROR   /* reported already defined on VS 2015 (Rich Geldreich) */
+#endif
+#define ERROR(name) ((size_t)-PREFIX(name))
 
 ERR_STATIC unsigned ERR_isError(size_t code) { return (code > ERROR(maxCode)); }
 
+ERR_STATIC ERR_enum ERR_getError(size_t code) { if (!ERR_isError(code)) return (ERR_enum)0; return (ERR_enum) (0-code); }
+
+
+/*-****************************************
+*  Error Strings
+******************************************/
+
 ERR_STATIC const char* ERR_getErrorName(size_t code)
 {
-    static const char* codeError = "Unspecified error code";
-    if (ERR_isError(code)) return ERR_strings[-(int)(code)];
-    return codeError;
+    static const char* notErrorCode = "Unspecified error code";
+    switch( ERR_getError(code) )
+    {
+    case PREFIX(no_error): return "No error detected";
+    case PREFIX(GENERIC):  return "Error (generic)";
+    case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
+    case PREFIX(srcSize_wrong): return "Src size incorrect";
+    case PREFIX(corruption_detected): return "Corrupted block detected";
+    case PREFIX(tableLog_tooLarge): return "tableLog requires too much memory : unsupported";
+    case PREFIX(maxSymbolValue_tooLarge): return "Unsupported max Symbol Value : too large";
+    case PREFIX(maxSymbolValue_tooSmall): return "Specified maxSymbolValue is too small";
+    case PREFIX(maxCode):
+    default: return notErrorCode;   /* impossible, due to ERR_getError() */
+    }
 }
 
 

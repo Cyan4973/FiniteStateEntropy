@@ -33,7 +33,7 @@
 
 #include "mem.h"
 #include "fse_static.h"
-#include "huff0_static.h"
+#include "huf_static.h"
 #include "xxhash.h"
 
 

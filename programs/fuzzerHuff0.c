@@ -1,6 +1,6 @@
 /*
 FuzzerHuff0.c
-Automated test program for Huff0
+Automated test program for HUF
 Copyright (C) Yann Collet 2015
 
 GPL v2 License
@@ -20,43 +20,40 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 You can contact the author at :
-- FSE+Huff0 source repository : https://github.com/Cyan4973/FiniteStateEntropy
+- FSE+HUF source repository : https://github.com/Cyan4973/FiniteStateEntropy
 - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 
-/******************************
+/*-****************************
 *  Compiler options
 ******************************/
 #define _CRT_SECURE_NO_WARNINGS   /* Visual warning */
 
 
-/******************************
-*  Include
+/*-****************************
+*  Dependencies
 *******************************/
 #include <stdlib.h>     /* malloc, abs */
 #include <stdio.h>      /* printf */
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
 #include "mem.h"
-#include "huff0_static.h"
+#include "huf_static.h"
 #include "xxhash.h"
 
 
-/***************************************************
+/*-*************************************************
 *  Constants
 ***************************************************/
 #define KB *(1<<10)
 #define MB *(1<<20)
 #define BUFFERSIZE ((1 MB) - 1)
 #define FUZ_NB_TESTS  (128 KB)
-#define PROBATABLESIZE (4 KB)
 #define FUZ_UPDATERATE  200
-#define PRIME1   2654435761U
-#define PRIME2   2246822519U
 
 
-/***************************************************
+/*-*************************************************
 *  Macros
 ***************************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
@@ -64,7 +61,7 @@ You can contact the author at :
 static unsigned displayLevel = 2;   /* 0 : no display; 1: errors; 2 : + result + interaction + warnings; 3 : + progression; 4 : + information */
 
 
-/***************************************************
+/*-*************************************************
 *  local functions
 ***************************************************/
 static int FUZ_GetMilliStart(void)
@@ -88,13 +85,16 @@ static int FUZ_GetMilliSpan ( int nTimeStart )
 
 static unsigned FUZ_rand (unsigned* src)
 {
-    *src =  ( (*src) * PRIME1) + PRIME2;
+    static const unsigned prime1 = 2654435761U;
+    static const unsigned prime2 = 2246822519U;
+    *src =  ( (*src) * prime1) + prime2;
     return (*src) >> 11;
 }
 
 
 static void generate (void* buffer, size_t buffSize, double p, U32* seed)
 {
+#   define PROBATABLESIZE (4 KB)
     char table[PROBATABLESIZE] = {0};
     int remaining = PROBATABLESIZE;
     int pos = 0;
@@ -103,8 +103,7 @@ static void generate (void* buffer, size_t buffSize, double p, U32* seed)
     char* oend = op + buffSize;
 
     /* Build Table */
-    while (remaining)
-    {
+    while (remaining) {
         int n = (int) (remaining * p);
         int end;
         if (!n) n=1;
@@ -116,10 +115,7 @@ static void generate (void* buffer, size_t buffSize, double p, U32* seed)
 
     /* Fill buffer */
     while (op<oend)
-    {
-        const int r = FUZ_rand (seed) & (PROBATABLESIZE-1);
-        *op++ = table[r];
-    }
+        *op++ = table[FUZ_rand (seed) & (PROBATABLESIZE-1)];
 }
 
 
@@ -128,6 +124,19 @@ static void generateNoise (void* buffer, size_t buffSize, U32* seed)
     BYTE* op = (BYTE*)buffer;
     BYTE* const oend = op + buffSize;
     while (op<oend) *op++ = (BYTE)FUZ_rand(seed);
+}
+
+#define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
+static void findDifferentByte(const void* buf1, size_t buf1Size,
+                              const void* buf2, size_t buf2Size)
+{
+    size_t const maxSize = MIN(buf1Size, buf2Size);
+    const BYTE* const B1 = (const BYTE*) buf1;
+    const BYTE* const B2 = (const BYTE*) buf2;
+    size_t n;
+    for (n=0; n<maxSize; n++) if (B1[n]!=B2[n]) break;
+    if (n==maxSize) { DISPLAY("No difference found \n"); return; }
+    DISPLAY("Buffers are different at byte %u / %u : %02X!=%02X\n", (U32)n, (U32)maxSize, B1[n], B2[n]);
 }
 
 
@@ -143,9 +152,9 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     BYTE* bufferP100  = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferDst   = (BYTE*) malloc (BUFFERSIZE+64);
     BYTE* bufferVerif = (BYTE*) malloc (BUFFERSIZE+64);
-    size_t bufferDstSize = BUFFERSIZE+64;
+    size_t const bufferDstSize = BUFFERSIZE+64;
     unsigned testNb;
-    const size_t maxTestSizeMask = 0x1FFFF;   /* 128 KB - 1 */
+    size_t const maxTestSizeMask = 0x1FFFF;   /* 128 KB - 1 */
     U32 rootSeed = seed;
     U32 time = FUZ_GetMilliStart();
 
@@ -156,38 +165,30 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     memset(bufferP100, (BYTE)FUZ_rand(&rootSeed), BUFFERSIZE);
     memset(bufferDst, 0, BUFFERSIZE);
 
-    if (startTestNb)
-    {
-        U32 i;
-        for (i=0; i<startTestNb; i++)
-            FUZ_rand (&rootSeed);
-    }
+    { U32 u; for (u=0; u<startTestNb; u++) FUZ_rand (&rootSeed); }
 
-    for (testNb=startTestNb; testNb<totalTest; testNb++)
-    {
-        BYTE* bufferTest = NULL;
-        int tag=0;
+    for (testNb=startTestNb; testNb<totalTest; testNb++) {
         U32 roundSeed = rootSeed ^ 0xEDA5B371;
         FUZ_rand(&rootSeed);
+        int tag=0;
+        BYTE* bufferTest = NULL;
 
         DISPLAYLEVEL (4, "\r test %5u  ", testNb);
-        if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE)
-        {
+        if (FUZ_GetMilliSpan (time) > FUZ_UPDATERATE) {
             DISPLAY ("\r test %5u  ", testNb);
             time = FUZ_GetMilliStart();
         }
 
         /* Compression / Decompression tests */
-        {
-            /* determine test sample */
-            size_t sizeOrig = (FUZ_rand(&roundSeed) & maxTestSizeMask) + 1;
-            size_t offset = (FUZ_rand(&roundSeed) % (BUFFERSIZE - 64 - maxTestSizeMask));
+        DISPLAYLEVEL (4,"%3i ", tag++);
+        {   /* determine test sample */
+            size_t const sizeOrig = (FUZ_rand(&roundSeed) & maxTestSizeMask) + 1;
+            size_t const offset = (FUZ_rand(&roundSeed) % (BUFFERSIZE - 64 - maxTestSizeMask));
             size_t sizeCompressed;
             U32 hashOrig;
 
             if (FUZ_rand(&roundSeed) & 7) bufferTest = bufferP15 + offset;
-            else
-            {
+            else {
                 switch(FUZ_rand(&roundSeed) & 3)
                 {
                     case 0: bufferTest = bufferP0 + offset; break;
@@ -196,65 +197,64 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     default : bufferTest = bufferP100 + offset; break;
                 }
             }
-            DISPLAYLEVEL (4,"%3i ", tag++);
             hashOrig = XXH32 (bufferTest, sizeOrig, 0);
 
             /* compression test */
             sizeCompressed = HUF_compress (bufferDst, bufferDstSize, bufferTest, sizeOrig);
-            CHECK(HUF_isError(sizeCompressed), "Compression failed");
-            if (sizeCompressed > 1)   /* don't check uncompressed & rle corner cases */
-            {
+            CHECK(HUF_isError(sizeCompressed), "HUF_compress failed");
+            if (sizeCompressed > 1) {   /* don't check uncompressed & rle corner cases */
                 /* failed compression test */
-                {
-                    BYTE saved = (bufferVerif[sizeCompressed-1] = 253);
-                    size_t errorCode;
-                    errorCode = HUF_compress (bufferVerif, sizeCompressed-1, bufferTest, sizeOrig);
-                    CHECK(errorCode!=0, "compression should have failed (too small destination buffer)")
+                {   BYTE const saved = bufferVerif[sizeCompressed-1] = 253;
+                    size_t const errorCode = HUF_compress (bufferVerif, sizeCompressed-1, bufferTest, sizeOrig);
+                    CHECK(errorCode!=0, "HUF_compress should have failed (too small destination buffer)")
                     CHECK(bufferVerif[sizeCompressed-1] != saved, "HUF_compress w/ too small dst : bufferVerif overflow");
                 }
 
                 /* decompression test */
-                {
-                    U32 hashEnd;
-                    BYTE saved = (bufferVerif[sizeOrig] = 253);
-                    size_t result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                {   BYTE const saved = bufferVerif[sizeOrig] = 253;
+                    size_t const result = HUF_decompress (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress : bufferVerif overflow");
-                    CHECK(HUF_isError(result), "Decompression failed : %s", HUF_getErrorName(result));
-                    hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
-                    CHECK(hashEnd != hashOrig, "Decompressed data corrupted");
-                    CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress overwrite dst buffer !");
-                }
+                    CHECK(HUF_isError(result), "HUF_decompress failed : %s", HUF_getErrorName(result));
+                    {   U32 const hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                        CHECK(hashEnd != hashOrig, "HUF_decompress : Decompressed data corrupted");
+                }   }
+
+                /* quad decoder test (more fragile) */
+                if (sizeOrig > 64)
+                {   BYTE const saved = bufferVerif[sizeOrig] = 253;
+                    size_t const result = HUF_decompress4X6 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
+                    CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress4X6 : bufferVerif overflow");
+                    CHECK(HUF_isError(result), "HUF_decompress4X6 failed : %s", HUF_getErrorName(result));
+                    {   U32 const hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                        if (hashEnd!=hashOrig) findDifferentByte(bufferVerif, sizeOrig, bufferTest, sizeOrig);
+                        CHECK(hashEnd != hashOrig, "HUF_decompress4X6 : Decompressed data corrupted");
+                }   }
 
                 /* truncated src decompression test */
-                if (sizeCompressed>4)
-                {
-                    /* note : in some rare cases, the truncated bitStream may still generate by chance a valid output of correct size.
-                              It typically requires `missing` to be small; hence a minimum value of `missing` for this test */
-                    size_t errorCode;
-                    const size_t missing = (FUZ_rand(&roundSeed) % (sizeCompressed-3)) + 2;   /* no problem, as sizeCompressed > 4 */
-                    const size_t tooSmallSize = sizeCompressed - missing;
+                if (sizeCompressed>4) {
+                    /* note : in some rare cases, the truncated bitStream may still generate by chance a valid output of correct size */
+                    size_t const missing = (FUZ_rand(&roundSeed) % (sizeCompressed-3)) + 2;   /* no problem, as sizeCompressed > 4 */
+                    size_t const tooSmallSize = sizeCompressed - missing;
                     void* cBufferTooSmall = malloc(tooSmallSize);   /* valgrind will catch read overflows */
                     CHECK(cBufferTooSmall == NULL, "not enough memory !");
                     memcpy(cBufferTooSmall, bufferDst, tooSmallSize);
-                    errorCode = HUF_decompress(bufferVerif, sizeOrig, cBufferTooSmall, tooSmallSize);
-                    CHECK(!HUF_isError(errorCode) && (errorCode!=sizeOrig), "HUF_decompress should have failed ! (truncated src buffer)");
+                    { size_t const errorCode = HUF_decompress(bufferVerif, sizeOrig, cBufferTooSmall, tooSmallSize);
+                      CHECK(!HUF_isError(errorCode) && (errorCode!=sizeOrig), "HUF_decompress should have failed ! (truncated src buffer)"); }
                     free(cBufferTooSmall);
-                }
-            }
-        }
+            }   }
+        }   /* Compression / Decompression tests */
 
         /* Attempt decompression on bogus data */
-        {
-            size_t maxDstSize = FUZ_rand (&roundSeed) & maxTestSizeMask;
-            size_t sizeCompressed = FUZ_rand (&roundSeed) & maxTestSizeMask;
-            BYTE saved = (bufferDst[maxDstSize] = 253);
+        {   size_t const maxDstSize = FUZ_rand (&roundSeed) & maxTestSizeMask;
+            size_t const sizeCompressed = FUZ_rand (&roundSeed) & maxTestSizeMask;
+            BYTE const saved = (bufferDst[maxDstSize] = 253);
             size_t result;
             DISPLAYLEVEL (4,"\b\b\b\b%3i ", tag++);;
             result = HUF_decompress (bufferDst, maxDstSize, bufferTest, sizeCompressed);
             CHECK(!HUF_isError(result) && (result > maxDstSize), "Decompression overran output buffer");
             CHECK(bufferDst[maxDstSize] != saved, "HUF_decompress noise : bufferDst overflow");
         }
-    }
+    }   /* for (testNb=startTestNb; testNb<totalTest; testNb++) */
 
     /* exit */
     free (bufferP0);
@@ -267,7 +267,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
 }
 
 
-/*****************************************************************
+/*-***************************************************************
 *  Unitary tests
 *****************************************************************/
 #define TBSIZE (16 KB)
@@ -277,8 +277,7 @@ static void unitTest(void)
     BYTE* cBuff = (BYTE*)malloc(HUF_COMPRESSBOUND(TBSIZE));
     BYTE* verifBuff = (BYTE*)malloc(TBSIZE);
 
-    if ((!testBuff) || (!cBuff) || (!verifBuff))
-    {
+    if ((!testBuff) || (!cBuff) || (!verifBuff)) {
         DISPLAY("Not enough memory, exiting ... \n");
         free(testBuff);
         free(cBuff);
@@ -301,11 +300,11 @@ static void unitTest(void)
 }
 
 
-/*****************************************************************
+/*-***************************************************************
 *  Command line
 *****************************************************************/
 
-int badUsage(const char* exename)
+static int badUsage(const char* exename)
 {
     (void) exename;
     DISPLAY("wrong parameter\n");
@@ -313,21 +312,18 @@ int badUsage(const char* exename)
 }
 
 
-int main (int argc, char** argv)
+int main (int argc, const char** argv)
 {
     U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
     int argNb;
 
     seed = FUZ_GetMilliStart() % 10000;
-    DISPLAYLEVEL (1, "Huff0 (%2i bits) automated test\n", (int)sizeof(void*)*8);
-    for (argNb=1; argNb<argc; argNb++)
-    {
-        char* argument = argv[argNb];
-        if (argument[0]=='-')
-        {
+    DISPLAYLEVEL (1, "HUF (%2i bits) automated test\n", (int)sizeof(void*)*8);
+    for (argNb=1; argNb<argc; argNb++) {
+        const char* argument = argv[argNb];
+        if (argument[0]=='-') {
             argument++;
-            while (argument[0]!=0)
-            {
+            while (argument[0]!=0) {
                 switch (argument[0])
                 {
                 /* seed setting */
@@ -335,11 +331,7 @@ int main (int argc, char** argv)
                     argument++;
                     seed=0;
                     while ((*argument>='0') && (*argument<='9'))
-                    {
-                        seed *= 10;
-                        seed += *argument - '0';
-                        argument++;
-                    }
+                        seed *= 10, seed += *argument++ - '0';
                     break;
 
                 /* total tests */
@@ -347,11 +339,7 @@ int main (int argc, char** argv)
                     argument++;
                     totalTest=0;
                     while ((*argument>='0') && (*argument<='9'))
-                    {
-                        totalTest *= 10;
-                        totalTest += *argument - '0';
-                        argument++;
-                    }
+                        totalTest *= 10, totalTest += *argument++ - '0';
                     break;
 
                 /* jump to test nb */
@@ -359,11 +347,7 @@ int main (int argc, char** argv)
                     argument++;
                     startTestNb=0;
                     while ((*argument>='0') && (*argument<='9'))
-                    {
-                        startTestNb *= 10;
-                        startTestNb += *argument - '0';
-                        argument++;
-                    }
+                        startTestNb *= 10, startTestNb += *argument++ - '0';
                     break;
 
                 /* verbose mode */
@@ -382,8 +366,8 @@ int main (int argc, char** argv)
                     return badUsage(argv[0]);
                 }
             }
-        }
-    }
+        }   /* if (argument[0]=='-') */
+    }   /* for (argNb=1; argNb<argc; argNb++) */
 
     if (startTestNb == 0) unitTest();
 
@@ -391,8 +375,7 @@ int main (int argc, char** argv)
     FUZ_tests (seed, totalTest, startTestNb);
 
     DISPLAY ("\rAll %u tests passed               \n", totalTest);
-    if (pause)
-    {
+    if (pause) {
         int unused;
         DISPLAY("press enter ...\n");
         unused = getchar();

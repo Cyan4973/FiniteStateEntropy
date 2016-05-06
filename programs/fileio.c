@@ -54,7 +54,7 @@
 #include <time.h>     /* clock */
 #include "fileio.h"
 #include "fse.h"
-#include "huff0.h"
+#include "huf.h"
 #include "zlibh.h"    /*ZLIBH_compress */
 #include "xxhash.h"
 
@@ -115,7 +115,7 @@ typedef unsigned long long  U64;
 #define BIT7  0x80
 
 #define FIO_magicNumber_fse   0x183E2309
-#define FIO_magicNumber_huff0 0x183E3309
+#define FIO_magicNumber_huf   0x183E3309
 #define FIO_magicNumber_zlibh 0x183E4309
 static const unsigned FIO_maxBlockSizeID = 6;   /* => 64 KB block */
 static const unsigned FIO_maxBlockHeaderSize = 5;
@@ -309,9 +309,9 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
         compressor = FSE_compress;
         magicNumber = FIO_magicNumber_fse;
         break;
-    case FIO_huff0:
+    case FIO_huf:
         compressor = HUF_compress;
-        magicNumber = FIO_magicNumber_huff0;
+        magicNumber = FIO_magicNumber_huf;
         break;
     case FIO_zlibh:
         compressor = FIO_ZLIBH_compress;
@@ -503,7 +503,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     case FIO_magicNumber_fse:
         decompressor = FSE_decompress;
         break;
-    case FIO_magicNumber_huff0:
+    case FIO_magicNumber_huf:
         decompressor = HUF_decompress;
         break;
     case FIO_magicNumber_zlibh:
