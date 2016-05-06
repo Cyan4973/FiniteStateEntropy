@@ -118,6 +118,7 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
     const U32 step = FSE_TABLESTEP(tableSize);
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
 
+    U32 const maxSV1 = maxSymbolValue + 1;
     U32 highThreshold = tableSize-1;
     S16 const largeLimit= (S16)(1 << (tableLog-1));
     U32 noLarge = 1;
@@ -129,7 +130,7 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
 
     /* Init, lay down lowprob symbols */
     DTableH.tableLog = (U16)tableLog;
-    for (s=0; s<=maxSymbolValue; s++) {
+    for (s=0; s<maxSV1; s++) {
         if (normalizedCounter[s]==-1) {
             tableDecode[highThreshold--].symbol = (FSE_FUNCTION_TYPE)s;
             symbolNext[s] = 1;
@@ -140,7 +141,7 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
 
     /* Spread symbols */
     {   U32 position = 0;
-        for (s=0; s<=maxSymbolValue; s++) {
+        for (s=0; s<maxSV1; s++) {
             int i;
             for (i=0; i<normalizedCounter[s]; i++) {
                 tableDecode[position].symbol = (FSE_FUNCTION_TYPE)s;
@@ -199,7 +200,7 @@ size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
     FSE_decode_t* const dinfo = (FSE_decode_t*)dPtr;
     const unsigned tableSize = 1 << nbBits;
     const unsigned tableMask = tableSize - 1;
-    const unsigned maxSymbolValue = tableMask;
+    const unsigned maxSV1 = tableMask+1;
     unsigned s;
 
     /* Sanity checks */
@@ -208,7 +209,7 @@ size_t FSE_buildDTable_raw (FSE_DTable* dt, unsigned nbBits)
     /* Build Decoding Table */
     DTableH->tableLog = (U16)nbBits;
     DTableH->fastMode = 1;
-    for (s=0; s<=maxSymbolValue; s++) {
+    for (s=0; s<maxSV1; s++) {
         dinfo[s].newState = 0;
         dinfo[s].symbol = (BYTE)s;
         dinfo[s].nbBits = (BYTE)nbBits;
