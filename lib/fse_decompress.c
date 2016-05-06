@@ -156,8 +156,7 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
     /* Build Decoding table */
     {   U32 u;
         for (u=0; u<tableSize; u++) {
-            FSE_FUNCTION_TYPE symbol = (FSE_FUNCTION_TYPE)(tableDecode[u].symbol);
-
+            FSE_FUNCTION_TYPE const symbol = (FSE_FUNCTION_TYPE)(tableDecode[u].symbol);
             U16 nextState = symbolNext[symbol]++;
             tableDecode[u].nbBits = (BYTE) (tableLog - BIT_highbit32 ((U32)nextState) );
             tableDecode[u].newState = (U16) ( (nextState << tableDecode[u].nbBits) - tableSize);
@@ -230,11 +229,10 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(
     BIT_DStream_t bitD;
     FSE_DState_t state1;
     FSE_DState_t state2;
-    size_t errorCode;
 
     /* Init */
-    errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);   /* replaced last arg by maxCompressed Size */
-    if (FSE_isError(errorCode)) return errorCode;
+    { size_t const errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);   /* replaced last arg by maxCompressed Size */
+      if (FSE_isError(errorCode)) return errorCode; }
 
     FSE_initDState(&state1, &bitD, dt);
     FSE_initDState(&state2, &bitD, dt);
@@ -308,22 +306,21 @@ size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, size_t cSr
     DTable_max_t dt;   /* Static analyzer seems unable to understand this table will be properly initialized later */
     unsigned tableLog;
     unsigned maxSymbolValue = FSE_MAX_SYMBOL_VALUE;
-    size_t errorCode;
 
     if (cSrcSize<2) return ERROR(srcSize_wrong);   /* too small input size */
 
     /* normal FSE decoding mode */
-    errorCode = FSE_readNCount (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
-    if (FSE_isError(errorCode)) return errorCode;
-    if (errorCode >= cSrcSize) return ERROR(srcSize_wrong);   /* too small input size */
-    ip += errorCode;
-    cSrcSize -= errorCode;
+    {   size_t const NCountLength = FSE_readNCount (counting, &maxSymbolValue, &tableLog, istart, cSrcSize);
+        if (FSE_isError(NCountLength)) return NCountLength;
+        if (NCountLength >= cSrcSize) return ERROR(srcSize_wrong);   /* too small input size */
+        ip += NCountLength;
+        cSrcSize -= NCountLength;
+    }
 
-    errorCode = FSE_buildDTable (dt, counting, maxSymbolValue, tableLog);
-    if (FSE_isError(errorCode)) return errorCode;
+    { size_t const errorCode = FSE_buildDTable (dt, counting, maxSymbolValue, tableLog);
+      if (FSE_isError(errorCode)) return errorCode; }
 
-    /* always return, even if it is an error code */
-    return FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, dt);
+    return FSE_decompress_usingDTable (dst, maxDstSize, ip, cSrcSize, dt);   /* always return, even if it is an error code */
 }
 
 
