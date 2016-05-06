@@ -111,18 +111,13 @@ void FSE_freeDTable (FSE_DTable* dt)
 size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
     FSE_DTableHeader DTableH;
-    void* const tdPtr = dt+1;   /* because dt is unsigned, 32-bits aligned on 32-bits */
+    void* const tdPtr = dt+1;   /* because *dt is unsigned, 32-bits aligned on 32-bits */
     FSE_DECODE_TYPE* const tableDecode = (FSE_DECODE_TYPE*) (tdPtr);
-    const U32 tableSize = 1 << tableLog;
-    const U32 tableMask = tableSize-1;
-    const U32 step = FSE_TABLESTEP(tableSize);
     U16 symbolNext[FSE_MAX_SYMBOL_VALUE+1];
 
     U32 const maxSV1 = maxSymbolValue + 1;
+    U32 const tableSize = 1 << tableLog;
     U32 highThreshold = tableSize-1;
-    S16 const largeLimit= (S16)(1 << (tableLog-1));
-    U32 noLarge = 1;
-    U32 s;
 
     /* Sanity Checks */
     if (maxSymbolValue > FSE_MAX_SYMBOL_VALUE) return ERROR(maxSymbolValue_tooLarge);
@@ -130,17 +125,23 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
 
     /* Init, lay down lowprob symbols */
     DTableH.tableLog = (U16)tableLog;
-    for (s=0; s<maxSV1; s++) {
-        if (normalizedCounter[s]==-1) {
-            tableDecode[highThreshold--].symbol = (FSE_FUNCTION_TYPE)s;
-            symbolNext[s] = 1;
-        } else {
-            if (normalizedCounter[s] >= largeLimit) noLarge=0;
-            symbolNext[s] = normalizedCounter[s];
-    }   }
+    DTableH.fastMode = 1;
+    {   S16 const largeLimit= (S16)(1 << (tableLog-1));
+        U32 s;
+        for (s=0; s<maxSV1; s++) {
+            if (normalizedCounter[s]==-1) {
+                tableDecode[highThreshold--].symbol = (FSE_FUNCTION_TYPE)s;
+                symbolNext[s] = 1;
+            } else {
+                if (normalizedCounter[s] >= largeLimit) DTableH.fastMode=0;
+                symbolNext[s] = normalizedCounter[s];
+    }   }   }
+    memcpy(dt, &DTableH, sizeof(DTableH));
 
     /* Spread symbols */
-    {   U32 position = 0;
+    {   U32 const tableMask = tableSize-1;
+        U32 const step = FSE_TABLESTEP(tableSize);
+        U32 s, position = 0;
         for (s=0; s<maxSV1; s++) {
             int i;
             for (i=0; i<normalizedCounter[s]; i++) {
@@ -162,8 +163,6 @@ size_t FSE_buildDTable(FSE_DTable* dt, const short* normalizedCounter, unsigned 
             tableDecode[u].newState = (U16) ( (nextState << tableDecode[u].nbBits) - tableSize);
     }   }
 
-    DTableH.fastMode = (U16)noLarge;
-    memcpy(dt, &DTableH, sizeof(DTableH));
     return 0;
 }
 
