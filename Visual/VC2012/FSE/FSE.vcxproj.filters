@@ -11,7 +11,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\common.c">
+    <ClCompile Include="..\..\..\lib\entropy_common.c">
       <Filter>sources</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\lib\fse_compress.c">
