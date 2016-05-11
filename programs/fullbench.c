@@ -1421,7 +1421,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             {   U32 loopNb;
                 for (loopNb=0; BMK_clockSpan(clockStart) < TIMELOOP; loopNb++) {
                     resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                    if (FSE_isError(resultCode)) {
+                    if (0 && FSE_isError(resultCode)) {
                             DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(resultCode));
                             exit(-1);
                 }   }
