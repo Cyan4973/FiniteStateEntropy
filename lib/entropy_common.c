@@ -148,7 +148,7 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
                 ip = iend - 4;
             }
             bitStream = MEM_readLE32(ip) >> (bitCount & 31);
-    }   }
+    }   }   /* while ((remaining>1) && (charnum<=*maxSVPtr)) */
     if (remaining != 1) return ERROR(GENERIC);
     *maxSVPtr = charnum-1;
 
