@@ -64,8 +64,8 @@ extern "C" {
 /*-****************************************
 *  Customization (error_public.h)
 ******************************************/
-typedef ZSTD_ErrorCode ERR_enum;
-#define PREFIX(name) ZSTD_error_##name
+typedef FSE_ErrorCode ERR_enum;
+#define PREFIX(name) FSE_error_##name
 
 
 /*-****************************************
@@ -92,20 +92,12 @@ ERR_STATIC const char* ERR_getErrorString(ERR_enum code)
     {
     case PREFIX(no_error): return "No error detected";
     case PREFIX(GENERIC):  return "Error (generic)";
-    case PREFIX(prefix_unknown): return "Unknown frame descriptor";
-    case PREFIX(frameParameter_unsupported): return "Unsupported frame parameter";
-    case PREFIX(frameParameter_unsupportedBy32bits): return "Frame parameter unsupported in 32-bits mode";
-    case PREFIX(compressionParameter_unsupported): return "Compression parameter is out of bound";
-    case PREFIX(init_missing): return "Context should be init first";
-    case PREFIX(memory_allocation): return "Allocation error : not enough memory";
-    case PREFIX(stage_wrong): return "Operation not authorized at current processing stage";
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
     case PREFIX(srcSize_wrong): return "Src size incorrect";
     case PREFIX(corruption_detected): return "Corrupted block detected";
     case PREFIX(tableLog_tooLarge): return "tableLog requires too much memory : unsupported";
     case PREFIX(maxSymbolValue_tooLarge): return "Unsupported max Symbol Value : too large";
     case PREFIX(maxSymbolValue_tooSmall): return "Specified maxSymbolValue is too small";
-    case PREFIX(dictionary_corrupted): return "Dictionary is corrupted";
     case PREFIX(maxCode):
     default: return notErrorCode;
     }
