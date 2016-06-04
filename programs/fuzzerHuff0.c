@@ -39,7 +39,8 @@ You can contact the author at :
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
 #include "mem.h"
-#include "huf_static.h"
+#define HUF_STATIC_LINKING_ONLY
+#include "huf.h"
 #include "xxhash.h"
 
 
