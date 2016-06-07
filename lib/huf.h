@@ -31,8 +31,8 @@
    You can contact the author at :
    - Source repository : https://github.com/Cyan4973/FiniteStateEntropy
 ****************************************************************** */
-#ifndef HUF_H
-#define HUF_H
+#ifndef HUF_H_298734234
+#define HUF_H_298734234
 
 #if defined (__cplusplus)
 extern "C" {
@@ -53,8 +53,9 @@ size_t HUF_decompress(void* dst,  size_t dstSize,
 /*
 HUF_compress() :
     Compress content from buffer 'src', of size 'srcSize', into buffer 'dst'.
-    'dst' buffer must be already allocated. Compression runs faster if `dstCapacity` >= HUF_compressBound(srcSize).
-    Note : `srcSize` must be <= `HUF_BLOCKSIZE_MAX` == 128 KB
+    'dst' buffer must be already allocated.
+    Compression runs faster if `dstCapacity` >= HUF_compressBound(srcSize).
+    `srcSize` must be <= `HUF_BLOCKSIZE_MAX` == 128 KB
     @return : size of compressed data (<= `dstCapacity`)
     Special values : if return == 0, srcData is not compressible => Nothing is stored within dst !!!
                      if return == 1, srcData is a single repeated byte symbol (RLE compression).
@@ -63,7 +64,7 @@ HUF_compress() :
 HUF_decompress() :
     Decompress HUF data from buffer 'cSrc', of size 'cSrcSize',
     into already allocated buffer 'dst', of minimum size 'dstSize'.
-    `dstSize` : must be the **exact** size of original (uncompressed) data.
+    `dstSize` : **must** be the ***exact*** size of original (uncompressed) data.
     Note : in contrast with FSE, HUF_decompress can regenerate
            RLE (cSrcSize==1) and uncompressed (cSrcSize==dstSize) data,
            because it knows size to regenerate.
@@ -126,8 +127,6 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
         unsigned short DTable[HUF_DTABLE_SIZE(maxTableLog)] = { maxTableLog }
 #define HUF_CREATE_STATIC_DTABLEX4(DTable, maxTableLog) \
         unsigned int DTable[HUF_DTABLE_SIZE(maxTableLog)] = { maxTableLog }
-#define HUF_CREATE_STATIC_DTABLEX6(DTable, maxTableLog) \
-        unsigned int DTable[HUF_DTABLE_SIZE(maxTableLog) * 3 / 2] = { maxTableLog }
 
 
 /* ****************************************
@@ -135,7 +134,6 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
 ******************************************/
 size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
 size_t HUF_decompress4X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbols decoder */
-size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* quad-symbols decoder, only works for dstSize >= 64 */
 
 
 /* ****************************************
@@ -169,11 +167,9 @@ HUF_decompress() does the following:
 */
 size_t HUF_readDTableX2 (unsigned short* DTable, const void* src, size_t srcSize);
 size_t HUF_readDTableX4 (unsigned* DTable, const void* src, size_t srcSize);
-size_t HUF_readDTableX6 (unsigned* DTable, const void* src, size_t srcSize);
 
 size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned short* DTable);
 size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
-size_t HUF_decompress4X6_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
 
 
 /* single stream variants */
@@ -183,11 +179,9 @@ size_t HUF_compress1X_usingCTable(void* dst, size_t dstSize, const void* src, si
 
 size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
 size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbol decoder */
-size_t HUF_decompress1X6 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* quad-symbols decoder, only works for dstSize >= 64 */
 
 size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned short* DTable);
 size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
-size_t HUF_decompress1X6_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const unsigned* DTable);
 
 
 /*! HUF_readStats() :
@@ -211,4 +205,4 @@ size_t HUF_readCTable (HUF_CElt* CTable, unsigned maxSymbolValue, const void* sr
 }
 #endif
 
-#endif   /* HUF_H */
+#endif   /* HUF_H_298734234 */
