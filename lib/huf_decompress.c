@@ -60,7 +60,6 @@
 *  Includes
 ****************************************************************/
 #include <string.h>     /* memcpy, memset */
-#include <stdio.h>      /* printf (debug) */
 #include "bitstream.h"
 #include "fse.h"        /* header compression */
 #define HUF_STATIC_LINKING_ONLY
@@ -76,9 +75,11 @@
 /*-***************************/
 /*  single-symbol decoding   */
 /*-***************************/
+typedef struct { BYTE maxTableLog; BYTE currentTableLog; } DTableDesc;
+
 typedef struct { BYTE byte; BYTE nbBits; } HUF_DEltX2;   /* single-symbol decoding */
 
-size_t HUF_readDTableX2 (U16* DTable, const void* src, size_t srcSize)
+size_t HUF_readDTableX2 (DTable_t* DTable, const void* src, size_t srcSize)
 {
     BYTE huffWeight[HUF_SYMBOLVALUE_MAX + 1];
     U32 rankVal[HUF_TABLELOG_ABSOLUTEMAX + 1];   /* large enough for values from 0 to 16 */
@@ -91,7 +92,7 @@ size_t HUF_readDTableX2 (U16* DTable, const void* src, size_t srcSize)
     HUF_DEltX2* const dt = (HUF_DEltX2*)dtPtr;
     DTableDesc dtd;
 
-    HUF_STATIC_ASSERT(sizeof(HUF_DEltX2) == sizeof(U16));   /* if compilation fails here, assertion is false */
+    HUF_STATIC_ASSERT(sizeof(HUF_DEltX2) == sizeof(DTable_t));   /* if compilation fails here, assertion is false */
     memcpy(&dtd, DTable, sizeof(dtd));
     //memset(huffWeight, 0, sizeof(huffWeight));   /* is not necessary, even though some analyzer complain ... */
 
@@ -172,7 +173,7 @@ static inline size_t HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* const bitDPtr, B
 size_t HUF_decompress1X2_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U16* DTable)
+    const DTable_t* DTable)
 {
     BYTE* op = (BYTE*)dst;
     BYTE* const oend = op + dstSize;
@@ -214,7 +215,7 @@ size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 size_t HUF_decompress4X2_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U16* DTable)
+    const DTable_t* DTable)
 {
     /* Check */
     if (cSrcSize < 10) return ERROR(corruption_detected);  /* strict minimum : jump table + 1 byte per stream */
@@ -413,7 +414,7 @@ static void HUF_fillDTableX4(HUF_DEltX4* DTable, const U32 targetLog,
     }
 }
 
-size_t HUF_readDTableX4 (U16* DTable, const void* src, size_t srcSize)
+size_t HUF_readDTableX4 (DTable_t* DTable, const void* src, size_t srcSize)
 {
     BYTE weightList[HUF_SYMBOLVALUE_MAX + 1];
     sortedSymbol_t sortedSymbol[HUF_SYMBOLVALUE_MAX + 1];
@@ -558,24 +559,21 @@ static inline size_t HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* c
 size_t HUF_decompress1X4_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U16* DTable)
+    const DTable_t* DTable)
 {
-    const BYTE* const istart = (const BYTE*) cSrc;
-    BYTE* const ostart = (BYTE*) dst;
-    BYTE* const oend = ostart + dstSize;
-
-    const void* const dtPtr = DTable+1;
-    const HUF_DEltX4* const dt = (const HUF_DEltX4*)dtPtr;
-
     BIT_DStream_t bitD;
 
     /* Init */
-    {   size_t const errorCode = BIT_initDStream(&bitD, istart, cSrcSize);
+    {   size_t const errorCode = BIT_initDStream(&bitD, cSrc, cSrcSize);
         if (HUF_isError(errorCode)) return errorCode;
     }
 
     /* decode */
-    {   DTableDesc dtd;
+    {   BYTE* const ostart = (BYTE*) dst;
+        BYTE* const oend = ostart + dstSize;
+        const void* const dtPtr = DTable+1;   /* force compiler to not use strict-aliasing */
+        const HUF_DEltX4* const dt = (const HUF_DEltX4*)dtPtr;
+        DTableDesc dtd;
         memcpy(&dtd, DTable, sizeof(dtd));
         HUF_decodeStreamX4(ostart, &bitD, oend, dt, dtd.currentTableLog);
     }
@@ -604,7 +602,7 @@ size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cS
 size_t HUF_decompress4X4_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U16* DTable)
+    const DTable_t* DTable)
 {
     if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
 
@@ -738,12 +736,29 @@ static const algo_time_t algoTime[16 /* Quantization */][3 /* single, double, qu
     {{ 722,128}, {1891,145}, {1936,146}},   /* Q ==15 : 93-99% */
 };
 
+/** HUF_selectDecoder() :
+*   Tells which decoder is likely to decode faster,
+*   based on a set of pre-determined metrics.
+*   @return : 0==HUF_decompress4X2, 1==HUF_decompress4X4 .
+*   Assumption : 0 < cSrcSize < dstSize <= 128 KB */
+U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize)
+{
+    /* decoder timing evaluation */
+    U32 const Q = (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 since dstSize > cSrcSize */
+    U32 const D256 = (U32)(dstSize >> 8);
+    U32 const DTime0 = algoTime[Q][0].tableTime + (algoTime[Q][0].decode256Time * D256);
+    U32 DTime1 = algoTime[Q][1].tableTime + (algoTime[Q][1].decode256Time * D256);
+    DTime1 += DTime1 >> 3;  /* advantage to algorithm using less memory, for cache eviction */
+
+    return DTime1 < DTime0;
+}
+
+
 typedef size_t (*decompressionAlgo)(void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);
 
 size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize)
 {
     static const decompressionAlgo decompress[2] = { HUF_decompress4X2, HUF_decompress4X4 };
-    U32 Dtime[2];   /* decompression time estimation */
 
     /* validation checks */
     if (dstSize == 0) return ERROR(dstSize_tooSmall);
@@ -751,16 +766,7 @@ size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_t cSrcS
     if (cSrcSize == dstSize) { memcpy(dst, cSrc, dstSize); return dstSize; }   /* not compressed */
     if (cSrcSize == 1) { memset(dst, *(const BYTE*)cSrc, dstSize); return dstSize; }   /* RLE */
 
-    /* decoder timing evaluation */
-    {   U32 const Q = (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 since dstSize > cSrcSize */
-        U32 const D256 = (U32)(dstSize >> 8);
-        U32 n; for (n=0; n<2; n++)
-            Dtime[n] = algoTime[Q][n].tableTime + (algoTime[Q][n].decode256Time * D256);
-    }
-
-    Dtime[1] += Dtime[1] >> 3;  /* advantage to algorithms using less memory, for cache eviction */
-
-    {   U32 const algoNb = Dtime[1] < Dtime[0];
+    {   U32 const algoNb = HUF_selectDecoder(dstSize, cSrcSize);
         return decompress[algoNb](dst, dstSize, cSrc, cSrcSize);
     }
 

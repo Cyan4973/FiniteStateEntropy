@@ -122,12 +122,12 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     HUF_CElt* name = (HUF_CElt*)(name##hv)   /* no final ; */
 
 /* static allocation of HUF's DTable */
-typedef struct { BYTE maxTableLog; BYTE currentTableLog; } DTableDesc;
+typedef U16 DTable_t;
 #define HUF_DTABLE_SIZE(maxTableLog)   (1 + (1<<(maxTableLog)))
 #define HUF_CREATE_STATIC_DTABLEX2(DTable, maxTableLog) \
-        U16 DTable[HUF_DTABLE_SIZE(maxTableLog)] = { ((maxTableLog)*0x101) }
+        DTable_t DTable[HUF_DTABLE_SIZE(maxTableLog)] = { ((maxTableLog)*0x101) }
 #define HUF_CREATE_STATIC_DTABLEX4(DTable, maxTableLog) \
-        U16 DTable[HUF_DTABLE_SIZE((maxTableLog)+1)] = { (((maxTableLog)+1)*0x101) }
+        DTable_t DTable[HUF_DTABLE_SIZE((maxTableLog)+1)] = { (((maxTableLog)+1)*0x101) }
 
 
 /* ****************************************
@@ -174,17 +174,25 @@ size_t HUF_readStats(BYTE* huffWeight, size_t hwSize, U32* rankStats,
 size_t HUF_readCTable (HUF_CElt* CTable, unsigned maxSymbolValue, const void* src, size_t srcSize);
 
 
-/*!
+/*
 HUF_decompress() does the following:
 1. select the decompression algorithm (X2, X4) based on pre-computed heuristics
 2. build Huffman table from save, using HUF_readDTableXn()
 3. decode 1 or 4 segments in parallel using HUF_decompressSXn_usingDTable
 */
-size_t HUF_readDTableX2 (U16* DTable, const void* src, size_t srcSize);
-size_t HUF_readDTableX4 (U16* DTable, const void* src, size_t srcSize);
 
-size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable);
-size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable);
+/** HUF_selectDecoder() :
+*   Tells which decoder is likely to decode faster,
+*   based on a set of pre-determined metrics.
+*   @return : 0==HUF_decompress4X2, 1==HUF_decompress4X4 .
+*   Assumption : 0 < cSrcSize < dstSize <= 128 KB */
+U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize);
+
+size_t HUF_readDTableX2 (DTable_t* DTable, const void* src, size_t srcSize);
+size_t HUF_readDTableX4 (DTable_t* DTable, const void* src, size_t srcSize);
+
+size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
+size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
 
 
 /* single stream variants */
@@ -195,8 +203,8 @@ size_t HUF_compress1X_usingCTable(void* dst, size_t dstSize, const void* src, si
 size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
 size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbol decoder */
 
-size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable);
-size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const U16* DTable);
+size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
+size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
 
 
 #endif /* HUF_STATIC_LINKING_ONLY */
