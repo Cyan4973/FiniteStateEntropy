@@ -122,12 +122,12 @@ size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize
     HUF_CElt* name = (HUF_CElt*)(name##hv)   /* no final ; */
 
 /* static allocation of HUF's DTable */
-typedef U16 DTable_t;
+typedef U32 HUF_DTable;
 #define HUF_DTABLE_SIZE(maxTableLog)   (1 + (1<<(maxTableLog)))
 #define HUF_CREATE_STATIC_DTABLEX2(DTable, maxTableLog) \
-        DTable_t DTable[HUF_DTABLE_SIZE(maxTableLog)] = { ((maxTableLog)*0x101) }
+        HUF_DTable DTable[HUF_DTABLE_SIZE((maxTableLog)-1)] = { ((U32)((maxTableLog)-1)*0x1000001) }
 #define HUF_CREATE_STATIC_DTABLEX4(DTable, maxTableLog) \
-        DTable_t DTable[HUF_DTABLE_SIZE((maxTableLog)+1)] = { (((maxTableLog)+1)*0x101) }
+        HUF_DTable DTable[HUF_DTABLE_SIZE(maxTableLog)] = { ((U32)(maxTableLog)*0x1000001) }
 
 
 /* ****************************************
@@ -188,11 +188,11 @@ HUF_decompress() does the following:
 *   Assumption : 0 < cSrcSize < dstSize <= 128 KB */
 U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize);
 
-size_t HUF_readDTableX2 (DTable_t* DTable, const void* src, size_t srcSize);
-size_t HUF_readDTableX4 (DTable_t* DTable, const void* src, size_t srcSize);
+size_t HUF_readDTableX2 (HUF_DTable* DTable, const void* src, size_t srcSize);
+size_t HUF_readDTableX4 (HUF_DTable* DTable, const void* src, size_t srcSize);
 
-size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
-size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
+size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
+size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
 
 
 /* single stream variants */
@@ -203,8 +203,8 @@ size_t HUF_compress1X_usingCTable(void* dst, size_t dstSize, const void* src, si
 size_t HUF_decompress1X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
 size_t HUF_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbol decoder */
 
-size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
-size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const DTable_t* DTable);
+size_t HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
+size_t HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
 
 
 #endif /* HUF_STATIC_LINKING_ONLY */
