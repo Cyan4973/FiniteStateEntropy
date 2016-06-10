@@ -43,24 +43,22 @@ extern "C" {
 #include <stddef.h>    /* size_t */
 
 
-/*-****************************************
-*  HUF simple functions
-******************************************/
-size_t HUF_compress(void* dst, size_t dstCapacity,
-              const void* src, size_t srcSize);
-size_t HUF_decompress(void* dst,  size_t dstSize,
-                const void* cSrc, size_t cSrcSize);
-/*
+/* *** simple functions *** */
+/**
 HUF_compress() :
     Compress content from buffer 'src', of size 'srcSize', into buffer 'dst'.
     'dst' buffer must be already allocated.
     Compression runs faster if `dstCapacity` >= HUF_compressBound(srcSize).
-    `srcSize` must be <= `HUF_BLOCKSIZE_MAX` == 128 KB
-    @return : size of compressed data (<= `dstCapacity`)
+    `srcSize` must be <= `HUF_BLOCKSIZE_MAX` == 128 KB.
+    @return : size of compressed data (<= `dstCapacity`).
     Special values : if return == 0, srcData is not compressible => Nothing is stored within dst !!!
                      if return == 1, srcData is a single repeated byte symbol (RLE compression).
                      if HUF_isError(return), compression failed (more details using HUF_getErrorName())
+*/
+size_t HUF_compress(void* dst, size_t dstCapacity,
+              const void* src, size_t srcSize);
 
+/**
 HUF_decompress() :
     Decompress HUF data from buffer 'cSrc', of size 'cSrcSize',
     into already allocated buffer 'dst', of minimum size 'dstSize'.
@@ -68,9 +66,11 @@ HUF_decompress() :
     Note : in contrast with FSE, HUF_decompress can regenerate
            RLE (cSrcSize==1) and uncompressed (cSrcSize==dstSize) data,
            because it knows size to regenerate.
-    @return : size of regenerated data (== dstSize)
+    @return : size of regenerated data (== dstSize),
               or an error code, which can be tested using HUF_isError()
 */
+size_t HUF_decompress(void* dst,  size_t dstSize,
+                const void* cSrc, size_t cSrcSize);
 
 
 /* ****************************************
@@ -133,8 +133,12 @@ typedef U32 HUF_DTable;
 /* ****************************************
 *  Advanced decompression functions
 ******************************************/
-size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* single-symbol decoder */
-size_t HUF_decompress4X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /* double-symbols decoder */
+size_t HUF_decompress4X2 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /**< single-symbol decoder */
+size_t HUF_decompress4X4 (void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /**< double-symbols decoder */
+
+size_t HUF_decompress_DCtx (HUF_DTable* dctx, void* dst,  size_t dstSize, const void* cSrc, size_t cSrcSize);
+size_t HUF_decompress4X2_DCtx (HUF_DTable* dctx, void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /**< single-symbol decoder */
+size_t HUF_decompress4X4_DCtx (HUF_DTable* dctx, void* dst, size_t dstSize, const void* cSrc, size_t cSrcSize);   /**< double-symbols decoder */
 
 
 /* ****************************************
