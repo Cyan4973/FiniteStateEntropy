@@ -191,6 +191,7 @@ U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize);
 size_t HUF_readDTableX2 (HUF_DTable* DTable, const void* src, size_t srcSize);
 size_t HUF_readDTableX4 (HUF_DTable* DTable, const void* src, size_t srcSize);
 
+size_t HUF_decompress4X_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
 size_t HUF_decompress4X2_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
 size_t HUF_decompress4X4_usingDTable(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize, const HUF_DTable* DTable);
 
