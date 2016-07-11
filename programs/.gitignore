@@ -1,3 +1,4 @@
+# binaries
 fse
 fse32
 probagen
@@ -9,4 +10,7 @@ fuzzerHuff0
 fuzzerHuff0_32
 fuzzerU16
 fuzzerU16_32
+
+# test artefacts
 *.bin
+*.fse
