@@ -361,7 +361,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
             } else {
                 out_buff[2] = (BYTE)inSize;
                 out_buff[1] = (BYTE)(inSize >> 8);
-                out_buff[0] = (BYTE)(bt_raw << 6);
+                out_buff[0] = (BYTE)(bt_rle << 6);
                 headerSize = 3;
             }
             out_buff[headerSize] = in_buff[0];
