@@ -36,7 +36,6 @@
     <ClInclude Include="..\..\..\lib\error.h" />
     <ClInclude Include="..\..\..\lib\fse.h" />
     <ClInclude Include="..\..\..\lib\fseU16.h" />
-    <ClInclude Include="..\..\..\lib\fse_static.h" />
     <ClInclude Include="..\..\..\lib\huf.h" />
     <ClInclude Include="..\..\..\lib\huf_static.h" />
     <ClInclude Include="..\..\..\lib\mem.h" />
