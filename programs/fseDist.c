@@ -36,7 +36,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdlib.h>   // malloc
 #include <stdio.h>    // fprintf, fopen, ftello64
 #include <string.h>   // memcpy
-#include "fse_static.h"
+#define FSE_STATIC_LINKING_ONLY
+#include "fse.h"
 
 
 //**************************************
@@ -698,4 +699,3 @@ int FSED_decompressU32 (U32* dst, size_t maxDstSize,
     FSE_buildDTable (DTable, norm, nbSymbols, tableLog);
     return FSED_decompressU32_usingDTable (dst, maxDstSize, ip, cSrcSize, DTable);
 }
-
