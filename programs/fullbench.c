@@ -23,6 +23,10 @@
     - website : http://fastcompression.blogspot.com/
 */
 
+/*=====   Compiler's specifics   =====*/
+#define _CRT_SECURE_NO_WARNINGS   /* Remove Visual warning */
+
+
 /*_************************************
 *  Includes
 **************************************/
