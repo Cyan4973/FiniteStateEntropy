@@ -39,7 +39,8 @@ You can contact the author at :
 #include <string.h>     /* memset */
 #include <sys/timeb.h>  /* timeb */
 #include "mem.h"
-#include "huf_static.h"
+#define HUF_STATIC_LINKING_ONLY
+#include "huf.h"
 #include "xxhash.h"
 
 
@@ -216,10 +217,12 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                     CHECK(bufferVerif[sizeOrig] != saved, "HUF_decompress : bufferVerif overflow");
                     CHECK(HUF_isError(result), "HUF_decompress failed : %s", HUF_getErrorName(result));
                     {   U32 const hashEnd = XXH32 (bufferVerif, sizeOrig, 0);
+                        if (hashEnd!=hashOrig) findDifferentByte(bufferVerif, sizeOrig, bufferTest, sizeOrig);
                         CHECK(hashEnd != hashOrig, "HUF_decompress : Decompressed data corrupted");
                 }   }
 
                 /* quad decoder test (more fragile) */
+                /*
                 if (sizeOrig > 64)
                 {   BYTE const saved = bufferVerif[sizeOrig] = 253;
                     size_t const result = HUF_decompress4X6 (bufferVerif, sizeOrig, bufferDst, sizeCompressed);
@@ -229,6 +232,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
                         if (hashEnd!=hashOrig) findDifferentByte(bufferVerif, sizeOrig, bufferTest, sizeOrig);
                         CHECK(hashEnd != hashOrig, "HUF_decompress4X6 : Decompressed data corrupted");
                 }   }
+                */
 
                 /* truncated src decompression test */
                 if (sizeCompressed>4) {

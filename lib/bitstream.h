@@ -84,7 +84,7 @@ MEM_STATIC size_t BIT_closeCStream(BIT_CStream_t* bitC);
 
 /* Start with initCStream, providing the size of buffer to write into.
 *  bitStream will never write outside of this buffer.
-*  `dstCapacity` must be >= sizeof(size_t), otherwise @return will be an error code.
+*  `dstCapacity` must be >= sizeof(bitD->bitContainer), otherwise @return will be an error code.
 *
 *  bits are first added to a local register.
 *  Local register is size_t, hence 64-bits on 64-bits systems, or 32-bits on 32-bits systems.
@@ -128,7 +128,7 @@ MEM_STATIC unsigned BIT_endOfDStream(const BIT_DStream_t* bitD);
 *  Local register size is 64-bits on 64-bits systems, 32-bits on 32-bits systems (size_t).
 *  You can then retrieve bitFields stored into the local register, **in reverse order**.
 *  Local register is explicitly reloaded from memory by the BIT_reloadDStream() method.
-*  A reload guarantee a minimum of ((8*sizeof(size_t))-7) bits when its result is BIT_DStream_unfinished.
+*  A reload guarantee a minimum of ((8*sizeof(bitD->bitContainer))-7) bits when its result is BIT_DStream_unfinished.
 *  Otherwise, it can be less than that, so proceed accordingly.
 *  Checking if DStream has reached its end can be performed with BIT_endOfDStream().
 */
@@ -162,14 +162,12 @@ MEM_STATIC unsigned BIT_highbit32 (register U32 val)
 #   else   /* Software version */
     static const unsigned DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
     U32 v = val;
-    unsigned r;
     v |= v >> 1;
     v |= v >> 2;
     v |= v >> 4;
     v |= v >> 8;
     v |= v >> 16;
-    r = DeBruijnClz[ (U32) (v * 0x07C4ACDDU) >> 27];
-    return r;
+    return DeBruijnClz[ (U32) (v * 0x07C4ACDDU) >> 27];
 #   endif
 }
 
@@ -263,76 +261,71 @@ MEM_STATIC size_t BIT_initDStream(BIT_DStream_t* bitD, const void* srcBuffer, si
 {
     if (srcSize < 1) { memset(bitD, 0, sizeof(*bitD)); return ERROR(srcSize_wrong); }
 
-    if (srcSize >=  sizeof(size_t)) {  /* normal case */
+    if (srcSize >=  sizeof(bitD->bitContainer)) {  /* normal case */
         bitD->start = (const char*)srcBuffer;
-        bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(size_t);
+        bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(bitD->bitContainer);
         bitD->bitContainer = MEM_readLEST(bitD->ptr);
         { BYTE const lastByte = ((const BYTE*)srcBuffer)[srcSize-1];
-          if (lastByte == 0) return ERROR(GENERIC);   /* endMark not present */
-          bitD->bitsConsumed = 8 - BIT_highbit32(lastByte); }
+          bitD->bitsConsumed = lastByte ? 8 - BIT_highbit32(lastByte) : 0;  /* ensures bitsConsumed is always set */
+          if (lastByte == 0) return ERROR(GENERIC); /* endMark not present */ }
     } else {
         bitD->start = (const char*)srcBuffer;
         bitD->ptr   = bitD->start;
         bitD->bitContainer = *(const BYTE*)(bitD->start);
         switch(srcSize)
         {
-            case 7: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[6]) << (sizeof(size_t)*8 - 16);
-            case 6: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[5]) << (sizeof(size_t)*8 - 24);
-            case 5: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[4]) << (sizeof(size_t)*8 - 32);
-            case 4: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[3]) << 24;
-            case 3: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[2]) << 16;
-            case 2: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[1]) <<  8;
+            case 7: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[6]) << (sizeof(bitD->bitContainer)*8 - 16);
+            case 6: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[5]) << (sizeof(bitD->bitContainer)*8 - 24);
+            case 5: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[4]) << (sizeof(bitD->bitContainer)*8 - 32);
+            case 4: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[3]) << 24;
+            case 3: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[2]) << 16;
+            case 2: bitD->bitContainer += (size_t)(((const BYTE*)(srcBuffer))[1]) <<  8;
             default:;
         }
         { BYTE const lastByte = ((const BYTE*)srcBuffer)[srcSize-1];
-          if (lastByte == 0) return ERROR(GENERIC);   /* endMark not present */
-          bitD->bitsConsumed = 8 - BIT_highbit32(lastByte); }
-        bitD->bitsConsumed += (U32)(sizeof(size_t) - srcSize)*8;
+          bitD->bitsConsumed = lastByte ? 8 - BIT_highbit32(lastByte) : 0;
+          if (lastByte == 0) return ERROR(GENERIC); /* endMark not present */ }
+        bitD->bitsConsumed += (U32)(sizeof(bitD->bitContainer) - srcSize)*8;
     }
 
     return srcSize;
 }
 
-MEM_STATIC size_t BIT_getUpperBits(size_t bitD, U32 const start)
+MEM_STATIC size_t BIT_getUpperBits(size_t bitContainer, U32 const start)
 {
-    return bitD >> start;
+    return bitContainer >> start;
 }
 
-MEM_STATIC size_t BIT_getMiddleBits(size_t bitD, U32 const nbBits, U32 const start)
+MEM_STATIC size_t BIT_getMiddleBits(size_t bitContainer, U32 const start, U32 const nbBits)
 {
 #if defined(__BMI__) && defined(__GNUC__)   /* experimental */
 #  if defined(__x86_64__)
-    if (sizeof(bitD)==8)
-        return _bextr_u64(bitD, start, nbBits);
+    if (sizeof(bitContainer)==8)
+        return _bextr_u64(bitContainer, start, nbBits);
     else
 #  endif
-        return _bextr_u32(bitD, start, nbBits);
+        return _bextr_u32(bitContainer, start, nbBits);
 #else
-    return (bitD >> start) & BIT_mask[nbBits];
+    return (bitContainer >> start) & BIT_mask[nbBits];
 #endif
 }
 
-MEM_STATIC size_t BIT_getLowerBits(size_t bitD, U32 const nbBits)
+MEM_STATIC size_t BIT_getLowerBits(size_t bitContainer, U32 const nbBits)
 {
-    return bitD & BIT_mask[nbBits];
+    return bitContainer & BIT_mask[nbBits];
 }
 
 /*! BIT_lookBits() :
  *  Provides next n bits from local register.
- *  local register is not modified (bits are still present for next read/look).
+ *  local register is not modified.
  *  On 32-bits, maxNbBits==24.
  *  On 64-bits, maxNbBits==56.
  *  @return : value extracted
  */
  MEM_STATIC size_t BIT_lookBits(const BIT_DStream_t* bitD, U32 nbBits)
 {
-#if defined(__BMI__) && defined(__GNUC__)   /* experimental */
-#  if defined(__x86_64__)
-    if (sizeof(bitD->bitContainer)==8)
-        return _bextr_u64(bitD->bitContainer, 64 - bitD->bitsConsumed - nbBits, nbBits);
-    else
-# endif
-        return _bextr_u32(bitD->bitContainer, 32 - bitD->bitsConsumed - nbBits, nbBits);
+#if defined(__BMI__) && defined(__GNUC__)   /* experimental; fails if bitD->bitsConsumed + nbBits > sizeof(bitD->bitContainer)*8 */
+    return BIT_getMiddleBits(bitD->bitContainer, (sizeof(bitD->bitContainer)*8) - bitD->bitsConsumed - nbBits, nbBits);
 #else
     U32 const bitMask = sizeof(bitD->bitContainer)*8 - 1;
     return ((bitD->bitContainer << (bitD->bitsConsumed & bitMask)) >> 1) >> ((bitMask-nbBits) & bitMask);
@@ -374,13 +367,13 @@ MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
 }
 
 /*! BIT_reloadDStream() :
-*   Refill `BIT_DStream_t` from src buffer previously defined (see BIT_initDStream() ).
+*   Refill `bitD` from buffer previously set in BIT_initDStream() .
 *   This function is safe, it guarantees it will not read beyond src buffer.
 *   @return : status of `BIT_DStream_t` internal register.
-              if status == unfinished, internal register is filled with >= (sizeof(size_t)*8 - 7) bits */
+              if status == BIT_DStream_unfinished, internal register is filled with >= (sizeof(bitD->bitContainer)*8 - 7) bits */
 MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
 {
-	if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* should never happen */
+	if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* should not happen => corruption detected */
 		return BIT_DStream_overflow;
 
     if (bitD->ptr >= bitD->start + sizeof(bitD->bitContainer)) {

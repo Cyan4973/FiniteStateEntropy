@@ -41,3 +41,4 @@ ipch/
 
 # Other files
 _codelite
+tmp*

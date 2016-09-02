@@ -26,10 +26,17 @@
 RELEASE    = v0.3.2
 FSEDIR     = ../lib
 
+ifeq ($(shell $(CC) -v 2>&1 | grep -c "gcc version "), 1)
+ALIGN_LOOP = -falign-loops=32
+else
+ALIGN_LOOP =
+endif
+
 DESTDIR   ?=
 CPPFLAGS   = -I$(FSEDIR)
-CFLAGS    ?= -O3 -falign-loops=32
-CFLAGS    += -std=c99 -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 -Wswitch-enum -Wstrict-prototypes -Wundef -pedantic
+CFLAGS    ?= -O3 $(ALIGN_LOOP)
+CFLAGS    += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
+             -Wstrict-aliasing=1 -Wswitch-enum -Wstrict-prototypes -Wundef
 FLAGS      = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(MOREFLAGS)
 CF32       = -m32
 FSETEST   ?=
@@ -41,7 +48,7 @@ EXT =.exe
 else
 EXT =
 endif
-             
+
 
 default: fse
 
@@ -51,7 +58,7 @@ bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
 bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
-fse: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
+fse: $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fse_opt:
@@ -115,10 +122,10 @@ test-fse: probagen fse
 	rm tmp
 
 test: test-fse fullbench fuzzer fuzzerU16 fuzzerHuff0
-	./fuzzer $(FSETEST) 
+	./fuzzer $(FSETEST)
 	./fullbench -i1
-	./fuzzerU16 $(FSEU16TEST) 
-	./fuzzerHuff0 $(FSETEST) 
+	./fuzzerU16 $(FSEU16TEST)
+	./fuzzerHuff0 $(FSETEST)
 
 test-fse32: probagen fse32
 	./probagen 20%
@@ -153,4 +160,3 @@ memtest: fuzzer fullbench fuzzerU16 fuzzerHuff0
 
 test-all: test test32 memtest
 	@echo test completed
-

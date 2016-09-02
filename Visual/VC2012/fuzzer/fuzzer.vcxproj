@@ -27,7 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\fse.h" />
-    <ClInclude Include="..\..\..\lib\fse_static.h" />
     <ClInclude Include="..\..\..\programs\xxhash.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
