@@ -446,8 +446,7 @@ static int local_countVector(void* dst, size_t dstSize, const void* src, size_t 
 
     (void)dst; (void)dstSize;
 
-    for (i = 0; i < 256; i += 8)
-    {
+    for (i = 0; i < 256; i += 8) {
         temp[i].a = 0;
         temp[i].b = 0;
         temp[i].c = 0;
@@ -456,8 +455,7 @@ static int local_countVector(void* dst, size_t dstSize, const void* src, size_t 
 
     __m128i *ptr = (__m128i*) src;
     __m128i *end = (__m128i*) ((BYTE*)src + srcSize);
-    while (ptr != end)
-    {
+    while (ptr != end) {
         __m128i bs = _mm_load_si128(ptr++);
 
         temp[_mm_extract_epi8(bs, 0)].a += 1;
@@ -482,172 +480,6 @@ static int local_countVector(void* dst, size_t dstSize, const void* src, size_t 
         count[i] = temp[i].a + temp[i].b + temp[i].c + temp[i].d;
 
     return count[0];
-}
-
-
-static int local_countVec2(void* dst, size_t dstSize, const void* src, size_t srcSize)
-{
-    // SSE version, based on code by Nathan Kurz; reaches 2010 MB/s
-    U32 count[16][256+16];   // +16 to avoid repeated call into the same cache line pool (cache associativity)
-
-    __m128i *ptr = (__m128i*) src;
-    __m128i *end = (__m128i*) ((BYTE*)src + (srcSize & (~0xF)));
-    __m128i next = _mm_load_si128(ptr++);
-
-    (void)dst; (void)dstSize;
-    memset(count, 0, sizeof(count));
-
-    while (ptr != end)
-    {
-        unsigned i;
-        __m128i bs = next;
-        next = _mm_load_si128(ptr++);
-
-        for (i=0; i<16; i++)
-            count[i][_mm_extract_epi8(bs,i)]++;   // Only compiles in release mode (which unrolls the loop to get constants)
-    }
-
-    /* note : unfinished : still requires to count last 16-bytes + %16 rest; okay enough for benchmark */
-
-    {
-        unsigned i;
-        for (i = 0; i < 256; i++)
-        {
-            unsigned idx;
-            for (idx=1; idx<16; idx++)
-                count[0][i] += count[idx][i];
-        }
-    }
-
-    return count[0][0];
-}
-
-
-// Nathan Kurz vectorial version
-#define COUNT_ARRAY_SIZE (256 + 8)
-static U32 g_count_0[COUNT_ARRAY_SIZE];
-static U32 g_count_1[COUNT_ARRAY_SIZE];
-static U32 g_count_2[COUNT_ARRAY_SIZE];
-static U32 g_count_3[COUNT_ARRAY_SIZE];
-static U32 g_count_4[COUNT_ARRAY_SIZE];
-static U32 g_count_5[COUNT_ARRAY_SIZE];
-static U32 g_count_6[COUNT_ARRAY_SIZE];
-static U32 g_count_7[COUNT_ARRAY_SIZE];
-static U32 g_count_8[COUNT_ARRAY_SIZE];
-static U32 g_count_9[COUNT_ARRAY_SIZE];
-static U32 g_count_A[COUNT_ARRAY_SIZE];
-static U32 g_count_B[COUNT_ARRAY_SIZE];
-static U32 g_count_C[COUNT_ARRAY_SIZE];
-static U32 g_count_D[COUNT_ARRAY_SIZE];
-static U32 g_count_E[COUNT_ARRAY_SIZE];
-static U32 g_count_F[COUNT_ARRAY_SIZE];
-
-// gcc really wants to use "addl $1, %reg", but somehow 'inc' is faster
-#define ASM_INC_ARRAY_INDEX_SCALE(array, index, scale)                  \
-    __asm volatile ("incl " #array "(, %0, %c1)" :                      \
-                    :    /* no registers written (only memory) */       \
-                    "r" (index),                                        \
-                    "i" (scale):                                        \
-                    "memory" /* clobbers */                             \
-                    )
-
-// This function is limited by the number of uops in the loop.  Sustained throughput is
-// limited to 4 per cycle, and we use about 100.   If you can figure out how to reduce the number
-// of uops in the loop (uops, not instructions) this loop should run faster.
-// Perhaps there is some means of using low and high byte (al/ah) registers for addressing?
-// Perhaps some way to create two single bytes with a single op?  shrd?  imul?
-typedef __m128i xmm_t;
-static int local_countVecNate(void* dst, size_t dstSize, const void* voidSrc, size_t srcSize)
-{
-    (void)dst; (void)dstSize;
-
-    memset(g_count_0, 0, 256 * sizeof(U32));
-    memset(g_count_1, 0, 256 * sizeof(U32));
-    memset(g_count_2, 0, 256 * sizeof(U32));
-    memset(g_count_3, 0, 256 * sizeof(U32));
-    memset(g_count_4, 0, 256 * sizeof(U32));
-    memset(g_count_5, 0, 256 * sizeof(U32));
-    memset(g_count_6, 0, 256 * sizeof(U32));
-    memset(g_count_7, 0, 256 * sizeof(U32));
-    memset(g_count_8, 0, 256 * sizeof(U32));
-    memset(g_count_9, 0, 256 * sizeof(U32));
-    memset(g_count_A, 0, 256 * sizeof(U32));
-    memset(g_count_B, 0, 256 * sizeof(U32));
-    memset(g_count_C, 0, 256 * sizeof(U32));
-    memset(g_count_D, 0, 256 * sizeof(U32));
-    memset(g_count_E, 0, 256 * sizeof(U32));
-    memset(g_count_F, 0, 256 * sizeof(U32));
-
-    const BYTE *src = voidSrc;
-    size_t remainder = srcSize % 16;
-    srcSize = srcSize - remainder;
-    if (srcSize == 0) goto handle_remainder;
-
-    xmm_t nextVec = _mm_loadu_si128((xmm_t *)&src[0]);
-    for (size_t i = 16; i < srcSize; i += 16) {
-        uint64_t byte;
-        xmm_t vec = nextVec;
-        nextVec = _mm_loadu_si128((xmm_t *)&src[i]);
-
-        byte = _mm_extract_epi8(vec, 0);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_0, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 1);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_1, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 2);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_2, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 3);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_3, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 4);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_4, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 5);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_5, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 6);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_6, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 7);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_7, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 8);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_8, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 9);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_9, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 10);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_A, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 11);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_B, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 12);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_C, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 13);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_D, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 14);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_E, byte, 4);
-
-        byte = _mm_extract_epi8(vec, 15);
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_F, byte, 4);
-
-    }
-
- handle_remainder:
-    src += srcSize;  // skip over the finished part
-    for (size_t i = 0; i < remainder; i++) {
-        uint64_t byte = src[i];
-        ASM_INC_ARRAY_INDEX_SCALE(g_count_0, byte, 4);
-
-    }
-
-    return 0;
 }
 
 #endif
@@ -1288,16 +1120,6 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 200:
         funcName = "local_countVector";
         func = local_countVector;
-        break;
-
-    case 201:
-        funcName = "local_countVec2";
-        func = local_countVec2;
-        break;
-
-    case 202:
-        funcName = "local_countVecNate";
-        func = local_countVecNate;
         break;
 #endif
 
