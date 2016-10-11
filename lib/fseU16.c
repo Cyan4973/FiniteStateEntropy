@@ -40,17 +40,20 @@
 *  Increasing memory usage improves compression ratio
 *  Reduced memory usage can improve speed, due to cache effect
 *  Recommended max value is 14, for 16KB, which nicely fits into Intel x86 L1 cache */
-#define FSE_MAX_MEMORY_USAGE 15
-#define FSE_DEFAULT_MEMORY_USAGE 14
-
+#ifndef FSEU16_MAX_MEMORY_USAGE
+#  define FSEU16_MAX_MEMORY_USAGE 15
+#endif
+#ifndef FSEU16_DEFAULT_MEMORY_USAGE
+#  define FSEU16_DEFAULT_MEMORY_USAGE 14
+#endif
 
 /* **************************************************************
 *  Includes
 *****************************************************************/
 #include "fseU16.h"
 #define FSEU16_SYMBOLVALUE_ABSOLUTEMAX 4095
-#if (FSE_MAX_SYMBOL_VALUE > FSEU16_SYMBOLVALUE_ABSOLUTEMAX)
-#  error "FSE_MAX_SYMBOL_VALUE is too large !"
+#if (FSEU16_MAX_SYMBOL_VALUE > FSEU16_SYMBOLVALUE_ABSOLUTEMAX)
+#  error "FSEU16_MAX_SYMBOL_VALUE is too large !"
 #endif
 
 /* **************************************************************
@@ -83,6 +86,15 @@ typedef struct {
 *  Include type-specific functions from fse.c (C template emulation)
 *********************************************************************/
 #define FSE_COMMONDEFS_ONLY
+
+#ifdef FSE_MAX_MEMORY_USAGE
+#  undef FSE_MAX_MEMORY_USAGE
+#endif
+#ifdef FSE_DEFAULT_MEMORY_USAGE
+#  undef FSE_DEFAULT_MEMORY_USAGE
+#endif
+#define FSE_MAX_MEMORY_USAGE FSEU16_MAX_MEMORY_USAGE
+#define FSE_DEFAULT_MEMORY_USAGE FSEU16_DEFAULT_MEMORY_USAGE
 
 #define FSE_FUNCTION_TYPE U16
 #define FSE_FUNCTION_EXTENSION U16
