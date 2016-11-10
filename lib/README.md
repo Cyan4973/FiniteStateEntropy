@@ -5,7 +5,6 @@ The __lib__ directory contains several files, but you don't necessarily want the
 Here is a detailed list, to help you decide which one you need :
 
 
-
 #### Compulsory files
 
 These files are required in all circumstances :
