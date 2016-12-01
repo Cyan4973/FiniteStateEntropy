@@ -101,6 +101,7 @@ typedef struct {
 
 #define FSE_count_generic FSE_count_genericU16
 #define FSE_buildCTable   FSE_buildCTableU16
+#define FSE_buildCTable_wksp FSE_buildCTable_wksp_U16
 
 #define FSE_DECODE_TYPE   FSE_decode_tU16
 #define FSE_createDTable  FSE_createDTableU16
@@ -212,9 +213,6 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 
     U32   counting[FSE_MAX_SYMBOL_VALUE+1] = {0};
     S16   norm[FSE_MAX_SYMBOL_VALUE+1];
-    CTable_max_t ct;
-
-
 
     /* checks */
     if (srcSize <= 1) return srcSize;
@@ -239,10 +237,11 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
         op += NSize;
     }
     /* Compress */
-    {   size_t const errorCode = FSE_buildCTableU16 (ct, norm, maxSymbolValue, tableLog);
+    {   FSE_CTable CTable[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
+        size_t const errorCode = FSE_buildCTableU16 (CTable, norm, maxSymbolValue, tableLog);
         if (FSE_isError(errorCode)) return errorCode;
+        op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, CTable);
     }
-    op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, ct);
 
     /* check compressibility */
     if ( (size_t)(op-ostart) >= (size_t)(srcSize-1)*(sizeof(U16)) )
