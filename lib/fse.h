@@ -49,7 +49,7 @@ extern "C" {
 *  FSE_PUBLIC_API : control library symbols visibility
 ******************************************/
 #if defined(__GNUC__) && (__GNUC__ >= 4)
-#  define PUBLIC_API __attribute__ ((visibility ("default")))
+#  define FSE_PUBLIC_API __attribute__ ((visibility ("default")))
 #elif defined(DLL_EXPORT) && (DLL_EXPORT==1)
 #  define FSE_PUBLIC_API __declspec(dllexport)
 #elif defined(DLL_IMPORT) && (DLL_IMPORT==1)
