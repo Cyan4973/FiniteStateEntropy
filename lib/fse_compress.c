@@ -115,7 +115,7 @@ size_t FSE_buildCTable_wksp(FSE_CTable* ct, const short* normalizedCounter, unsi
     U32 highThreshold = tableSize-1;
 
     /* CTable header */
-    if ((1<<tableLog) * sizeof(FSE_FUNCTION_TYPE) > wkspSize) return ERROR(tableLog_tooLarge);
+    if (((size_t)1 << tableLog) * sizeof(FSE_FUNCTION_TYPE) > wkspSize) return ERROR(tableLog_tooLarge);
     tableU16[-2] = (U16) tableLog;
     tableU16[-1] = (U16) maxSymbolValue;
 
@@ -308,14 +308,14 @@ size_t FSE_writeNCount (void* buffer, size_t bufferSize, const short* normalized
 *  Counting histogram
 ****************************************************************/
 /*! FSE_count_simple
-    This function just counts byte values within `src`,
-    and store the histogram into table `count`.
-    This function is unsafe : it doesn't check that all values within `src` can fit into `count`.
+    This function counts byte values within `src`, and store the histogram into table `count`.
+    It doesn't use any additional memory.
+    But this function is unsafe : it doesn't check that all values within `src` can fit into `count`.
     For this reason, prefer using a table `count` with 256 elements.
     @return : count of most numerous element
 */
-static size_t FSE_count_simple(unsigned* count, unsigned* maxSymbolValuePtr,
-                               const void* src, size_t srcSize)
+size_t FSE_count_simple(unsigned* count, unsigned* maxSymbolValuePtr,
+                        const void* src, size_t srcSize)
 {
     const BYTE* ip = (const BYTE*)src;
     const BYTE* const end = ip + srcSize;
@@ -409,101 +409,41 @@ static size_t FSE_count_parallel_wksp(
     return (size_t)max;
 }
 
-
-static size_t FSE_count_parallel(unsigned* count, unsigned* maxSymbolValuePtr,
-                                const void* source, size_t sourceSize,
-                                unsigned checkMax)
+/* FSE_countFast_wksp() :
+ * Same as FSE_countFast(), but using an externally provided scratch buffer.
+ * `workSpace` size must be table of >= `1024` unsigned */
+size_t FSE_countFast_wksp(unsigned* count, unsigned* maxSymbolValuePtr,
+                     const void* source, size_t sourceSize, unsigned* workSpace)
 {
-    U32 tmpCounters[1024];
-    return FSE_count_parallel_wksp(count, maxSymbolValuePtr, source, sourceSize, checkMax, tmpCounters);
+    if (sourceSize < 1500) return FSE_count_simple(count, maxSymbolValuePtr, source, sourceSize);
+    return FSE_count_parallel_wksp(count, maxSymbolValuePtr, source, sourceSize, 0, workSpace);
 }
-
-
-#if 0
-static size_t FSE_count_parallel(unsigned* count, unsigned* maxSymbolValuePtr,
-                                const void* source, size_t sourceSize,
-                                unsigned checkMax)
-{
-    const BYTE* ip = (const BYTE*)source;
-    const BYTE* const iend = ip+sourceSize;
-    unsigned maxSymbolValue = *maxSymbolValuePtr;
-    unsigned max=0;
-
-    U32 Counting1[256] = { 0 };
-    U32 Counting2[256] = { 0 };
-    U32 Counting3[256] = { 0 };
-    U32 Counting4[256] = { 0 };
-
-    /* safety checks */
-    if (!sourceSize) {
-        memset(count, 0, maxSymbolValue + 1);
-        *maxSymbolValuePtr = 0;
-        return 0;
-    }
-    if (!maxSymbolValue) maxSymbolValue = 255;            /* 0 == default */
-
-    /* by stripes of 16 bytes */
-    {   U32 cached = MEM_read32(ip); ip += 4;
-        while (ip < iend-15) {
-            U32 c = cached; cached = MEM_read32(ip); ip += 4;
-            Counting1[(BYTE) c     ]++;
-            Counting2[(BYTE)(c>>8) ]++;
-            Counting3[(BYTE)(c>>16)]++;
-            Counting4[       c>>24 ]++;
-            c = cached; cached = MEM_read32(ip); ip += 4;
-            Counting1[(BYTE) c     ]++;
-            Counting2[(BYTE)(c>>8) ]++;
-            Counting3[(BYTE)(c>>16)]++;
-            Counting4[       c>>24 ]++;
-            c = cached; cached = MEM_read32(ip); ip += 4;
-            Counting1[(BYTE) c     ]++;
-            Counting2[(BYTE)(c>>8) ]++;
-            Counting3[(BYTE)(c>>16)]++;
-            Counting4[       c>>24 ]++;
-            c = cached; cached = MEM_read32(ip); ip += 4;
-            Counting1[(BYTE) c     ]++;
-            Counting2[(BYTE)(c>>8) ]++;
-            Counting3[(BYTE)(c>>16)]++;
-            Counting4[       c>>24 ]++;
-        }
-        ip-=4;
-    }
-
-    /* finish last symbols */
-    while (ip<iend) Counting1[*ip++]++;
-
-    if (checkMax) {   /* verify stats will fit into destination table */
-        U32 s; for (s=255; s>maxSymbolValue; s--) {
-            Counting1[s] += Counting2[s] + Counting3[s] + Counting4[s];
-            if (Counting1[s]) return ERROR(maxSymbolValue_tooSmall);
-    }   }
-
-    {   U32 s; for (s=0; s<=maxSymbolValue; s++) {
-            count[s] = Counting1[s] + Counting2[s] + Counting3[s] + Counting4[s];
-            if (count[s] > max) max = count[s];
-    }   }
-
-    while (!count[maxSymbolValue]) maxSymbolValue--;
-    *maxSymbolValuePtr = maxSymbolValue;
-    return (size_t)max;
-}
-#endif
 
 /* fast variant (unsafe : won't check if src contains values beyond count[] limit) */
 size_t FSE_countFast(unsigned* count, unsigned* maxSymbolValuePtr,
                      const void* source, size_t sourceSize)
 {
-    if (sourceSize < 1500) return FSE_count_simple(count, maxSymbolValuePtr, source, sourceSize);
-    return FSE_count_parallel(count, maxSymbolValuePtr, source, sourceSize, 0);
+    unsigned tmpCounters[1024];
+    return FSE_countFast_wksp(count, maxSymbolValuePtr, source, sourceSize, tmpCounters);
+}
+
+/* FSE_count_wksp() :
+ * Same as FSE_count(), but using an externally provided scratch buffer.
+ * `workSpace` size must be table of >= `1024` unsigned */
+size_t FSE_count_wksp(unsigned* count, unsigned* maxSymbolValuePtr,
+                 const void* source, size_t sourceSize, unsigned* workSpace)
+{
+    if (*maxSymbolValuePtr < 255)
+        return FSE_count_parallel_wksp(count, maxSymbolValuePtr, source, sourceSize, 1, workSpace);
+    *maxSymbolValuePtr = 255;
+    return FSE_countFast_wksp(count, maxSymbolValuePtr, source, sourceSize, workSpace);
 }
 
 size_t FSE_count(unsigned* count, unsigned* maxSymbolValuePtr,
-                 const void* source, size_t sourceSize)
+                 const void* src, size_t srcSize)
 {
-    if (*maxSymbolValuePtr < 255)
-        return FSE_count_parallel(count, maxSymbolValuePtr, source, sourceSize, 1);
-    *maxSymbolValuePtr = 255;
-    return FSE_countFast(count, maxSymbolValuePtr, source, sourceSize);
+    unsigned tmpCounters[1024];
+    return FSE_count_wksp(count, maxSymbolValuePtr, src, srcSize, tmpCounters);
 }
 
 
@@ -834,8 +774,8 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
 
 size_t FSE_compressBound(size_t size) { return FSE_COMPRESSBOUND(size); }
 
-#define CHECK_E_F(e, f) size_t const e = f; if (FSE_isError(e)) return f
-#define CHECK_F(f)   { CHECK_E_F(_var_err__, f); }
+#define CHECK_V_F(e, f) size_t const e = f; if (ERR_isError(e)) return f
+#define CHECK_F(f)   { CHECK_V_F(_var_err__, f); }
 
 /* FSE_compress_wksp() :
  * Same as FSE_compress2(), but using an externally allocated scratch buffer (`workSpace`).
@@ -843,9 +783,6 @@ size_t FSE_compressBound(size_t size) { return FSE_COMPRESSBOUND(size); }
  */
 size_t FSE_compress_wksp (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog, void* workSpace, size_t wkspSize)
 {
-    const BYTE* const istart = (const BYTE*) src;
-    const BYTE* ip = istart;
-
     BYTE* const ostart = (BYTE*) dst;
     BYTE* op = ostart;
     BYTE* const oend = ostart + dstSize;
@@ -864,23 +801,23 @@ size_t FSE_compress_wksp (void* dst, size_t dstSize, const void* src, size_t src
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     /* Scan input and build symbol stats */
-    {   CHECK_E_F(maxCount, FSE_count(count, &maxSymbolValue, ip, srcSize) );
+    {   CHECK_V_F(maxCount, FSE_count(count, &maxSymbolValue, src, srcSize) );
         if (maxCount == srcSize) return 1;   /* only a single symbol in src : rle */
         if (maxCount == 1) return 0;         /* each symbol present maximum once => not compressible */
         if (maxCount < (srcSize >> 7)) return 0;   /* Heuristic : not compressible enough */
     }
 
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
-    CHECK_F( FSE_normalizeCount (norm, tableLog, count, srcSize, maxSymbolValue) );
+    CHECK_F( FSE_normalizeCount(norm, tableLog, count, srcSize, maxSymbolValue) );
 
     /* Write table description header */
-    {   CHECK_E_F(nc_err, FSE_writeNCount(op, oend-op, norm, maxSymbolValue, tableLog) );
+    {   CHECK_V_F(nc_err, FSE_writeNCount(op, oend-op, norm, maxSymbolValue, tableLog) );
         op += nc_err;
     }
 
     /* Compress */
     CHECK_F( FSE_buildCTable_wksp(CTable, norm, maxSymbolValue, tableLog, scratchBuffer, scratchBufferSize) );
-    {   CHECK_E_F(cSize, FSE_compress_usingCTable(op, oend - op, ip, srcSize, CTable) );
+    {   CHECK_V_F(cSize, FSE_compress_usingCTable(op, oend - op, src, srcSize, CTable) );
         if (cSize == 0) return 0;   /* not enough space for compressed data */
         op += cSize;
     }
