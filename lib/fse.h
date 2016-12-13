@@ -58,6 +58,19 @@ extern "C" {
 #  define FSE_PUBLIC_API
 #endif
 
+/*------   Version   ------*/
+#define FSE_VERSION_MAJOR    0
+#define FSE_VERSION_MINOR    9
+#define FSE_VERSION_RELEASE  0
+
+#define FSE_LIB_VERSION FSE_VERSION_MAJOR.FSE_VERSION_MINOR.FSE_VERSION_RELEASE
+#define FSE_QUOTE(str) #str
+#define FSE_EXPAND_AND_QUOTE(str) FSE_QUOTE(str)
+#define FSE_VERSION_STRING FSE_EXPAND_AND_QUOTE(FSE_LIB_VERSION)
+
+#define FSE_VERSION_NUMBER  (FSE_VERSION_MAJOR *100*100 + FSE_VERSION_MINOR *100 + FSE_VERSION_RELEASE)
+FSE_PUBLIC_API unsigned FSE_versionNumber(void);   /**< library version number; to be used when checking dll version */
+
 /*-****************************************
 *  FSE simple functions
 ******************************************/

@@ -44,6 +44,12 @@
 
 
 /*-****************************************
+*  Version
+******************************************/
+unsigned FSE_versionNumber(void) { return FSE_VERSION_NUMBER; }
+
+
+/*-****************************************
 *  FSE Error Management
 ******************************************/
 unsigned FSE_isError(size_t code) { return ERR_isError(code); }
