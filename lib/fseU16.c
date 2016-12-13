@@ -295,6 +295,8 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
 }
 
 
+typedef FSE_DTable DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
+
 size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
                   const void* cSrc, size_t cSrcSize)
 {
