@@ -43,6 +43,18 @@ extern "C" {
 #include <stddef.h>    /* size_t */
 
 
+/*-*** PUBLIC_API : control library symbols visibility *** */
+#if defined(__GNUC__) && (__GNUC__ >= 4)
+#  define HUF_PUBLIC_API __attribute__ ((visibility ("default")))
+#elif defined(DLL_EXPORT) && (DLL_EXPORT==1)
+#  define HUF_PUBLIC_API __declspec(dllexport)
+#elif defined(DLL_IMPORT) && (DLL_IMPORT==1)
+#  define HUF_PUBLIC_API __declspec(dllimport) /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
+#else
+#  define HUF_PUBLIC_API
+#endif
+
+
 /* *** simple functions *** */
 /**
 HUF_compress() :
@@ -55,8 +67,8 @@ HUF_compress() :
                      if return == 1, srcData is a single repeated byte symbol (RLE compression).
                      if HUF_isError(return), compression failed (more details using HUF_getErrorName())
 */
-size_t HUF_compress(void* dst, size_t dstCapacity,
-              const void* src, size_t srcSize);
+HUF_PUBLIC_API size_t HUF_compress(void* dst, size_t dstCapacity,
+                             const void* src, size_t srcSize);
 
 /**
 HUF_decompress() :
@@ -69,17 +81,17 @@ HUF_decompress() :
     @return : size of regenerated data (== originalSize),
               or an error code, which can be tested using HUF_isError()
 */
-size_t HUF_decompress(void* dst,  size_t originalSize,
-                const void* cSrc, size_t cSrcSize);
+HUF_PUBLIC_API size_t HUF_decompress(void* dst,  size_t originalSize,
+                               const void* cSrc, size_t cSrcSize);
 
 
 /* ***   Tool functions *** */
-#define HUF_BLOCKSIZE_MAX (128 * 1024)       /**< maximum input size for a single block compressed with HUF_compress */
-size_t HUF_compressBound(size_t size);       /**< maximum compressed size (worst case) */
+#define HUF_BLOCKSIZE_MAX (128 * 1024)                 /**< maximum input size for a single block compressed with HUF_compress */
+HUF_PUBLIC_API size_t HUF_compressBound(size_t size);      /**< maximum compressed size (worst case) */
 
 /* Error Management */
-unsigned    HUF_isError(size_t code);        /**< tells if a return value is an error code */
-const char* HUF_getErrorName(size_t code);   /**< provides error code string (useful for debugging) */
+HUF_PUBLIC_API unsigned    HUF_isError(size_t code);       /**< tells if a return value is an error code */
+HUF_PUBLIC_API const char* HUF_getErrorName(size_t code);  /**< provides error code string (useful for debugging) */
 
 
 /* ***   Advanced function   *** */
@@ -87,11 +99,11 @@ const char* HUF_getErrorName(size_t code);   /**< provides error code string (us
 /** HUF_compress2() :
  *   Same as HUF_compress(), but offers direct control over `maxSymbolValue` and `tableLog` .
  *   `tableLog` must be `<= HUF_TABLELOG_MAX` . */
-size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog);
+HUF_PUBLIC_API size_t HUF_compress2 (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog);
 
 /** HUF_compress4X_wksp() :
 *   Same as HUF_compress2(), but uses externally allocated `workSpace`, which must be a table of >= 1024 unsigned */
-size_t HUF_compress4X_wksp (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog, void* workSpace, size_t wkspSize);  /**< `workSpace` must be a table of at least 1024 unsigned */
+HUF_PUBLIC_API size_t HUF_compress4X_wksp (void* dst, size_t dstSize, const void* src, size_t srcSize, unsigned maxSymbolValue, unsigned tableLog, void* workSpace, size_t wkspSize);  /**< `workSpace` must be a table of at least 1024 unsigned */
 
 
 
