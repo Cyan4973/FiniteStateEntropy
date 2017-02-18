@@ -32,7 +32,8 @@
    - FSE source repository : https://github.com/Cyan4973/FiniteStateEntropy
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 ****************************************************************** */
-#pragma once
+#ifndef FSE_U16_H_30982039483
+#define FSE_U16_H_30982039483
 
 #if defined (__cplusplus)
 extern "C" {
@@ -45,8 +46,13 @@ extern "C" {
 /* FSE_MAX_SYMBOL_VALUE :
 *  Maximum nb of symbol values authorized.
 *  Required for allocation purposes */
-#define FSE_MAX_SYMBOL_VALUE 286   /* This is just an example, typical value for zlib */
-
+#ifndef FSEU16_MAX_SYMBOL_VALUE
+#  define FSEU16_MAX_SYMBOL_VALUE 286   /* This is just an example, typical value for zlib */
+#endif
+#ifdef FSE_MAX_SYMBOL_VALUE
+#  undef FSE_MAX_SYMBOL_VALUE
+#endif
+#define FSE_MAX_SYMBOL_VALUE FSEU16_MAX_SYMBOL_VALUE
 
 /*-*****************************************
 *  Includes
@@ -66,14 +72,16 @@ extern "C" {
    Special values : if result == 0, data is not compressible => Nothing is stored within cSrc !!
                     if result == 1, data is one constant element x srcSize times. Use RLE compression.
                     if FSE_isError(result), it's an error code.*/
-size_t FSE_compressU16(void* dst, size_t maxDstSize,
+size_t FSE_compressU16(void* dst, size_t dstCapacity,
        const unsigned short* src, size_t srcSize,
        unsigned maxSymbolValue, unsigned tableLog);
 
-size_t FSE_decompressU16(unsigned short* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
+size_t FSE_decompressU16(unsigned short* dst, size_t dstCapacity, const void* cSrc, size_t cSrcSize);
 
 
 
 #if defined (__cplusplus)
 }
 #endif
+
+#endif  /* FSE_U16_H_30982039483 */

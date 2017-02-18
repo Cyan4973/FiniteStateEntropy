@@ -40,17 +40,20 @@
 *  Increasing memory usage improves compression ratio
 *  Reduced memory usage can improve speed, due to cache effect
 *  Recommended max value is 14, for 16KB, which nicely fits into Intel x86 L1 cache */
-#define FSE_MAX_MEMORY_USAGE 15
-#define FSE_DEFAULT_MEMORY_USAGE 14
-
+#ifndef FSEU16_MAX_MEMORY_USAGE
+#  define FSEU16_MAX_MEMORY_USAGE 15
+#endif
+#ifndef FSEU16_DEFAULT_MEMORY_USAGE
+#  define FSEU16_DEFAULT_MEMORY_USAGE 14
+#endif
 
 /* **************************************************************
 *  Includes
 *****************************************************************/
 #include "fseU16.h"
 #define FSEU16_SYMBOLVALUE_ABSOLUTEMAX 4095
-#if (FSE_MAX_SYMBOL_VALUE > FSEU16_SYMBOLVALUE_ABSOLUTEMAX)
-#  error "FSE_MAX_SYMBOL_VALUE is too large !"
+#if (FSEU16_MAX_SYMBOL_VALUE > FSEU16_SYMBOLVALUE_ABSOLUTEMAX)
+#  error "FSEU16_MAX_SYMBOL_VALUE is too large !"
 #endif
 
 /* **************************************************************
@@ -84,11 +87,21 @@ typedef struct {
 *********************************************************************/
 #define FSE_COMMONDEFS_ONLY
 
+#ifdef FSE_MAX_MEMORY_USAGE
+#  undef FSE_MAX_MEMORY_USAGE
+#endif
+#ifdef FSE_DEFAULT_MEMORY_USAGE
+#  undef FSE_DEFAULT_MEMORY_USAGE
+#endif
+#define FSE_MAX_MEMORY_USAGE FSEU16_MAX_MEMORY_USAGE
+#define FSE_DEFAULT_MEMORY_USAGE FSEU16_DEFAULT_MEMORY_USAGE
+
 #define FSE_FUNCTION_TYPE U16
 #define FSE_FUNCTION_EXTENSION U16
 
 #define FSE_count_generic FSE_count_genericU16
 #define FSE_buildCTable   FSE_buildCTableU16
+#define FSE_buildCTable_wksp FSE_buildCTable_wksp_U16
 
 #define FSE_DECODE_TYPE   FSE_decode_tU16
 #define FSE_createDTable  FSE_createDTableU16
@@ -200,9 +213,6 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
 
     U32   counting[FSE_MAX_SYMBOL_VALUE+1] = {0};
     S16   norm[FSE_MAX_SYMBOL_VALUE+1];
-    CTable_max_t ct;
-
-
 
     /* checks */
     if (srcSize <= 1) return srcSize;
@@ -227,10 +237,11 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
         op += NSize;
     }
     /* Compress */
-    {   size_t const errorCode = FSE_buildCTableU16 (ct, norm, maxSymbolValue, tableLog);
+    {   FSE_CTable CTable[FSE_CTABLE_SIZE_U32(FSE_MAX_TABLELOG, FSE_MAX_SYMBOL_VALUE)];
+        size_t const errorCode = FSE_buildCTableU16 (CTable, norm, maxSymbolValue, tableLog);
         if (FSE_isError(errorCode)) return errorCode;
+        op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, CTable);
     }
-    op += FSE_compressU16_usingCTable (op, omax - op, ip, srcSize, ct);
 
     /* check compressibility */
     if ( (size_t)(op-ostart) >= (size_t)(srcSize-1)*(sizeof(U16)) )
@@ -283,6 +294,8 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     return op-ostart;
 }
 
+
+typedef FSE_DTable DTable_max_t[FSE_DTABLE_SIZE_U32(FSE_MAX_TABLELOG)];
 
 size_t FSE_decompressU16(U16* dst, size_t maxDstSize,
                   const void* cSrc, size_t cSrcSize)
