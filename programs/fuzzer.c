@@ -364,6 +364,14 @@ static void unitTest(void)
             errorCode = FSE_normalizeCount(norm, 10, count, total, 80);
             CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
         }
+        /* corner case : try to make normalizeM2 divide by 0 */
+        {
+            U32 i = 0;
+            for (i = 0; i < 22; i++) count[i] = 0;
+            for (; i < 44; i++) count[i] = 1;
+            errorCode = FSE_normalizeCount(norm, 5, count, 22, 43);
+            CHECK(FSE_isError(errorCode), "Error : FSE_normalizeCount() should have worked");
+        }
     }
 
     /* FSE_writeNCount, FSE_readNCount */
