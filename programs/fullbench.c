@@ -605,6 +605,15 @@ static int local_HUF_decompress1X4(void* dst, size_t maxDstSize, const void* src
     return (int)HUF_decompress1X4(dst, g_oSize, src, g_cSize);
 }
 
+static int local_HUF_readStats(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
+{
+    BYTE weights[HUF_SYMBOLVALUE_MAX+1];
+    U32 ranks[HUF_TABLELOG_ABSOLUTEMAX+1];
+    U32 nbSymbols=0, tableLog=0;
+    (void)dst; (void)maxDstSize; (void)srcSize;
+    return (int)HUF_readStats(weights, HUF_SYMBOLVALUE_MAX+1, ranks, &nbSymbols, &tableLog, src, g_cSize);
+}
+
 static int local_HUF_readDTableX4(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)maxDstSize; (void)srcSize;
@@ -830,12 +839,21 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         {
             g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
             memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readStats";
+            func = local_HUF_readStats;
+            break;
+        }
+
+    case 32:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
             funcName = "HUF_readDTable";
             func = local_HUF_readDTable;
             break;
         }
 
-    case 32:
+    case 33:
         {
             size_t hSize;
             g_oSize = benchedSize;
@@ -1113,9 +1131,9 @@ static int fullbench(const char* filename, double p, size_t blockSize, U32 algNb
         BMK_genData(buffer, blockSize, p);
     else {
         FILE* f = fopen( filename, "rb" );
-        DISPLAY("Loading %u KB from %s \n", (U32)(blockSize>>10), filename);
         if (f==NULL) { DISPLAY( "Pb opening %s\n", filename); return 11; }
         blockSize = fread(buffer, 1, blockSize, f);
+        DISPLAY("Loading %u bytes from %s \n", (U32)blockSize, filename);
         fclose(f);
     }
 
