@@ -14,3 +14,6 @@ fuzzerU16_32
 # test artefacts
 *.bin
 *.fse
+
+# Apple Mac artefacts
+*.dSYM

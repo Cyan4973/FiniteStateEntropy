@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - Makefile
-# Copyright (C) Yann Collet 2015
+# Copyright (C) Yann Collet 2015 - 2017
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 # You can contact the author at :
 #  - Public forum froup : https://groups.google.com/forum/#!forum/lz4c
 # #####################################################################
-# This is just a launcher for the Makefile within test directory
+# This is just a launcher for the Makefile within `programs` directory
 # #####################################################################
 
 PROGDIR?= programs
@@ -59,8 +59,6 @@ staticAnalyze: clean
 	scan-build --status-bugs -v $(MAKE) -C $(PROGDIR) all CFLAGS=-g   # does not work well; too many false positives
 
 sanitize: clean
-	@echo ---- check undefined behavior - sanitize ----
-	CC=clang CFLAGS="-g -O3 -fsanitize=undefined" $(MAKE) -C $(PROGDIR) test   FSETEST="-i5000" FSEU16TEST=-i2000
-	CC=clang CFLAGS="-g -O3 -fsanitize=undefined" $(MAKE) -C $(PROGDIR) test32 FSETEST="-i5000" FSEU16TEST=-i2000
-
-
+	@echo ---- check undefined behavior and address overflows ----
+	CC=clang CFLAGS="-g -O3 -fsanitize=undefined -fsanitize=address" $(MAKE) -C $(PROGDIR) test   FSETEST="-i5000" FSEU16TEST=-i2000
+	CC=clang CFLAGS="-g -O3 -fsanitize=undefined -fsanitize=address" $(MAKE) -C $(PROGDIR) test32 FSETEST="-i5000" FSEU16TEST=-i2000

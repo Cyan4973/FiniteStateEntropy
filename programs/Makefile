@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - tester Makefile
-# Copyright (C) Yann Collet 2013-2015
+# Copyright (C) Yann Collet 2013-2017
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -21,6 +21,8 @@
 #  - Public forum froup : https://groups.google.com/forum/#!forum/lz4c
 # #####################################################################
 # fse : Command Line Utility, featuring benchmark and validation tools
+# fuzzer : stress tester for FSE library
+# fuzzerHuff0 : stress tester for Huff0 library
 # #####################################################################
 
 RELEASE    = v0.3.2
@@ -33,7 +35,7 @@ ALIGN_LOOP =
 endif
 
 DESTDIR   ?=
-CPPFLAGS   = -I$(FSEDIR)
+CPPFLAGS  += -I$(FSEDIR)
 CFLAGS    ?= -O3 $(ALIGN_LOOP)
 CFLAGS    += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wstrict-aliasing=1 -Wswitch-enum -Wstrict-prototypes -Wundef
@@ -58,7 +60,8 @@ bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
 bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
-fse: $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c
+fse32: CFLAGS += $(CF32)
+fse fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fse_opt:
@@ -67,40 +70,32 @@ fse_opt:
 fse_safe:
 	CFLAGS=-O2 $(MAKE) fse
 
-fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
-	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
-
-fuzzer: fuzzer.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
+fuzzer fuzzer32: CPPFLAGS += -DBIT_DEBUG=1
+fuzzer32: CFLAGS += $(CF32)
+fuzzer fuzzer32: fuzzer.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer32: fuzzer.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
-	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
-
-fuzzerU16: fuzzerU16.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/entropy_common.c
+fuzzerU16 fuzzerU16_32: CPPFLAGS += -DBIT_DEBUG=1
+fuzzerU16_32: CFLAGS += $(CF32)
+fuzzerU16 fuzzerU16_32: fuzzerU16.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/entropy_common.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fuzzerU16_32: fuzzerU16.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/entropy_common.c
-	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
-
-fuzzerHuff0: fuzzerHuff0.c xxhash.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
+fuzzerHuff0 fuzzerHuff0_32: CPPFLAGS += -DBIT_DEBUG=1
+fuzzerHuff0_32: CFLAGS += $(CF32)
+fuzzerHuff0 fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
-	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
-
-fullbench: fullbench.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
+fullbench32: CFLAGS += $(CF32)
+fullbench fullbench32: fullbench.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
-
-fullbench32: fullbench.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
-	$(CC) $(FLAGS) $(CF32) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o fse$(EXT) fse32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
-	@rm -f core *.o fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
-	@rm -f tmp result proba.bin
+	@$(RM) core *.o fse$(EXT) fse32$(EXT) fullbench$(EXT) fullbench32$(EXT) probagen$(EXT)
+	@$(RM) core *.o fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
+	@$(RM) tmp result proba.bin
 	@echo Cleaning completed
 
 test-fse: probagen fse
