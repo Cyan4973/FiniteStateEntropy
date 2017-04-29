@@ -1,6 +1,6 @@
 /*
   commandline.c - simple command line interface for FSE
-  Copyright (C) Yann Collet 2013-2016
+  Copyright (C) Yann Collet 2013-2017
 
   GPL v2 License
 
@@ -133,7 +133,7 @@ int main(int argc, const char** argv)
     char*  tmpFilenameBuffer   = NULL;
     size_t tmpFilenameSize     = 0;
     const char extension[] = FSE_EXTENSION;
-    const char* programName = argv[0];
+    const char* const programName = argv[0];
     FIO_compressor_t compressor = FIO_fse;
 
     DISPLAY(WELCOME_MESSAGE);

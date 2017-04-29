@@ -28,7 +28,7 @@
 *  Tuning parameters
 ***************************************/
 #define NBLOOPS    4
-#define TIMELOOP   2500
+#define TIMELOOP   (CLOCKS_PER_SEC * 2)
 
 
 /*-************************************
@@ -60,13 +60,7 @@
 #include <string.h>      // strcat
 #include <sys/types.h>   // stat64
 #include <sys/stat.h>    // stat64
-
-// Use ftime() if gettimeofday() is not available on your target
-#if defined(BMK_LEGACY_TIMER)
-#  include <sys/timeb.h> /* timeb, ftime */
-#else
-#  include <sys/time.h>  /* gettimeofday */
-#endif
+#include <time.h>        /* clock_t */
 
 #include "mem.h"
 #include "bench.h"
@@ -144,44 +138,10 @@ typedef struct
 *  local functions
 *********************************************************/
 
-#if defined(BMK_LEGACY_TIMER)
-
-static int BMK_GetMilliStart(void)
+static clock_t BMK_clockSpan(clock_t start)
 {
-    /* Based on Legacy ftime()
-    *  Rolls over every ~ 12.1 days (0x100000/24/60/60)
-    *  Use GetMilliSpan to correct for rollover */
-    struct timeb tb;
-    int nCount;
-    ftime( &tb );
-    nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-    return nCount;
+    return clock() - start;   /* works even if overflow; max duration ~ 30mn */
 }
-
-#else
-
-static int BMK_GetMilliStart(void)
-{
-    /* Based on newer gettimeofday()
-    *  Use GetMilliSpan to correct for rollover */
-    struct timeval tv;
-    int nCount;
-    gettimeofday(&tv, NULL);
-    nCount = (int) (tv.tv_usec/1000 + (tv.tv_sec & 0xfffff) * 1000);
-    return nCount;
-}
-
-#endif
-
-
-static int BMK_GetMilliSpan( int nTimeStart )
-{
-    int nSpan = BMK_GetMilliStart() - nTimeStart;
-    if ( nSpan < 0 )
-        nSpan += 0x100000 * 1000;
-    return nSpan;
-}
-
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
@@ -242,17 +202,17 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++) {
         int nbLoops;
-        int milliTime;
+        clock_t clockStart, clockDuration;
 
         /* Compression benchmark */
         DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, benchedSize);
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 const void* rawPtr = chunkP[chunkNb].origBuffer;
                 const U16* U16chunkPtr = (const U16*) rawPtr;
@@ -260,9 +220,9 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
             }
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
+        clockDuration = BMK_clockSpan(clockStart);
 
-        if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestC*nbLoops) fastestC = (double)clockDuration/nbLoops;
         cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
         ratio = (double)cSize/(double)benchedSize*100.;
 
@@ -273,10 +233,10 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
         //{ size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 void* rawPtr = chunkP[chunkNb].destBuffer;
                 U16* U16dstPtr = (U16*)rawPtr;
@@ -284,9 +244,9 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
             }
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
+        clockDuration = BMK_clockSpan(clockStart);
 
-        if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestC*nbLoops) fastestC = (double)clockDuration/nbLoops;
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         /* CRC Checking */
@@ -357,17 +317,17 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, const char* inFileNam
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++) {
         int nbLoops;
-        int milliTime;
+        clock_t clockStart, clockDuration;
 
         /* Compression */
         DISPLAY("%1i-%-15.15s : %9i ->\r", loopNb, inFileName, benchedSize);
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 size_t cBSize = compressor(chunkP[chunkNb].compressedBuffer, FSE_compressBound(chunkP[chunkNb].origSize),
                                            chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize, nbSymbols, memLog);
@@ -376,10 +336,10 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, const char* inFileNam
             }
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
-        milliTime += !milliTime;
+        clockDuration = BMK_clockSpan(clockStart);
+        clockDuration += !clockDuration;
 
-        if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestC*nbLoops) fastestC = (double)clockDuration/nbLoops;
         cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize ? chunkP[chunkNb].compressedSize : chunkP[chunkNb].origSize;
         ratio = (double)cSize/(double)benchedSize*100.;
 
@@ -390,10 +350,10 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, const char* inFileNam
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     /* zeroing area, for CRC checking */
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 size_t regenSize;
 
@@ -429,9 +389,9 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks, const char* inFileNam
             }   }
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
+        clockDuration = BMK_clockSpan(clockStart);
 
-        if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestD*nbLoops) fastestD = (double)clockDuration/nbLoops;
         DISPLAY("%1i-%-15.15s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         /* CRC Checking */
@@ -469,8 +429,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
     double totald = 0.;
 
     while (fileIdx<nbFiles) {
-        FILE*  inFile;
-        const char* inFileName;
+        const char* const inFileName = fileNamesTable[fileIdx++];
+        FILE* const inFile = fopen( inFileName, "rb" );
         U64    inFileSize;
         size_t benchedSize;
         int nbChunks;
@@ -481,8 +441,6 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
         chunkParameters_t* chunkP;
 
         /* Check file existence */
-        inFileName = fileNamesTable[fileIdx++];
-        inFile = fopen( inFileName, "rb" );
         if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
         /* Memory size evaluation */
@@ -590,25 +548,25 @@ static void BMK_benchCore_Mem(char* dst,
     DISPLAY("\r%79s\r", "");
     for (loopNb = 1; loopNb <= nbIterations; loopNb++) {
         int nbLoops;
-        int milliTime;
+        clock_t clockStart, clockDuration;
 
         /* Compression */
         DISPLAY("%1i-%-14.14s : %9u ->\r", loopNb, inFileName, benchedSize);
         { unsigned i; for (i=0; i<benchedSize; i++) dst[i]=(char)i; }     /* warmimg up memory */
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             cSize = FSE_compress_usingCTable(dst, FSE_compressBound(benchedSize), src, benchedSize, ct);
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
+        clockDuration = BMK_clockSpan(clockStart);
 
         if (FSE_isError(cSize)) { DISPLAY("!!! Error compressing file %s !!!!    \n", inFileName); break; }
 
-        if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestC*nbLoops) fastestC = (double)clockDuration/nbLoops;
         ratio = (double)cSize/(double)benchedSize*100.;
 
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
@@ -617,19 +575,19 @@ static void BMK_benchCore_Mem(char* dst,
         { unsigned i; for (i=0; i<benchedSize; i++) src[i]=0; }     /* zeroing area, for CRC checking */
 
         nbLoops = 0;
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliStart() == milliTime);
-        milliTime = BMK_GetMilliStart();
-        while(BMK_GetMilliSpan(milliTime) < TIMELOOP) {
+        clockStart = clock();
+        while(clock() == clockStart);
+        clockStart = clock();
+        while(BMK_clockSpan(clockStart) < TIMELOOP) {
             dSize = FSE_decompress_usingDTable(src, benchedSize, dst, cSize, dt);
             nbLoops++;
         }
-        milliTime = BMK_GetMilliSpan(milliTime);
+        clockDuration = BMK_clockSpan(clockStart);
 
         if (FSE_isError(dSize)) { DISPLAY("\n!!! Error decompressing file %s !!!!    \n", inFileName); break; }
         if (dSize != benchedSize) { DISPLAY("\n!!! Error decompressing file %s !!!!    \n", inFileName); break; }
 
-        if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
+        if ((double)clockDuration < fastestD*nbLoops) fastestD = (double)clockDuration/nbLoops;
         DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
         /* CRC Checking */
