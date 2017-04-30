@@ -448,7 +448,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
 }
 
 
-int BMK_benchFiles(const char** fileNamesTable, int const nbFiles)
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
 {
     int fileIdx=0;
     U64 totalSourceSize = 0;
