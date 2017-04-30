@@ -122,6 +122,7 @@ typedef struct
     unsigned bitsConsumed;
     const char* ptr;
     const char* start;
+    const char* limitPtr;
 } BIT_DStream_t;
 
 typedef enum { BIT_DStream_unfinished = 0,
@@ -289,15 +290,16 @@ MEM_STATIC size_t BIT_initDStream(BIT_DStream_t* bitD, const void* srcBuffer, si
 {
     if (srcSize < 1) { memset(bitD, 0, sizeof(*bitD)); return ERROR(srcSize_wrong); }
 
+    bitD->start = (const char*)srcBuffer;
+    bitD->limitPtr = bitD->start + sizeof(bitD->bitContainer);
+
     if (srcSize >=  sizeof(bitD->bitContainer)) {  /* normal case */
-        bitD->start = (const char*)srcBuffer;
         bitD->ptr   = (const char*)srcBuffer + srcSize - sizeof(bitD->bitContainer);
         bitD->bitContainer = MEM_readLEST(bitD->ptr);
         { BYTE const lastByte = ((const BYTE*)srcBuffer)[srcSize-1];
           bitD->bitsConsumed = lastByte ? 8 - BIT_highbit32(lastByte) : 0;  /* ensures bitsConsumed is always set */
           if (lastByte == 0) return ERROR(GENERIC); /* endMark not present */ }
     } else {
-        bitD->start = (const char*)srcBuffer;
         bitD->ptr   = bitD->start;
         bitD->bitContainer = *(const BYTE*)(bitD->start);
         switch(srcSize)
@@ -406,7 +408,7 @@ MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
     if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* should not happen => corruption detected */
         return BIT_DStream_overflow;
 
-    if (bitD->ptr >= bitD->start + sizeof(bitD->bitContainer)) {
+    if (bitD->ptr >= bitD->limitPtr) {
         bitD->ptr -= bitD->bitsConsumed >> 3;
         bitD->bitsConsumed &= 7;
         bitD->bitContainer = MEM_readLEST(bitD->ptr);
