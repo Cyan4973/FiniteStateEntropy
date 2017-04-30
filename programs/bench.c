@@ -349,7 +349,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
         clockDuration = BMK_clockSpan(clockStart);
         clockDuration += !clockDuration;  /* to avoid division by zero */
 
-        if ((double)clockDuration < fastestC*nbLoops)
+        if ((double)clockDuration < fastestC * nbLoops * CLOCKS_PER_SEC)
             fastestC = (double) clockDuration / CLOCKS_PER_SEC / nbLoops;
         cSize=0;
         for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
@@ -407,7 +407,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
         }
         clockDuration = BMK_clockSpan(clockStart);
 
-        if ((double)clockDuration < fastestD*nbLoops)
+        if ((double)clockDuration < fastestD * nbLoops * CLOCKS_PER_SEC)
             fastestD = (double)clockDuration / CLOCKS_PER_SEC / nbLoops;
         DISPLAY("%1i-%-15.15s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r",
                  trial, inFileName, (int)benchedSize,

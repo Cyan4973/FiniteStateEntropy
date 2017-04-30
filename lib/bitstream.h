@@ -84,7 +84,7 @@ extern "C" {
 typedef struct
 {
     size_t bitContainer;
-    int    bitPos;
+    unsigned bitPos;
     char*  startPtr;
     char*  ptr;
     char*  endPtr;
