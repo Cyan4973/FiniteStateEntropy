@@ -126,8 +126,10 @@ static void waitEnter(void)
 int main(int argc, const char** argv)
 {
     int   i,
-          forceCompress=1, decode=0, bench=0; /* default action if no argument */
-    int   indexFileNames=0;
+          forceCompress = 1,  /* default action if no argument */
+          decode= 0,
+          bench = 0;
+    int   indexFileNames = 0;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
     char*  tmpFilenameBuffer   = NULL;
@@ -278,10 +280,10 @@ int main(int argc, const char** argv)
             size_t l = strlen(input_filename);
             if (tmpFilenameSize < l+6) tmpFilenameSize = l+6;
             tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
-			if (tmpFilenameBuffer==NULL) {
-				DISPLAY("Not enough memory, exiting ... \n");
-				exit(1);
-			}
+            if (tmpFilenameBuffer==NULL) {
+                DISPLAY("Not enough memory, exiting ... \n");
+                exit(1);
+            }
             strcpy(tmpFilenameBuffer, input_filename);
             strcpy(tmpFilenameBuffer+l, FSE_EXTENSION);
             output_filename = tmpFilenameBuffer;
