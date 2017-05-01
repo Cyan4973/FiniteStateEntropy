@@ -395,12 +395,14 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
                     size_t n;
                     for (n=0; (n<origSize) && (src[n]==regen[n]); n++);
                     if (n<origSize) {
-                        DISPLAY("\n!!! %15s : Invalid block %i !!! pos %u/%u\n", inFileName, chunkNb, (U32)n, (U32)origSize);
+                        DISPLAY("\n!!! %15s : Invalid block %i !!! pos %u/%u\n",
+                                inFileName, chunkNb, (U32)n, (U32)origSize);
                         break;
                 }   }
 
                 if (regenSize != chunkP[chunkNb].origSize) {
-                    DISPLAY("!!! Error decompressing block %i !!!! => (%s)   \n", chunkNb, FSE_getErrorName(regenSize));
+                    DISPLAY("!! Error decompressing block %i of cSize %u !! => (%s)  \n",
+                             chunkNb, (U32)chunkP[chunkNb].compressedSize, FSE_getErrorName(regenSize));
                     return;
             }   }
             nbLoops++;

@@ -405,7 +405,7 @@ MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
               if status == BIT_DStream_unfinished, internal register is filled with >= (sizeof(bitD->bitContainer)*8 - 7) bits */
 MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
 {
-    if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* should not happen => corruption detected */
+    if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* overflow detected, like end of stream */
         return BIT_DStream_overflow;
 
     if (bitD->ptr >= bitD->limitPtr) {
@@ -418,6 +418,7 @@ MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
         if (bitD->bitsConsumed < sizeof(bitD->bitContainer)*8) return BIT_DStream_endOfBuffer;
         return BIT_DStream_completed;
     }
+    /* start < ptr < limitPtr */
     {   U32 nbBytes = bitD->bitsConsumed >> 3;
         BIT_DStream_status result = BIT_DStream_unfinished;
         if (bitD->ptr - nbBytes < bitD->start) {
@@ -426,7 +427,7 @@ MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
         }
         bitD->ptr -= nbBytes;
         bitD->bitsConsumed -= nbBytes*8;
-        bitD->bitContainer = MEM_readLEST(bitD->ptr);   /* reminder : srcSize > sizeof(bitD), otherwise bitD->ptr == bitD->start */
+        bitD->bitContainer = MEM_readLEST(bitD->ptr);   /* reminder : srcSize > sizeof(bitD->bitContainer), otherwise bitD->ptr == bitD->start */
         return result;
     }
 }
