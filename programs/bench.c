@@ -545,8 +545,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
     if (nbFiles > 1)
         DISPLAY("%-17.17s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL",
                 (long long unsigned int)totalSourceSize, (long long unsigned int)totalCompressedSize,
-                (double)totalCompressedSize/(double)totalSourceSize*100., (double)totalSourceSize/totalc/1000.,
-                (double)totalSourceSize/totald/1000.);
+                (double)totalCompressedSize/(double)totalSourceSize*100., (double)totalSourceSize/totalc/CLOCKS_PER_SEC,
+                (double)totalSourceSize/totald/CLOCKS_PER_SEC);
 
     return 0;
 }
