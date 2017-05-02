@@ -61,7 +61,9 @@ bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
 fse32: CFLAGS += -m32
 fsex32: CFLAGS += -mx32
-fse fse32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
+fse fse32 fsex32: bench.c commandline.c fileio.c xxhash.c zlibh.c $(FSEDIR)/entropy_common.c \
+                  $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c \
+                  $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fse_opt:
@@ -72,22 +74,28 @@ fse_safe:
 
 fuzzer fuzzer32: CPPFLAGS += -DBIT_DEBUG=1
 fuzzer32: CFLAGS += -m32
-fuzzer fuzzer32: fuzzer.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
+fuzzer fuzzer32: fuzzer.c xxhash.c $(FSEDIR)/entropy_common.c \
+                 $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzerU16 fuzzerU16_32: CPPFLAGS += -DBIT_DEBUG=1
 fuzzerU16_32: CFLAGS += -m32
-fuzzerU16 fuzzerU16_32: fuzzerU16.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/entropy_common.c
+fuzzerU16 fuzzerU16_32: fuzzerU16.c xxhash.c $(FSEDIR)/entropy_common.c \
+                        $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzerHuff0 fuzzerHuff0_32: CPPFLAGS += -DBIT_DEBUG=1
 fuzzerHuff0_32: CFLAGS += -m32
-fuzzerHuff0 fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/entropy_common.c
+fuzzerHuff0 fuzzerHuff0_32: fuzzerHuff0.c xxhash.c $(FSEDIR)/entropy_common.c \
+                            $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c \
+                            $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: CFLAGS += -m32
 fullbenchx32: CFLAGS += -mx32
-fullbench fullbench32 fullbenchx32: fullbench.c xxhash.c $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c $(FSEDIR)/entropy_common.c
+fullbench fullbench32 fullbenchx32: fullbench.c xxhash.c $(FSEDIR)/entropy_common.c \
+                                    $(FSEDIR)/fse_decompress.c $(FSEDIR)/fse_compress.c $(FSEDIR)/fseU16.c \
+                                    $(FSEDIR)/huf_compress.c $(FSEDIR)/huf_decompress.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 probagen: probaGenerator.c
