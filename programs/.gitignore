@@ -1,9 +1,11 @@
 # binaries
 fse
 fse32
+fsex32
 probagen
 fullbench
 fullbench32
+fullbenchx32
 fuzzer
 fuzzer32
 fuzzerHuff0
