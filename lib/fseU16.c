@@ -113,11 +113,10 @@ typedef struct {
 
 
 /*! FSE_countU16() :
-    This function just counts U16 values within `src`,
-    and store the histogram into `count`.
-    This function is unsafe : it doesn't check that all values within `src` can fit into `count`.
-    For this reason, prefer using a table `count` with 256 elements.
-    @return : highest count for a single element
+    This function counts U16 values stored in `src`,
+    and push the histogram into `count`.
+   @return : count of most common element
+   *maxSymbolValuePtr : will be updated with value of highest symbol.
 */
 size_t FSE_countU16(unsigned* count, unsigned* maxSymbolValuePtr,
                     const U16* src, size_t srcSize)
@@ -125,23 +124,24 @@ size_t FSE_countU16(unsigned* count, unsigned* maxSymbolValuePtr,
     const U16* ip16 = (const U16*)src;
     const U16* const end = src + srcSize;
     unsigned maxSymbolValue = *maxSymbolValuePtr;
-    unsigned max=0;
-    U32 s;
 
     memset(count, 0, (maxSymbolValue+1)*sizeof(*count));
     if (srcSize==0) { *maxSymbolValuePtr = 0; return 0; }
 
     while (ip16<end) {
-        if (*ip16 > maxSymbolValue) return ERROR(maxSymbolValue_tooSmall);
+        if (*ip16 > maxSymbolValue)
+            return ERROR(maxSymbolValue_tooSmall);
         count[*ip16++]++;
     }
 
     while (!count[maxSymbolValue]) maxSymbolValue--;
     *maxSymbolValuePtr = maxSymbolValue;
 
-    for (s=0; s<=maxSymbolValue; s++) if (count[s] > max) max = count[s];
-
-    return (size_t)max;
+    {   U32 s, max=0;
+        for (s=0; s<=maxSymbolValue; s++)
+            if (count[s] > max) max = count[s];
+        return (size_t)max;
+    }
 }
 
 /* *******************************************************
@@ -183,7 +183,7 @@ size_t FSE_compressU16_usingCTable (void* dst, size_t maxDstSize,
     while (ip>istart) {
         FSE_encodeSymbol(&bitC, &CState, *--ip);
 
-        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )   /* This test must be static */
+        if (sizeof(size_t)*8 < FSE_MAX_TABLELOG*2+7 )  /* This test must be static */
             BIT_flushBits(&bitC);
 
         FSE_encodeSymbol(&bitC, &CState, *--ip);
@@ -224,7 +224,7 @@ size_t FSE_compressU16(void* dst, size_t maxDstSize,
     /* Scan for stats */
     {   size_t const maxCount = FSE_countU16 (counting, &maxSymbolValue, ip, srcSize);
         if (FSE_isError(maxCount)) return maxCount;
-        if (maxCount == srcSize) return 1;   /* Input data is one constant element x srcSize times. Use RLE compression. */
+        if (maxCount == srcSize) return 1;   /* src contains one constant element x srcSize times. Use RLE compression. */
     }
     /* Normalize */
     tableLog = FSE_optimalTableLog(tableLog, srcSize, maxSymbolValue);
@@ -285,11 +285,17 @@ size_t FSE_decompressU16_usingDTable (U16* dst, size_t maxDstSize,
     BIT_initDStream(&bitD, cSrc, cSrcSize);
     FSE_initDState(&state, &bitD, dt);
 
-    while((BIT_reloadDStream(&bitD) < 2) && (op<oend)) {
+    while((BIT_reloadDStream(&bitD) < BIT_DStream_completed) && (op<oend)) {
         *op++ = FSE_decodeSymbolU16(&state, &bitD);
     }
 
-    if (!BIT_endOfDStream(&bitD)) return ERROR(GENERIC);
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    while (state.state && op<oend) {
+        *op++ = FSE_decodeSymbolU16(&state, &bitD);
+    }
+
+    if (state.state) return ERROR(corruption_detected);
 
     return op-ostart;
 }
