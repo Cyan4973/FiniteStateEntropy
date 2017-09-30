@@ -132,7 +132,7 @@ MEM_STATIC U64 MEM_readST(const void* ptr) { return ((const unalign_ust*)ptr)->v
 
 MEM_STATIC void MEM_write16(void* memPtr, U16 value) { ((unalign_u16*)memPtr)->v = value; }
 MEM_STATIC void MEM_write32(void* memPtr, U32 value) { ((unalign_u32*)memPtr)->v = value; }
-MEM_STATIC void MEM_write64(void* memPtr, U64 value) { ((unalign_ust*)memPtr)->v = value; }
+MEM_STATIC void MEM_write64(void* memPtr, U64 value) { ((unalign_u64*)memPtr)->v = value; }
 
 #else
 
