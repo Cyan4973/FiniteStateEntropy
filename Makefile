@@ -61,4 +61,4 @@ staticAnalyze: clean
 sanitize: clean
 	@echo ---- check undefined behavior and address overflows ----
 	CC=clang CFLAGS="-g -O3 -fsanitize=undefined -fsanitize=address" $(MAKE) -C $(PROGDIR) test   FSETEST="-i5000" FSEU16TEST=-i2000
-	CC=clang CFLAGS="-g -O3 -fsanitize=undefined -fsanitize=address" $(MAKE) -C $(PROGDIR) test32 FSETEST="-i5000" FSEU16TEST=-i2000
+	# CC=clang CFLAGS="-g -O3 -fsanitize=undefined -fsanitize=address" $(MAKE) -C $(PROGDIR) test32 FSETEST="-i5000" FSEU16TEST=-i2000  # sanitizer for 32-bits not correctly shipped with clang 3.8, which is used in travisCI
