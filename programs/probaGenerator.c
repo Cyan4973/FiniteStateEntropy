@@ -128,10 +128,16 @@ static void generate(void* buffer, size_t buffSize, double p)
 
 void createSampleFile(char* filename, double p)
 {
-    FILE* foutput = fopen( filename, "wb" );
-    void* buffer = malloc(BUFFERSIZE);
-    generate(buffer, BUFFERSIZE, p);
-    fwrite(buffer, 1, BUFFERSIZE, foutput);
+    FILE* const foutput = fopen( filename, "wb" );
+    if (foutput==NULL) {
+        perror("dataGenerator:");
+        exit(1);
+    }
+    {   void* const buffer = malloc(BUFFERSIZE);
+        generate(buffer, BUFFERSIZE, p);
+        fwrite(buffer, 1, BUFFERSIZE, foutput);
+        free(buffer);
+    }
     fclose(foutput);
     DISPLAY("File %s generated\n", filename);
 }
