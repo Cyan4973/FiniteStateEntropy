@@ -261,14 +261,15 @@ size_t FIO_ZLIBH_compress(void* dst, size_t dstSize, const void* src, size_t src
 Compressed format : MAGICNUMBER - STREAMDESCRIPTOR - ( BLOCKHEADER - COMPRESSEDBLOCK ) - STREAMCRC
 MAGICNUMBER - 4 bytes - Designates compression algo
 STREAMDESCRIPTOR - 1 byte
-    bits 0-3 : max block size, 2^value from 0 to 0xA; min 0=>1KB, max 0x6=>64KB, typical 5=>32 KB
+    bits 0-3 : max block size, 2^value, from 0 to 6; min 0=>1KB, max 6=>64KB, typical 5=>32 KB
     bits 4-7 = 0 : reserved;
 BLOCKHEADER - 1-5 bytes
     1st byte :
     bits 6-7 : blockType (compressed, raw, rle, crc (end of Frame)
     bit 5 : full block
+    bits 0-4 : reserved
     ** if not full block **
-    2nd & 3rd byte : regenerated size of block (big endian); note : 0 = 64 KB
+    2nd & 3rd byte : regenerated size of block (big endian)
     ** if blockType==compressed **
     next 2 bytes : compressed size of block
 COMPRESSEDBLOCK
@@ -343,9 +344,9 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
                 out_buff[0] = (BYTE)((bt_raw << 6) + BIT5);
                 headerSize = 1;
             } else {
-                out_buff[2] = (BYTE)inSize;
-                out_buff[1] = (BYTE)(inSize >> 8);
                 out_buff[0] = (BYTE)(bt_raw << 6);
+                out_buff[1] = (BYTE)(inSize >> 8);
+                out_buff[2] = (BYTE)inSize;
                 headerSize = 3;
             }
             { size_t const sizeCheck = fwrite(out_buff, 1, headerSize, foutput);
@@ -359,9 +360,9 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
                 out_buff[0] = (BYTE)((bt_rle << 6) + BIT5);
                 headerSize = 1;
             } else {
-                out_buff[2] = (BYTE)inSize;
-                out_buff[1] = (BYTE)(inSize >> 8);
                 out_buff[0] = (BYTE)(bt_rle << 6);
+                out_buff[1] = (BYTE)(inSize >> 8);
+                out_buff[2] = (BYTE)inSize;
                 headerSize = 3;
             }
             out_buff[headerSize] = in_buff[0];
@@ -371,9 +372,9 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
             break;
         default : /* compressed */
             if (inSize == inputBlockSize) {
-                out_buff[2] = (BYTE)((bt_compressed << 6) + BIT5);
-                out_buff[3] = (BYTE)(cSize >> 8);
-                out_buff[4] = (BYTE)cSize;
+                out_buff[0] = (BYTE)((bt_compressed << 6) + BIT5);
+                out_buff[1] = (BYTE)(cSize >> 8);
+                out_buff[2] = (BYTE)cSize;
                 headerSize = 3;
             } else {
                 out_buff[0] = (BYTE)(bt_compressed << 6);
@@ -429,14 +430,15 @@ size_t FIO_ZLIBH_decompress(void* dst, size_t dstSize, const void* src, size_t s
 Compressed format : MAGICNUMBER - STREAMDESCRIPTOR - ( BLOCKHEADER - COMPRESSEDBLOCK ) - STREAMCRC
 MAGICNUMBER - 4 bytes - Designates compression algo
 STREAMDESCRIPTOR - 1 byte
-    bits 0-3 : max block size, 2^value from 0 to 0xA; min 0=>1KB, max 0x6=>64KB, typical 5=>32 KB
+    bits 0-3 : max block size, 2^value, from 0 to 6; min 0=>1KB, max 6=>64KB, typical 5=>32 KB
     bits 4-7 = 0 : reserved;
 BLOCKHEADER - 1-5 bytes
     1st byte :
     bits 6-7 : blockType (compressed, raw, rle, crc (end of Frame)
     bit 5 : full block
+    bits 0-4 : reserved
     ** if not full block **
-    2nd & 3rd byte : regenerated size of block (big endian); note : 0 = 64 KB
+    2nd & 3rd byte : regenerated size of block (big endian)
     ** if blockType==compressed **
     next 2 bytes : compressed size of block
 COMPRESSEDBLOCK
@@ -461,8 +463,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     /* check header */
-    {   U32   header32[(FIO_FRAMEHEADERSIZE+3) >> 2];
-        BYTE* const header = (BYTE*)header32;
+    {   BYTE header[FIO_FRAMEHEADERSIZE];
 
         { size_t const sizeCheck = fread(header, (size_t)1, FIO_FRAMEHEADERSIZE, finput);
           if (sizeCheck != FIO_FRAMEHEADERSIZE) EXM_THROW(30, "Read error : cannot read header\n"); }
@@ -483,7 +484,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
         }
 
         {   U32 const blockSizeId = header[4];
-            if (blockSizeId > FIO_maxBlockSizeID) EXM_THROW(32, "Wrong version : unknown header flags\n");
+            if (blockSizeId > FIO_maxBlockSizeID)
+                EXM_THROW(32, "Wrong version : unknown header flags\n");
             blockSize = FIO_blockID_to_blockSize(blockSizeId);
     }   }
 
@@ -491,18 +493,16 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     in_buff  = (BYTE*)malloc(blockSize + FIO_maxBlockHeaderSize);
     out_buff = (BYTE*)malloc(blockSize);
     if (!in_buff || !out_buff) EXM_THROW(33, "Allocation error : not enough memory");
-    ip = in_buff;
 
     /* read first bHeader */
     { size_t const sizeCheck = fread(in_buff, 1, 1, finput);
-      if (sizeCheck != 1) EXM_THROW(34, "Read error : cannot read header\n"); }
+      if (sizeCheck != 1) EXM_THROW(34, "Read error : cannot read header\n");
+      ip = in_buff;
+    }
 
     /* Main Loop */
     while (1) {
         size_t readSize, bType, rSize=0, cSize;
-
-        //static U32 blockNb=0;
-        //printf("blockNb = %u \n", ++blockNb);
 
         /* Decode header */
         bType = (ip[0] & (BIT7+BIT6)) >> 6;
@@ -597,5 +597,3 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
 
     return filesize;
 }
-
-
