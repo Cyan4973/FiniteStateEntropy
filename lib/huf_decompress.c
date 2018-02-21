@@ -146,6 +146,26 @@ size_t HUF_readDTableX2(HUF_DTable* DTable, const void* src, size_t srcSize)
 
 typedef struct { U16 sequence; BYTE nbBits; BYTE length; } HUF_DEltX4;  /* double-symbols decoding */
 
+static BYTE HUF_decodeSymbolX2(BIT_DStream_t* Dstream, const HUF_DEltX2* dt, const U32 dtLog)
+{
+    size_t const val = BIT_lookBitsFast(Dstream, dtLog); /* note : dtLog >= 1 */
+    BYTE const c = dt[val].byte;
+    BIT_skipBits(Dstream, dt[val].nbBits);
+    return c;
+}
+
+#define HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr) \
+    *ptr++ = HUF_decodeSymbolX2(DStreamPtr, dt, dtLog)
+
+#define HUF_DECODE_SYMBOLX2_1(ptr, DStreamPtr)  \
+    if (MEM_64bits() || (HUF_TABLELOG_MAX<=12)) \
+        HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
+
+#define HUF_DECODE_SYMBOLX2_2(ptr, DStreamPtr) \
+    if (MEM_64bits()) \
+        HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
+
+
 #define FUNCTION(fn) fn##_default
 #define TARGET
 #include "huf_decompress_impl.h"
@@ -167,6 +187,7 @@ typedef size_t (*HUF_decompress_usingDTable_t)(void *dst, size_t dstSize,
                                                size_t cSrcSize,
                                                const HUF_DTable *DTable);
 #if DYNAMIC_BMI2
+
 #define X(fn)                                                                  \
     static size_t fn(void* dst, size_t dstSize, void const* cSrc,              \
                      size_t cSrcSize, HUF_DTable const* DTable, int bmi2)      \
@@ -176,7 +197,9 @@ typedef size_t (*HUF_decompress_usingDTable_t)(void *dst, size_t dstSize,
         }                                                                      \
         return fn##_default(dst, dstSize, cSrc, cSrcSize, DTable);             \
     }
+
 #else
+
 #define X(fn)                                                                  \
     static size_t fn(void* dst, size_t dstSize, void const* cSrc,              \
                      size_t cSrcSize, HUF_DTable const* DTable, int bmi2)      \
@@ -184,6 +207,7 @@ typedef size_t (*HUF_decompress_usingDTable_t)(void *dst, size_t dstSize,
         (void)bmi2;                                                            \
         return fn##_default(dst, dstSize, cSrc, cSrcSize, DTable);             \
     }
+
 #endif
 
 X(HUF_decompress1X2_usingDTable_internal)

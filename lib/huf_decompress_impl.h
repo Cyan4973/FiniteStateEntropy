@@ -17,25 +17,6 @@
 #endif
 
 
-static TARGET BYTE FUNCTION(HUF_decodeSymbolX2)(BIT_DStream_t* Dstream, const HUF_DEltX2* dt, const U32 dtLog)
-{
-    size_t const val = BIT_lookBitsFast(Dstream, dtLog); /* note : dtLog >= 1 */
-    BYTE const c = dt[val].byte;
-    BIT_skipBits(Dstream, dt[val].nbBits);
-    return c;
-}
-
-#define HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr) \
-    *ptr++ = FUNCTION(HUF_decodeSymbolX2)(DStreamPtr, dt, dtLog)
-
-#define HUF_DECODE_SYMBOLX2_1(ptr, DStreamPtr) \
-    if (MEM_64bits() || (HUF_TABLELOG_MAX<=12)) \
-        HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
-
-#define HUF_DECODE_SYMBOLX2_2(ptr, DStreamPtr) \
-    if (MEM_64bits()) \
-        HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
-
 HINT_INLINE TARGET size_t FUNCTION(HUF_decodeStreamX2)(BYTE* p, BIT_DStream_t* const bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
 {
     BYTE* const pStart = p;
@@ -174,10 +155,6 @@ FUNCTION(HUF_decompress4X2_usingDTable_internal)(
         return dstSize;
     }
 }
-
-#undef HUF_DECODE_SYMBOLX2_0
-#undef HUF_DECODE_SYMBOLX2_1
-#undef HUF_DECODE_SYMBOLX2_2
 
 static TARGET U32 FUNCTION(HUF_decodeSymbolX4)(void* op, BIT_DStream_t* DStream, const HUF_DEltX4* dt, const U32 dtLog)
 {
