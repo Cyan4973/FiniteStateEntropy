@@ -329,6 +329,8 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
         /* Fill input Buffer */
         size_t cSize;
         size_t const inSize = fread(in_buff, (size_t)1, (size_t)inputBlockSize, finput);
+        DISPLAYLEVEL(6, "reading %zu bytes from input (%s)\n",
+                        inSize, input_filename);
         if (inSize==0) break;
         filesize += inSize;
         XXH32_update(&xxhState, in_buff, inSize);

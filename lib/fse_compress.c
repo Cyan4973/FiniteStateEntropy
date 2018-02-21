@@ -33,40 +33,22 @@
 ****************************************************************** */
 
 /* **************************************************************
-*  Compiler specifics
-****************************************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    /* For Visual 2005 */
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4214)        /* disable: C4214: non-int bitfields */
-#else
-#  if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-#    ifdef __GNUC__
-#      define FORCE_INLINE static inline __attribute__((always_inline))
-#    else
-#      define FORCE_INLINE static inline
-#    endif
-#  else
-#    define FORCE_INLINE static
-#  endif /* __STDC_VERSION__ */
-#endif
-
-
-/* **************************************************************
 *  Includes
 ****************************************************************/
 #include <stdlib.h>     /* malloc, free, qsort */
 #include <string.h>     /* memcpy, memset */
 #include <stdio.h>      /* printf (debug) */
 #include "bitstream.h"
+#include "compiler.h"
 #define FSE_STATIC_LINKING_ONLY
 #include "fse.h"
+#include "error_private.h"
 
 
 /* **************************************************************
 *  Error Management
 ****************************************************************/
+#define FSE_isError ERR_isError
 #define FSE_STATIC_ASSERT(c) { enum { FSE_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
@@ -291,7 +273,7 @@ static size_t FSE_writeNCount_generic (void* header, size_t headerBufferSize,
 
 size_t FSE_writeNCount (void* buffer, size_t bufferSize, const short* normalizedCounter, unsigned maxSymbolValue, unsigned tableLog)
 {
-    if (tableLog > FSE_MAX_TABLELOG) return ERROR(GENERIC);   /* Unsupported */
+    if (tableLog > FSE_MAX_TABLELOG) return ERROR(tableLog_tooLarge);   /* Unsupported */
     if (tableLog < FSE_MIN_TABLELOG) return ERROR(GENERIC);   /* Unsupported */
 
     if (bufferSize < FSE_NCountWriteBound(maxSymbolValue, tableLog))
@@ -476,20 +458,22 @@ void FSE_freeCTable (FSE_CTable* ct) { free(ct); }
 /* provides the minimum logSize to safely represent a distribution */
 static unsigned FSE_minTableLog(size_t srcSize, unsigned maxSymbolValue)
 {
-	U32 minBitsSrc = BIT_highbit32((U32)(srcSize - 1)) + 1;
-	U32 minBitsSymbols = BIT_highbit32(maxSymbolValue) + 2;
-	U32 minBits = minBitsSrc < minBitsSymbols ? minBitsSrc : minBitsSymbols;
-	return minBits;
+    U32 minBitsSrc = BIT_highbit32((U32)(srcSize - 1)) + 1;
+    U32 minBitsSymbols = BIT_highbit32(maxSymbolValue) + 2;
+    U32 minBits = minBitsSrc < minBitsSymbols ? minBitsSrc : minBitsSymbols;
+    assert(srcSize > 1); /* Not supported, RLE should be used instead */
+    return minBits;
 }
 
 unsigned FSE_optimalTableLog_internal(unsigned maxTableLog, size_t srcSize, unsigned maxSymbolValue, unsigned minus)
 {
-	U32 maxBitsSrc = BIT_highbit32((U32)(srcSize - 1)) - minus;
+    U32 maxBitsSrc = BIT_highbit32((U32)(srcSize - 1)) - minus;
     U32 tableLog = maxTableLog;
-	U32 minBits = FSE_minTableLog(srcSize, maxSymbolValue);
+    U32 minBits = FSE_minTableLog(srcSize, maxSymbolValue);
+    assert(srcSize > 1); /* Not supported, RLE should be used instead */
     if (tableLog==0) tableLog = FSE_DEFAULT_TABLELOG;
-	if (maxBitsSrc < tableLog) tableLog = maxBitsSrc;   /* Accuracy can be reduced */
-	if (minBits > tableLog) tableLog = minBits;   /* Need a minimum to safely represent all symbol values */
+    if (maxBitsSrc < tableLog) tableLog = maxBitsSrc;   /* Accuracy can be reduced */
+    if (minBits > tableLog) tableLog = minBits;   /* Need a minimum to safely represent all symbol values */
     if (tableLog < FSE_MIN_TABLELOG) tableLog = FSE_MIN_TABLELOG;
     if (tableLog > FSE_MAX_TABLELOG) tableLog = FSE_MAX_TABLELOG;
     return tableLog;
@@ -598,7 +582,7 @@ size_t FSE_normalizeCount (short* normalizedCounter, unsigned tableLog,
     if (tableLog > FSE_MAX_TABLELOG) return ERROR(tableLog_tooLarge);   /* Unsupported size */
     if (tableLog < FSE_minTableLog(total, maxSymbolValue)) return ERROR(GENERIC);   /* Too small tableLog, compression potentially impossible */
 
-    {   U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
+    {   static U32 const rtbTable[] = {     0, 473195, 504333, 520860, 550000, 700000, 750000, 830000 };
         U64 const scale = 62 - tableLog;
         U64 const step = ((U64)1<<62) / total;   /* <== here, one division ! */
         U64 const vStep = 1ULL<<(scale-20);
@@ -781,7 +765,7 @@ size_t FSE_compress_usingCTable (void* dst, size_t dstSize,
 
 size_t FSE_compressBound(size_t size) { return FSE_COMPRESSBOUND(size); }
 
-#define CHECK_V_F(e, f) size_t const e = f; if (ERR_isError(e)) return f
+#define CHECK_V_F(e, f) size_t const e = f; if (ERR_isError(e)) return e
 #define CHECK_F(f)   { CHECK_V_F(_var_err__, f); }
 
 /* FSE_compress_wksp() :
@@ -808,7 +792,7 @@ size_t FSE_compress_wksp (void* dst, size_t dstSize, const void* src, size_t src
     if (!tableLog) tableLog = FSE_DEFAULT_TABLELOG;
 
     /* Scan input and build symbol stats */
-    {   CHECK_V_F(maxCount, FSE_count(count, &maxSymbolValue, src, srcSize) );
+    {   CHECK_V_F(maxCount, FSE_count_wksp(count, &maxSymbolValue, src, srcSize, (unsigned*)scratchBuffer) );
         if (maxCount == srcSize) return 1;   /* only a single symbol in src : rle */
         if (maxCount == 1) return 0;         /* each symbol present maximum once => not compressible */
         if (maxCount < (srcSize >> 7)) return 0;   /* Heuristic : not compressible enough */

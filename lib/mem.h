@@ -1,10 +1,11 @@
-/**
+/*
  * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
  * All rights reserved.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
+ * You may select, at your option, one of the above-listed licenses.
  */
 
 #ifndef MEM_H_MODULE
@@ -55,8 +56,6 @@ MEM_STATIC void MEM_check(void) { MEM_STATIC_ASSERT((sizeof(size_t)==4) || (size
   typedef   int32_t S32;
   typedef  uint64_t U64;
   typedef   int64_t S64;
-  typedef  intptr_t iPtrDiff;
-  typedef uintptr_t uPtrDiff;
 #else
   typedef unsigned char      BYTE;
   typedef unsigned short      U16;
@@ -65,8 +64,6 @@ MEM_STATIC void MEM_check(void) { MEM_STATIC_ASSERT((sizeof(size_t)==4) || (size
   typedef   signed int        S32;
   typedef unsigned long long  U64;
   typedef   signed long long  S64;
-  typedef ptrdiff_t      iPtrDiff;
-  typedef size_t         uPtrDiff;
 #endif
 
 
@@ -110,7 +107,7 @@ Only use if no other choice to achieve best performance on target platform */
 MEM_STATIC U16 MEM_read16(const void* memPtr) { return *(const U16*) memPtr; }
 MEM_STATIC U32 MEM_read32(const void* memPtr) { return *(const U32*) memPtr; }
 MEM_STATIC U64 MEM_read64(const void* memPtr) { return *(const U64*) memPtr; }
-MEM_STATIC U64 MEM_readST(const void* memPtr) { return *(const size_t*) memPtr; }
+MEM_STATIC size_t MEM_readST(const void* memPtr) { return *(const size_t*) memPtr; }
 
 MEM_STATIC void MEM_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
 MEM_STATIC void MEM_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
@@ -120,19 +117,28 @@ MEM_STATIC void MEM_write64(void* memPtr, U64 value) { *(U64*)memPtr = value; }
 
 /* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
 /* currently only defined for gcc and icc */
-typedef struct { U16 v; } __attribute__((packed))    unalign_u16;
-typedef struct { U32 v; } __attribute__((packed))    unalign_u32;
-typedef struct { U64 v; } __attribute__((packed))    unalign_u64;
-typedef struct { size_t v; } __attribute__((packed)) unalign_ust;
+#if defined(_MSC_VER) || (defined(__INTEL_COMPILER) && defined(WIN32))
+    __pragma( pack(push, 1) )
+    typedef struct { U16 v; } unalign16;
+    typedef struct { U32 v; } unalign32;
+    typedef struct { U64 v; } unalign64;
+    typedef struct { size_t v; } unalignArch;
+    __pragma( pack(pop) )
+#else
+    typedef struct { U16 v; } __attribute__((packed)) unalign16;
+    typedef struct { U32 v; } __attribute__((packed)) unalign32;
+    typedef struct { U64 v; } __attribute__((packed)) unalign64;
+    typedef struct { size_t v; } __attribute__((packed)) unalignArch;
+#endif
 
-MEM_STATIC U16 MEM_read16(const void* ptr) { return ((const unalign_u16*)ptr)->v; }
-MEM_STATIC U32 MEM_read32(const void* ptr) { return ((const unalign_u32*)ptr)->v; }
-MEM_STATIC U64 MEM_read64(const void* ptr) { return ((const unalign_u64*)ptr)->v; }
-MEM_STATIC U64 MEM_readST(const void* ptr) { return ((const unalign_ust*)ptr)->v; }
+MEM_STATIC U16 MEM_read16(const void* ptr) { return ((const unalign16*)ptr)->v; }
+MEM_STATIC U32 MEM_read32(const void* ptr) { return ((const unalign32*)ptr)->v; }
+MEM_STATIC U64 MEM_read64(const void* ptr) { return ((const unalign64*)ptr)->v; }
+MEM_STATIC size_t MEM_readST(const void* ptr) { return ((const unalignArch*)ptr)->v; }
 
-MEM_STATIC void MEM_write16(void* memPtr, U16 value) { ((unalign_u16*)memPtr)->v = value; }
-MEM_STATIC void MEM_write32(void* memPtr, U32 value) { ((unalign_u32*)memPtr)->v = value; }
-MEM_STATIC void MEM_write64(void* memPtr, U64 value) { ((unalign_u64*)memPtr)->v = value; }
+MEM_STATIC void MEM_write16(void* memPtr, U16 value) { ((unalign16*)memPtr)->v = value; }
+MEM_STATIC void MEM_write32(void* memPtr, U32 value) { ((unalign32*)memPtr)->v = value; }
+MEM_STATIC void MEM_write64(void* memPtr, U64 value) { ((unalign64*)memPtr)->v = value; }
 
 #else
 
@@ -348,20 +354,6 @@ MEM_STATIC void MEM_writeBEST(void* memPtr, size_t val)
         MEM_writeBE64(memPtr, (U64)val);
 }
 
-
-/* function safe only for comparisons */
-MEM_STATIC U32 MEM_readMINMATCH(const void* memPtr, U32 length)
-{
-    switch (length)
-    {
-    default :
-    case 4 : return MEM_read32(memPtr);
-    case 3 : if (MEM_isLittleEndian())
-                return MEM_read32(memPtr)<<8;
-             else
-                return MEM_read32(memPtr)>>8;
-    }
-}
 
 #if defined (__cplusplus)
 }
