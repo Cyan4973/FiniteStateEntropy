@@ -49,18 +49,19 @@
 ****************************************************************/
 #define HUF_isError ERR_isError
 #define HUF_STATIC_ASSERT(c) { enum { HUF_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+#define CHECK_F(f) { size_t const err_ = (f); if (HUF_isError(err_)) return err_; }
 
 
 /* **************************************************************
 *  Byte alignment for workSpace management
 ****************************************************************/
-#define HUF_ALIGN(x, a) HUF_ALIGN_MASK((x), (a) - 1)
+#define HUF_ALIGN(x, a)         HUF_ALIGN_MASK((x), (a) - 1)
 #define HUF_ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
+
 
 /*-***************************/
 /*  generic DTableDesc       */
 /*-***************************/
-
 typedef struct { BYTE maxTableLog; BYTE tableType; BYTE tableLog; BYTE reserved; } DTableDesc;
 
 static DTableDesc HUF_getDTableDesc(const HUF_DTable* table)
@@ -74,7 +75,6 @@ static DTableDesc HUF_getDTableDesc(const HUF_DTable* table)
 /*-***************************/
 /*  single-symbol decoding   */
 /*-***************************/
-
 typedef struct { BYTE byte; BYTE nbBits; } HUF_DEltX2;   /* single-symbol decoding */
 
 size_t HUF_readDTableX2_wksp(HUF_DTable* DTable, const void* src, size_t srcSize, void* workSpace, size_t wkspSize)
