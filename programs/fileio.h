@@ -47,6 +47,7 @@ static char const stdoutmark[] = "stdout";
 **************************************/
 typedef enum { FIO_fse, FIO_huf, FIO_zlibh } FIO_compressor_t;
 void FIO_setCompressor(FIO_compressor_t c);
+void FIO_setDisplayLevel(int dlevel);
 void FIO_overwriteMode(void);
 
 

@@ -52,6 +52,7 @@
 #include <stdlib.h>   /* malloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include <time.h>     /* clock */
+#include <assert.h>   /* assert */
 #include "fileio.h"
 #include "fse.h"
 #include "huf.h"
@@ -157,8 +158,9 @@ static U32 FIO_readLE32(const void* memPtr)
 *  Macros
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
+
+static int g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
             if ((FIO_GetMilliSpan(g_time) > refreshRate) || (g_displayLevel>=4)) \
@@ -177,6 +179,7 @@ FIO_compressor_t g_compressor = FIO_fse;
 
 void FIO_overwriteMode(void) { g_overwrite=1; }
 void FIO_setCompressor(FIO_compressor_t c) { g_compressor = c; }
+void FIO_setDisplayLevel(int dlevel) { g_displayLevel = dlevel; }
 
 
 /*-************************************
@@ -340,6 +343,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
         {
         size_t headerSize;
         case 0: /* raw */
+            DISPLAYLEVEL(6, "packing uncompressed block, of size %zu \n", inSize);
             if (inSize == inputBlockSize) {
                 out_buff[0] = (BYTE)((bt_raw << 6) + BIT5);
                 headerSize = 1;
@@ -356,6 +360,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
             compressedfilesize += inSize + headerSize;
             break;
         case 1: /* rle */
+            DISPLAYLEVEL(6, "packing RLE block, of size %zu \n", inSize);
             if (inSize == inputBlockSize) {
                 out_buff[0] = (BYTE)((bt_rle << 6) + BIT5);
                 headerSize = 1;
@@ -371,10 +376,13 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
             compressedfilesize += headerSize + 1;
             break;
         default : /* compressed */
+            DISPLAYLEVEL(6, "packing compressed block, of size %zu, into %zu bytes \n",
+                            inSize, cSize);
             if (inSize == inputBlockSize) {
-                out_buff[0] = (BYTE)((bt_compressed << 6) + BIT5);
-                out_buff[1] = (BYTE)(cSize >> 8);
-                out_buff[2] = (BYTE)cSize;
+                out_buff[2] = (BYTE)((bt_compressed << 6) + BIT5);
+                DISPLAYLEVEL(7, "generated block descriptor : %u \n", out_buff[2]);
+                out_buff[3] = (BYTE)(cSize >> 8);
+                out_buff[4] = (BYTE)cSize;
                 headerSize = 3;
             } else {
                 out_buff[0] = (BYTE)(bt_compressed << 6);
@@ -471,12 +479,15 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
         switch(FIO_readLE32(header))   /* magic number */
         {
         case FIO_magicNumber_fse:
+            DISPLAYLEVEL(5, "compressed with fse \n");
             decompressor = FSE_decompress;
             break;
         case FIO_magicNumber_huf:
+            DISPLAYLEVEL(5, "compressed with huff0 \n");
             decompressor = HUF_decompress;
             break;
         case FIO_magicNumber_zlibh:
+            DISPLAYLEVEL(5, "compressed with zlib's huffman \n");
             decompressor = FIO_ZLIBH_decompress;
             break;
         default :
@@ -494,7 +505,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
     out_buff = (BYTE*)malloc(blockSize);
     if (!in_buff || !out_buff) EXM_THROW(33, "Allocation error : not enough memory");
 
-    /* read first bHeader */
+    /* read first block header */
     { size_t const sizeCheck = fread(in_buff, 1, 1, finput);
       if (sizeCheck != 1) EXM_THROW(34, "Read error : cannot read header\n");
       ip = in_buff;
@@ -502,17 +513,21 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
 
     /* Main Loop */
     while (1) {
-        size_t readSize, bType, rSize=0, cSize;
+        size_t rSize=blockSize, cSize;
 
         /* Decode header */
-        bType = (ip[0] & (BIT7+BIT6)) >> 6;
+        int const bType = (ip[0] & (BIT7+BIT6)) >> 6;
+        DISPLAYLEVEL(6, "next block type == %i \n", bType);
+        DISPLAYLEVEL(7, "read block descriptor : %u \n", ip[0]);
         if (bType == bt_crc) break;   /* end - frame content CRC */
-        rSize = blockSize;
-        if (!(ip[0] & BIT5)) {   /* non full block */
-            size_t const sizeCheck = fread(in_buff, 1, 2, finput);
-            if (sizeCheck != 2) EXM_THROW(35, "Read error : cannot read header\n");
-            rSize = (in_buff[0]<<8) + in_buff[1];
-        }
+
+        {   int const fullBlock = ip[0] & BIT5;
+            DISPLAYLEVEL(6, "next block is full ? ==> %i \n", !!fullBlock);
+            if (!fullBlock) {
+                size_t const sizeCheck = fread(in_buff, 1, 2, finput);
+                if (sizeCheck != 2) EXM_THROW(35, "Read error : cannot read header\n");
+                rSize = (in_buff[0]<<8) + in_buff[1];
+        }   }
 
         switch(bType)
         {
@@ -529,15 +544,18 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
             cSize = 1;
             break;
           default :
-            EXM_THROW(37, "unknown block header");   /* should not happen */
+          case bt_crc :
+            assert(0);   /* supposed already eliminated at this stage */
         }
+
+        DISPLAYLEVEL(6, "next block has a compressed size of %zu, and an original size of %zu \n",
+                        cSize, rSize);
 
         /* Fill input buffer */
         {   size_t const toReadSize = cSize + 1;
-            readSize = fread(in_buff, 1, toReadSize, finput);
-            if (readSize != toReadSize)
-                EXM_THROW(38, "Read error");
-            ip = in_buff + cSize;
+            size_t const readSize = fread(in_buff, 1, toReadSize, finput);
+            if (readSize != toReadSize) EXM_THROW(38, "Read error");
+            ip = in_buff + cSize;   /* end - 1 */
         }
 
         /* Decode block */
@@ -545,7 +563,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
         {
           case bt_compressed :
             rSize = decompressor(out_buff, rSize, in_buff, cSize);
-            if (FSE_isError(rSize)) EXM_THROW(39, "Decoding error : %s", FSE_getErrorName(rSize));
+            if (FSE_isError(rSize))
+                EXM_THROW(39, "Decoding error : %s", FSE_getErrorName(rSize));
             break;
           case bt_raw :
             /* will read directly from in_buff, so no need to memcpy */
@@ -554,7 +573,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
             memset(out_buff, in_buff[0], rSize);
             break;
           default :
-            EXM_THROW(40, "unknown block header");   /* should not happen */
+          case bt_crc :
+            assert(0);   /* supposed already eliminated at this stage */
         }
 
         /* Write block */
@@ -574,7 +594,8 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
             filesize += cSize;
             break;
           default :
-            EXM_THROW(41, "unknown block header");   /* should not happen */
+          case bt_crc :
+            assert(0);   /* supposed already eliminated at this stage */
         }
     }
 

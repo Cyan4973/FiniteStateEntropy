@@ -82,8 +82,8 @@
 /*-*************************************************
 *  Local variables
 ***************************************************/
-static int   displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
-static int   fse_pause = 0;
+static int displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
+static int fse_pause = 0;
 
 
 /*-*************************************************
@@ -194,7 +194,7 @@ int main(int argc, const char** argv)
                 case 'f': FIO_overwriteMode(); break;
 
                     // Verbose mode
-                case 'v': displayLevel=4; break;
+                case 'v': displayLevel++; break;
 
                     // Quiet mode
                 case 'q': displayLevel--; break;
@@ -257,8 +257,6 @@ int main(int argc, const char** argv)
         if (!output_filename) { output_filename=argument; continue; }
     }
 
-    /* DISPLAYLEVEL(3, WELCOME_MESSAGE); */
-
     /* No input filename ==> use stdin */
     if(!input_filename) { input_filename=stdinmark; }
 
@@ -273,11 +271,11 @@ int main(int argc, const char** argv)
     while (!output_filename) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   // Default to stdout whenever possible (i.e. not a console)
         if ((!decode) && !(forceCompress)) {   // auto-determine compression or decompression, based on file extension
-            size_t l = strlen(input_filename);
+            size_t const l = strlen(input_filename);
             if (!strcmp(input_filename+(l-4), FSE_EXTENSION)) decode=1;
         }
         if (!decode) {   /* compression to file */
-            size_t l = strlen(input_filename);
+            size_t const l = strlen(input_filename);
             if (tmpFilenameSize < l+6) tmpFilenameSize = l+6;
             tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
             if (tmpFilenameBuffer==NULL) {
@@ -292,7 +290,7 @@ int main(int argc, const char** argv)
         }
         /* decompression to file (automatic name will work only if input filename has correct format extension) */
         {   size_t outl;
-            size_t inl = strlen(input_filename);
+            size_t const inl = strlen(input_filename);
             if (tmpFilenameSize < inl+2) tmpFilenameSize = inl+2;
             tmpFilenameBuffer = (char*)calloc(1,tmpFilenameSize);
             strcpy(tmpFilenameBuffer, input_filename);
@@ -312,6 +310,7 @@ int main(int argc, const char** argv)
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin) ) badusage(programName);
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout)) badusage(programName);
 
+    FIO_setDisplayLevel(displayLevel);
     if (decode) FIO_decompressFilename(output_filename, input_filename);
     else {
         FIO_setCompressor(compressor);
