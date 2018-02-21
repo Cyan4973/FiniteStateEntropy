@@ -55,12 +55,13 @@
 /*-************************************
 *  Includes
 ***************************************/
-#include <stdlib.h>      /* malloc */
-#include <stdio.h>       /* fprintf, fopen, ftello64 */
-#include <string.h>      // strcat
-#include <sys/types.h>   // stat64
-#include <sys/stat.h>    // stat64
-#include <time.h>        /* clock_t */
+#include <stdlib.h>     /* malloc, free */
+#include <stdio.h>      /* fprintf, fopen, ftello64 */
+#include <string.h>     /* strcat */
+#include <sys/types.h>  /* stat64 */
+#include <sys/stat.h>   /* stat64 */
+#include <time.h>       /* clock_t */
+#include <assert.h>     /* assert */
 
 #include "mem.h"
 #include "bench.h"
@@ -291,6 +292,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
     double fastestC = 100000000., fastestD = 100000000.;
     double ratio = 0.;
     U32 crcCheck = 0;
+    int nbDecodeLoops = ((100 MB) / (benchedSize+1)) + 1;
     U32 const crcOrig = XXH32(chunkP[0].origBuffer, benchedSize,0);
     size_t (*compressor)(void* dst, size_t, const void* src, size_t, unsigned, unsigned);
     size_t (*decompressor)(void* dst, size_t maxDstSize, const void* cSrc, size_t cSrcSize);
@@ -365,11 +367,10 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
         /* Decompression */
         { int i; for (i=0; i<benchedSize; i++) chunkP[0].destBuffer[i]=0; }     /* zeroing area, for CRC checking */
 
-        nbLoops = 0;
         clockStart = clock();
         while(clock() == clockStart);
         clockStart = clock();
-        while(BMK_clockSpan(clockStart) < TIMELOOP) {
+        for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                 size_t regenSize;
 
@@ -405,17 +406,23 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
                              chunkNb, (U32)chunkP[chunkNb].compressedSize, FSE_getErrorName(regenSize));
                     return;
             }   }
-            nbLoops++;
         }
         clockDuration = BMK_clockSpan(clockStart);
 
-        if ((double)clockDuration < fastestD * nbLoops * CLOCKS_PER_SEC)
-            fastestD = (double)clockDuration / CLOCKS_PER_SEC / nbLoops;
+        if (clockDuration > 0) {
+            if ((double)clockDuration < fastestD * nbDecodeLoops * CLOCKS_PER_SEC)
+                fastestD = (double)clockDuration / CLOCKS_PER_SEC / nbDecodeLoops;
+            assert(fastestD > 1./1000000000);   /* avoid overflow */
+            nbDecodeLoops = (U32)(1. / fastestD) + 1;   /* aims for ~1sec */
+        } else {
+            assert(nbDecodeLoops < 20000000);  /* avoid overflow */
+            nbDecodeLoops *= 100;
+        }
         DISPLAY("%1i-%-15.15s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r",
                  trial, inFileName, (int)benchedSize,
                  (int)cSize, ratio,
-                 (double)benchedSize / fastestC / 1000000.,
-                 (double)benchedSize / fastestD / 1000000.);
+                 (double)benchedSize / (1 MB) / fastestC,
+                 (double)benchedSize / (1 MB) / fastestD);
 
         /* CRC Checking */
         crcCheck = XXH32(chunkP[0].destBuffer, benchedSize, 0);
@@ -434,14 +441,14 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
             DISPLAY("%-17.17s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n",
                      inFileName, (int)benchedSize,
                      (int)cSize, ratio,
-                     (double)benchedSize / fastestC / 1000000.,
-                     (double)benchedSize / fastestD / 1000000.);
+                     (double)benchedSize / (1 MB) / fastestC,
+                     (double)benchedSize / (1 MB) / fastestD);
         else
             DISPLAY("%-17.17s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n",
                      inFileName, (int)benchedSize,
                      (int)cSize, ratio,
-                     (double)benchedSize / fastestC / 1000000.,
-                     (double)benchedSize / fastestD / 1000000.);
+                     (double)benchedSize / (1 MB) / fastestC,
+                     (double)benchedSize / (1 MB) / fastestD);
     }
     else DISPLAY("\n");
     *totalCompressedSize    += cSize;

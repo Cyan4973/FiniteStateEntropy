@@ -1086,7 +1086,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
 
     /* Bench */
     DISPLAY("\r%79s\r", "");
-    {
+    {   int nbLoops = ((100 MB) / (benchedSize+1)) + 1;   /* initial speed evaluation */
         double bestTime = 999.;
         U32 benchNb=1;
         DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
@@ -1098,14 +1098,19 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             clockStart = clock();
             while(clock() == clockStart);
             clockStart = clock();
-            {   U32 loopNb;
-                for (loopNb=0; BMK_clockSpan(clockStart) < TIMELOOP; loopNb++) {
+            {   int loopNb;
+                for (loopNb=0; loopNb < nbLoops; loopNb++) {
                     resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
                     if (0 && FSE_isError(resultCode)) {
                             DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(resultCode));
                             exit(-1);
-                }   }
-                averageTime = (double)BMK_clockSpan(clockStart) / loopNb / CLOCKS_PER_SEC;
+            }   }   }
+            averageTime = (double)BMK_clockSpan(clockStart) / nbLoops / CLOCKS_PER_SEC;
+            if (averageTime > 0.) {
+                nbLoops = (U32)(1. / averageTime) + 1;   /*aim for 1sec*/
+            } else {
+                assert(nbLoops < 20000000);  /* avoid overflow */
+                nbLoops *= 100;
             }
             if (averageTime < bestTime) bestTime = averageTime;
             DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6u) \r",
