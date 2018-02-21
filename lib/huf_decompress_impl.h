@@ -17,29 +17,6 @@
 #endif
 
 
-HINT_INLINE TARGET size_t FUNCTION(HUF_decodeStreamX2)(BYTE* p, BIT_DStream_t* const bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
-{
-    BYTE* const pStart = p;
-
-    /* up to 4 symbols at a time */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-4)) {
-        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_1(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-    }
-
-    /* closer to the end */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p < pEnd))
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-
-    /* no more data to retrieve from bitstream, hence no need to reload */
-    while (p < pEnd)
-        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
-
-    return pEnd-pStart;
-}
-
 static TARGET size_t FUNCTION(HUF_decompress1X2_usingDTable_internal)(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
@@ -55,7 +32,7 @@ static TARGET size_t FUNCTION(HUF_decompress1X2_usingDTable_internal)(
 
     CHECK_F( BIT_initDStream(&bitD, cSrc, cSrcSize) );
 
-    FUNCTION(HUF_decodeStreamX2)(op, &bitD, oend, dt, dtLog);
+    HUF_decodeStreamX2(op, &bitD, oend, dt, dtLog);
 
     if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
 
@@ -142,10 +119,10 @@ FUNCTION(HUF_decompress4X2_usingDTable_internal)(
         /* note : op4 supposed already verified within main loop */
 
         /* finish bitStreams one by one */
-        FUNCTION(HUF_decodeStreamX2)(op1, &bitD1, opStart2, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX2)(op2, &bitD2, opStart3, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX2)(op3, &bitD3, opStart4, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX2)(op4, &bitD4, oend,     dt, dtLog);
+        HUF_decodeStreamX2(op1, &bitD1, opStart2, dt, dtLog);
+        HUF_decodeStreamX2(op2, &bitD2, opStart3, dt, dtLog);
+        HUF_decodeStreamX2(op3, &bitD3, opStart4, dt, dtLog);
+        HUF_decodeStreamX2(op4, &bitD4, oend,     dt, dtLog);
 
         /* check */
         { U32 const endCheck = BIT_endOfDStream(&bitD1) & BIT_endOfDStream(&bitD2) & BIT_endOfDStream(&bitD3) & BIT_endOfDStream(&bitD4);

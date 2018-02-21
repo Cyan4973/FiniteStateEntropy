@@ -165,6 +165,30 @@ static BYTE HUF_decodeSymbolX2(BIT_DStream_t* Dstream, const HUF_DEltX2* dt, con
     if (MEM_64bits()) \
         HUF_DECODE_SYMBOLX2_0(ptr, DStreamPtr)
 
+HINT_INLINE size_t
+HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* const bitDPtr, BYTE* const pEnd, const HUF_DEltX2* const dt, const U32 dtLog)
+{
+    BYTE* const pStart = p;
+
+    /* up to 4 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p <= pEnd-4)) {
+        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_1(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+    }
+
+    /* closer to the end */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) && (p < pEnd))
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+
+    /* no more data to retrieve from bitstream, hence no need to reload */
+    while (p < pEnd)
+        HUF_DECODE_SYMBOLX2_0(p, bitDPtr);
+
+    return pEnd-pStart;
+}
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET
