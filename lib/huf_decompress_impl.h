@@ -17,22 +17,6 @@
 #endif
 
 
-static TARGET U32 FUNCTION(HUF_decodeLastSymbolX4)(void* op, BIT_DStream_t* DStream, const HUF_DEltX4* dt, const U32 dtLog)
-{
-    size_t const val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
-    memcpy(op, dt+val, 1);
-    if (dt[val].length==1) BIT_skipBits(DStream, dt[val].nbBits);
-    else {
-        if (DStream->bitsConsumed < (sizeof(DStream->bitContainer)*8)) {
-            BIT_skipBits(DStream, dt[val].nbBits);
-            if (DStream->bitsConsumed > (sizeof(DStream->bitContainer)*8))
-                /* ugly hack; works only because it's the last symbol. Note : can't easily extract nbBits from just this symbol */
-                DStream->bitsConsumed = (sizeof(DStream->bitContainer)*8);
-    }   }
-    return 1;
-}
-
-
 #define HUF_DECODE_SYMBOLX4_0(ptr, DStreamPtr) \
     ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
 
@@ -64,7 +48,7 @@ HINT_INLINE TARGET size_t FUNCTION(HUF_decodeStreamX4)(BYTE* p, BIT_DStream_t* b
         HUF_DECODE_SYMBOLX4_0(p, bitDPtr);   /* no need to reload : reached the end of DStream */
 
     if (p < pEnd)
-        p += FUNCTION(HUF_decodeLastSymbolX4)(p, bitDPtr, dt, dtLog);
+        p += HUF_decodeLastSymbolX4(p, bitDPtr, dt, dtLog);
 
     return p-pStart;
 }

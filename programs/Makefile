@@ -29,7 +29,7 @@ RELEASE    = v0.3.2
 FSEDIR     = ../lib
 
 ifeq ($(shell $(CC) -v 2>&1 | grep -c "gcc version "), 1)
-ALIGN_LOOP = -falign-loops=32
+ALIGN_LOOP = # -falign-functions=16 # -falign-loops=32
 else
 ALIGN_LOOP =
 endif

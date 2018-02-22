@@ -333,6 +333,22 @@ static U32 HUF_decodeSymbolX4(void* op, BIT_DStream_t* DStream, const HUF_DEltX4
     return dt[val].length;
 }
 
+FORCE_INLINE_TEMPLATE U32
+HUF_decodeLastSymbolX4(void* op, BIT_DStream_t* DStream, const HUF_DEltX4* dt, const U32 dtLog)
+{
+    size_t const val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    memcpy(op, dt+val, 1);
+    if (dt[val].length==1) BIT_skipBits(DStream, dt[val].nbBits);
+    else {
+        if (DStream->bitsConsumed < (sizeof(DStream->bitContainer)*8)) {
+            BIT_skipBits(DStream, dt[val].nbBits);
+            if (DStream->bitsConsumed > (sizeof(DStream->bitContainer)*8))
+                /* ugly hack; works only because it's the last symbol. Note : can't easily extract nbBits from just this symbol */
+                DStream->bitsConsumed = (sizeof(DStream->bitContainer)*8);
+    }   }
+    return 1;
+}
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET
