@@ -349,6 +349,44 @@ HUF_decodeLastSymbolX4(void* op, BIT_DStream_t* DStream, const HUF_DEltX4* dt, c
     return 1;
 }
 
+#define HUF_DECODE_SYMBOLX4_0(ptr, DStreamPtr) \
+    ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
+
+#define HUF_DECODE_SYMBOLX4_1(ptr, DStreamPtr) \
+    if (MEM_64bits() || (HUF_TABLELOG_MAX<=12)) \
+        ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
+
+#define HUF_DECODE_SYMBOLX4_2(ptr, DStreamPtr) \
+    if (MEM_64bits()) \
+        ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
+
+HINT_INLINE size_t
+HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd,
+                const HUF_DEltX4* const dt, const U32 dtLog)
+{
+    BYTE* const pStart = p;
+
+    /* up to 8 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) & (p < pEnd-(sizeof(bitDPtr->bitContainer)-1))) {
+        HUF_DECODE_SYMBOLX4_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX4_1(p, bitDPtr);
+        HUF_DECODE_SYMBOLX4_2(p, bitDPtr);
+        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);
+    }
+
+    /* closer to end : up to 2 symbols at a time */
+    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) & (p <= pEnd-2))
+        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);
+
+    while (p <= pEnd-2)
+        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);   /* no need to reload : reached the end of DStream */
+
+    if (p < pEnd)
+        p += HUF_decodeLastSymbolX4(p, bitDPtr, dt, dtLog);
+
+    return p-pStart;
+}
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET

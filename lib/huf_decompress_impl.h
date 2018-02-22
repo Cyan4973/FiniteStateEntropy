@@ -17,41 +17,6 @@
 #endif
 
 
-#define HUF_DECODE_SYMBOLX4_0(ptr, DStreamPtr) \
-    ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
-
-#define HUF_DECODE_SYMBOLX4_1(ptr, DStreamPtr) \
-    if (MEM_64bits() || (HUF_TABLELOG_MAX<=12)) \
-        ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
-
-#define HUF_DECODE_SYMBOLX4_2(ptr, DStreamPtr) \
-    if (MEM_64bits()) \
-        ptr += HUF_decodeSymbolX4(ptr, DStreamPtr, dt, dtLog)
-
-HINT_INLINE TARGET size_t FUNCTION(HUF_decodeStreamX4)(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd, const HUF_DEltX4* const dt, const U32 dtLog)
-{
-    BYTE* const pStart = p;
-
-    /* up to 8 symbols at a time */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) & (p < pEnd-(sizeof(bitDPtr->bitContainer)-1))) {
-        HUF_DECODE_SYMBOLX4_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX4_1(p, bitDPtr);
-        HUF_DECODE_SYMBOLX4_2(p, bitDPtr);
-        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);
-    }
-
-    /* closer to end : up to 2 symbols at a time */
-    while ((BIT_reloadDStream(bitDPtr) == BIT_DStream_unfinished) & (p <= pEnd-2))
-        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);
-
-    while (p <= pEnd-2)
-        HUF_DECODE_SYMBOLX4_0(p, bitDPtr);   /* no need to reload : reached the end of DStream */
-
-    if (p < pEnd)
-        p += HUF_decodeLastSymbolX4(p, bitDPtr, dt, dtLog);
-
-    return p-pStart;
-}
 
 static TARGET size_t FUNCTION(HUF_decompress1X4_usingDTable_internal)(
           void* dst,  size_t dstSize,
@@ -69,7 +34,7 @@ static TARGET size_t FUNCTION(HUF_decompress1X4_usingDTable_internal)(
         const void* const dtPtr = DTable+1;   /* force compiler to not use strict-aliasing */
         const HUF_DEltX4* const dt = (const HUF_DEltX4*)dtPtr;
         DTableDesc const dtd = HUF_getDTableDesc(DTable);
-        FUNCTION(HUF_decodeStreamX4)(ostart, &bitD, oend, dt, dtd.tableLog);
+        HUF_decodeStreamX4(ostart, &bitD, oend, dt, dtd.tableLog);
     }
 
     /* check */
@@ -153,10 +118,10 @@ static TARGET size_t FUNCTION(HUF_decompress4X4_usingDTable_internal)(
         /* note : op4 already verified within main loop */
 
         /* finish bitStreams one by one */
-        FUNCTION(HUF_decodeStreamX4)(op1, &bitD1, opStart2, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX4)(op2, &bitD2, opStart3, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX4)(op3, &bitD3, opStart4, dt, dtLog);
-        FUNCTION(HUF_decodeStreamX4)(op4, &bitD4, oend,     dt, dtLog);
+        HUF_decodeStreamX4(op1, &bitD1, opStart2, dt, dtLog);
+        HUF_decodeStreamX4(op2, &bitD2, opStart3, dt, dtLog);
+        HUF_decodeStreamX4(op3, &bitD3, opStart4, dt, dtLog);
+        HUF_decodeStreamX4(op4, &bitD4, oend,     dt, dtLog);
 
         /* check */
         { U32 const endCheck = BIT_endOfDStream(&bitD1) & BIT_endOfDStream(&bitD2) & BIT_endOfDStream(&bitD3) & BIT_endOfDStream(&bitD4);
@@ -166,7 +131,3 @@ static TARGET size_t FUNCTION(HUF_decompress4X4_usingDTable_internal)(
         return dstSize;
     }
 }
-
-#undef HUF_DECODE_SYMBOLX4_0
-#undef HUF_DECODE_SYMBOLX4_1
-#undef HUF_DECODE_SYMBOLX4_2
