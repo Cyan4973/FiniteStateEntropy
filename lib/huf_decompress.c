@@ -189,6 +189,38 @@ HUF_decodeStreamX2(BYTE* p, BIT_DStream_t* const bitDPtr, BYTE* const pEnd, cons
     return pEnd-pStart;
 }
 
+FORCE_INLINE_TEMPLATE size_t
+HUF_decompress1X2_usingDTable_internal_body(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    BYTE* op = (BYTE*)dst;
+    BYTE* const oend = op + dstSize;
+    const void* dtPtr = DTable + 1;
+    const HUF_DEltX2* const dt = (const HUF_DEltX2*)dtPtr;
+    BIT_DStream_t bitD;
+    DTableDesc const dtd = HUF_getDTableDesc(DTable);
+    U32 const dtLog = dtd.tableLog;
+
+    CHECK_F( BIT_initDStream(&bitD, cSrc, cSrcSize) );
+
+    HUF_decodeStreamX2(op, &bitD, oend, dt, dtLog);
+
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    return dstSize;
+}
+
+static size_t
+HUF_decompress1X2_usingDTable_internal_default(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    return HUF_decompress1X2_usingDTable_internal_body(dst, dstSize, cSrc, cSrcSize, DTable);
+}
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET
@@ -211,6 +243,15 @@ typedef size_t (*HUF_decompress_usingDTable_t)(void *dst, size_t dstSize,
                                                size_t cSrcSize,
                                                const HUF_DTable *DTable);
 #if DYNAMIC_BMI2
+
+static TARGET_ATTRIBUTE("bmi2") size_t
+HUF_decompress1X2_usingDTable_internal_bmi2(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    return HUF_decompress1X2_usingDTable_internal_body(dst, dstSize, cSrc, cSrcSize, DTable);
+}
 
 #define X(fn)                                                                  \
     static size_t fn(void* dst, size_t dstSize, void const* cSrc,              \
@@ -240,6 +281,7 @@ X(HUF_decompress1X4_usingDTable_internal)
 X(HUF_decompress4X4_usingDTable_internal)
 
 #undef X
+
 
 size_t HUF_decompress1X2_usingDTable(
           void* dst,  size_t dstSize,

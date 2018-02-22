@@ -16,29 +16,6 @@
 #  error "TARGET must be defined"
 #endif
 
-
-static TARGET size_t FUNCTION(HUF_decompress1X2_usingDTable_internal)(
-          void* dst,  size_t dstSize,
-    const void* cSrc, size_t cSrcSize,
-    const HUF_DTable* DTable)
-{
-    BYTE* op = (BYTE*)dst;
-    BYTE* const oend = op + dstSize;
-    const void* dtPtr = DTable + 1;
-    const HUF_DEltX2* const dt = (const HUF_DEltX2*)dtPtr;
-    BIT_DStream_t bitD;
-    DTableDesc const dtd = HUF_getDTableDesc(DTable);
-    U32 const dtLog = dtd.tableLog;
-
-    CHECK_F( BIT_initDStream(&bitD, cSrc, cSrcSize) );
-
-    HUF_decodeStreamX2(op, &bitD, oend, dt, dtLog);
-
-    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
-
-    return dstSize;
-}
-
 static TARGET size_t
 FUNCTION(HUF_decompress4X2_usingDTable_internal)(
           void* dst,  size_t dstSize,
