@@ -325,6 +325,15 @@ HUF_decompress4X2_usingDTable_internal_default(
 }
 
 
+static U32 HUF_decodeSymbolX4(void* op, BIT_DStream_t* DStream, const HUF_DEltX4* dt, const U32 dtLog)
+{
+    size_t const val = BIT_lookBitsFast(DStream, dtLog);   /* note : dtLog >= 1 */
+    memcpy(op, dt+val, 2);
+    BIT_skipBits(DStream, dt[val].nbBits);
+    return dt[val].length;
+}
+
+
 #define FUNCTION(fn) fn##_default
 #define TARGET
 #include "huf_decompress_impl.h"
