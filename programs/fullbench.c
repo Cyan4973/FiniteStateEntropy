@@ -476,13 +476,17 @@ static U32    g_tableLog;
 static U32    g_CTable[2350];
 static U32    g_DTable[FSE_DTABLE_SIZE_U32(12)];
 static U32    g_max;
+static U32    g_bmi2 = 0;
 static size_t g_skip;
 static size_t g_cSize;
 static size_t g_oSize;
 #define DTABLE_LOG 12
 HUF_CREATE_STATIC_DTABLEX4(g_huff_dtable, DTABLE_LOG);
 
-static void BMK_init(void) { g_tree = (HUF_CElt*) g_treeVoidPtr; }
+static void BMK_init(void) {
+    g_tree = (HUF_CElt*) g_treeVoidPtr;
+    g_bmi2 = ZSTD_cpuid_bmi2(ZSTD_cpuid());
+}
 
 static int local_HUF_buildCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -652,7 +656,7 @@ static int local_HUF_decompress_usingDTable(void* dst, size_t maxDstSize, const 
 static int local_HUF_decompress4X_usingDTable_bmi2(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)srcSize; (void)maxDstSize;
-    return (int)HUF_decompress4X_usingDTable_bmi2(dst, g_oSize, src, g_cSize, g_huff_dtable, ZSTD_cpuid_bmi2(ZSTD_cpuid()));
+    return (int)HUF_decompress4X_usingDTable_bmi2(dst, g_oSize, src, g_cSize, g_huff_dtable, g_bmi2);
 }
 
 static int local_HUF_decompress1X2_usingDTable(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
@@ -670,7 +674,7 @@ static int local_HUF_decompress1X4_usingDTable(void* dst, size_t maxDstSize, con
 static int local_HUF_decompress1X_usingDTable_bmi2(void* dst, size_t maxDstSize, const void* src, size_t srcSize)
 {
     (void)srcSize; (void)maxDstSize;
-    return (int)HUF_decompress1X_usingDTable_bmi2(dst, g_oSize, src, g_cSize, g_huff_dtable, ZSTD_cpuid_bmi2(ZSTD_cpuid()));
+    return (int)HUF_decompress1X_usingDTable_bmi2(dst, g_oSize, src, g_cSize, g_huff_dtable, g_bmi2);
 }
 
 
