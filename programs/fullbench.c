@@ -333,7 +333,7 @@ static int local_hist_8_32(void* dst, size_t dstSize, const void* src, size_t sr
         c5[(unsigned char) d ]++;
         c6[ c>>8 ]++;
         c7[ d>>8 ]++;
-        c = cp,	d = *(++ip32); cp = *(++ip32);
+        c = cp; d = *(++ip32); cp = *(++ip32);
         c0[(unsigned char) c ]++;
         c1[(unsigned char) d ]++;
         c2[(unsigned char)(c>>8)]++; c>>=16;
@@ -1168,10 +1168,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             {   int loopNb;
                 for (loopNb=0; loopNb < nbLoops; loopNb++) {
                     resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
-                    if (0 && FSE_isError(resultCode)) {
-                            DISPLAY("Error %s (%s)\n", funcName, FSE_getErrorName(resultCode));
-                            exit(-1);
-            }   }   }
+            }   }
             averageTime = (double)BMK_clockSpan(clockStart) / nbLoops / CLOCKS_PER_SEC;
             if (averageTime > 0.) {
                 nbLoops = (U32)(1. / averageTime) + 1;   /*aim for 1sec*/
@@ -1304,30 +1301,38 @@ int main(int argc, const char** argv)
                 case 'b':
                     argument++;
                     algNb=0;
-                    while ((*argument >='0') && (*argument <='9')) algNb*=10, algNb += *argument++ - '0';
+                    while ((*argument >='0') && (*argument <='9')) {
+                        algNb*=10; algNb += *argument++ - '0';
+                    }
                     break;
 
                     // Modify Nb loops
                 case 'i':
                     argument++;
                     nbLoops=0;
-                    while ((*argument >='0') && (*argument <='9')) nbLoops*=10, nbLoops += *argument++ - '0';
+                    while ((*argument >='0') && (*argument <='9')) {
+                        nbLoops*=10; nbLoops += *argument++ - '0';
+                    }
                     break;
 
                     // Modify data probability
                 case 'P':
                     argument++;
                     proba=0;
-                    while ((*argument >='0') && (*argument <='9')) proba*=10, proba += *argument++ - '0';
+                    while ((*argument >='0') && (*argument <='9')) {
+                        proba*=10; proba += *argument++ - '0';
+                    }
                     break;
 
                     // Modify block size
                 case 'B':
                     argument++;
                     blockSize=0;
-                    while ((*argument >='0') && (*argument <='9')) blockSize*=10, blockSize += *argument++ - '0';
-                    if (argument[0]=='K') blockSize<<=10, argument++;  /* allows using KB notation */
-                    if (argument[0]=='M') blockSize<<=20, argument++;
+                    while ((*argument >='0') && (*argument <='9')) {
+                        blockSize*=10; blockSize += *argument++ - '0';
+                    }
+                    if (argument[0]=='K') { blockSize<<=10; argument++; }  /* allows using KB notation */
+                    if (argument[0]=='M') { blockSize<<=20; argument++; }
                     if (argument[0]=='B') argument++;
                     break;
 

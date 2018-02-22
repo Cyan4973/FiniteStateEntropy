@@ -39,6 +39,9 @@ ipch/
 *.sdf
 *.cachefile
 
+# Mac OS-X artefacts
+.DS_Store
+
 # Other files
 _codelite
 tmp*
