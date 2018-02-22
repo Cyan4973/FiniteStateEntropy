@@ -18,32 +18,6 @@
 
 
 
-static TARGET size_t FUNCTION(HUF_decompress1X4_usingDTable_internal)(
-          void* dst,  size_t dstSize,
-    const void* cSrc, size_t cSrcSize,
-    const HUF_DTable* DTable)
-{
-    BIT_DStream_t bitD;
-
-    /* Init */
-    CHECK_F( BIT_initDStream(&bitD, cSrc, cSrcSize) );
-
-    /* decode */
-    {   BYTE* const ostart = (BYTE*) dst;
-        BYTE* const oend = ostart + dstSize;
-        const void* const dtPtr = DTable+1;   /* force compiler to not use strict-aliasing */
-        const HUF_DEltX4* const dt = (const HUF_DEltX4*)dtPtr;
-        DTableDesc const dtd = HUF_getDTableDesc(DTable);
-        HUF_decodeStreamX4(ostart, &bitD, oend, dt, dtd.tableLog);
-    }
-
-    /* check */
-    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
-
-    /* decoded size */
-    return dstSize;
-}
-
 static TARGET size_t FUNCTION(HUF_decompress4X4_usingDTable_internal)(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,

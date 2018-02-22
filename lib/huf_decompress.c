@@ -387,6 +387,43 @@ HUF_decodeStreamX4(BYTE* p, BIT_DStream_t* bitDPtr, BYTE* const pEnd,
     return p-pStart;
 }
 
+FORCE_INLINE_TEMPLATE size_t
+HUF_decompress1X4_usingDTable_internal_body(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    BIT_DStream_t bitD;
+
+    /* Init */
+    CHECK_F( BIT_initDStream(&bitD, cSrc, cSrcSize) );
+
+    /* decode */
+    {   BYTE* const ostart = (BYTE*) dst;
+        BYTE* const oend = ostart + dstSize;
+        const void* const dtPtr = DTable+1;   /* force compiler to not use strict-aliasing */
+        const HUF_DEltX4* const dt = (const HUF_DEltX4*)dtPtr;
+        DTableDesc const dtd = HUF_getDTableDesc(DTable);
+        HUF_decodeStreamX4(ostart, &bitD, oend, dt, dtd.tableLog);
+    }
+
+    /* check */
+    if (!BIT_endOfDStream(&bitD)) return ERROR(corruption_detected);
+
+    /* decoded size */
+    return dstSize;
+}
+
+static size_t
+HUF_decompress1X4_usingDTable_internal_default(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    return HUF_decompress1X4_usingDTable_internal_body(dst, dstSize, cSrc, cSrcSize, DTable);
+}
+
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET
@@ -426,6 +463,15 @@ HUF_decompress4X2_usingDTable_internal_bmi2(
     const HUF_DTable* DTable)
 {
     return HUF_decompress4X2_usingDTable_internal_body(dst, dstSize, cSrc, cSrcSize, DTable);
+}
+
+static TARGET_ATTRIBUTE("bmi2") size_t
+HUF_decompress1X4_usingDTable_internal_bmi2(
+          void* dst,  size_t dstSize,
+    const void* cSrc, size_t cSrcSize,
+    const HUF_DTable* DTable)
+{
+    return HUF_decompress1X4_usingDTable_internal_body(dst, dstSize, cSrc, cSrcSize, DTable);
 }
 
 #define X(fn)                                                                  \
