@@ -93,11 +93,12 @@ ERR_STATIC const char* ERR_getErrorString(ERR_enum code)
     case PREFIX(no_error): return "No error detected";
     case PREFIX(GENERIC):  return "Error (generic)";
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
-    case PREFIX(srcSize_wrong): return "Src size incorrect";
+    case PREFIX(srcSize_wrong): return "Src size is incorrect";
     case PREFIX(corruption_detected): return "Corrupted block detected";
     case PREFIX(tableLog_tooLarge): return "tableLog requires too much memory : unsupported";
     case PREFIX(maxSymbolValue_tooLarge): return "Unsupported max Symbol Value : too large";
     case PREFIX(maxSymbolValue_tooSmall): return "Specified maxSymbolValue is too small";
+    case PREFIX(workSpace_tooSmall): return "workspace buffer is too small";
     case PREFIX(maxCode):
     default: return notErrorCode;
     }
