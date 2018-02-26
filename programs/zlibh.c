@@ -1620,6 +1620,7 @@ int ZLIBH_inflate(unsigned char* dest, const unsigned char* compressed)
                 break;
             }
             state.mode = LEN;
+            /* fallthrough */
 
         case LEN:
             lcode = state.lencode;
@@ -1668,4 +1669,3 @@ int ZLIBH_decompress (char* dest, const char* compressed)
     unsigned char* op = (unsigned char*)dest;
     return ZLIBH_inflate(op, ip);
 }
-

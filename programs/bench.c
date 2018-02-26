@@ -227,7 +227,10 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
         cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
         ratio = (double)cSize/(double)benchedSize*100.;
 
-        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
+        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r",
+                loopNb, inFileName, (int)benchedSize,
+                (int)cSize, ratio,
+                (double)benchedSize / fastestC / 1000.);
 
         //DISPLAY("\n"); continue;   // skip decompression
         // Decompression
@@ -248,7 +251,11 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
         clockDuration = BMK_clockSpan(clockStart);
 
         if ((double)clockDuration < fastestC*nbLoops) fastestC = (double)clockDuration/nbLoops;
-        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+        DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r",
+                loopNb, inFileName, (int)benchedSize,
+                (int)cSize, ratio,
+                (double)benchedSize / fastestC / 1000.,
+                (double)benchedSize / fastestD / 1000.);
 
         /* CRC Checking */
         crcCheck = XXH32(chunkP[0].destBuffer, benchedSize,0);
@@ -263,9 +270,17 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
 
     if (crcOrig==crcCheck) {
         if (ratio<100.)
-            DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+            DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n",
+                    inFileName, (int)benchedSize,
+                    (int)cSize, ratio,
+                    (double)benchedSize / fastestC / 1000.,
+                    (double)benchedSize / fastestD / 1000.);
         else
-            DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n", inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
+            DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n",
+                    inFileName, (int)benchedSize,
+                    (int)cSize, ratio,
+                    (double)benchedSize / fastestC / 1000.,
+                    (double)benchedSize / fastestD / 1000.);
     }
     *totalCompressedSize    += cSize;
     *totalCompressionTime   += fastestC;
@@ -361,7 +376,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
         DISPLAY("%1i-%-15.15s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r",
                  trial, inFileName, (int)benchedSize,
                  (int)cSize, ratio,
-                 (double)benchedSize / fastestC / 1000000.);
+                 (double)benchedSize / (1 MB) / fastestC);
 
         //if (loopNb == nbIterations) DISPLAY("\n"); continue;   /* skip decompression */
         /* Decompression */
@@ -432,7 +447,8 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
             const char* const srcStart = src;
             while (*src==*fin)
                 src++, fin++;
-            DISPLAY("\n!!! %15s : Invalid Checksum !!! pos %i/%i\n", inFileName, (int)(src-srcStart), benchedSize);
+            DISPLAY("\n!!! %15s : Invalid Checksum !!! pos %i/%i\n",
+                    inFileName, (int)(src-srcStart), benchedSize);
             break;
     }   }
 
@@ -486,7 +502,9 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
         if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
         benchedSize = (size_t) BMK_findMaxMem(inFileSize * 3) / 3;
         if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
-        if (benchedSize < inFileSize) DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
+        if (benchedSize < inFileSize)
+            DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n",
+                    inFileName, (int)(benchedSize>>20));
 
         /* Allocation */
         chunkP = (chunkParameters_t*) malloc(((benchedSize / chunkSize)+1) * sizeof(chunkParameters_t));
@@ -516,7 +534,13 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
             for (i=0; i<nbChunks; i++) {
                 chunkP[i].id = i;
                 chunkP[i].origBuffer = in; in += chunkSize;
-                if (remaining > chunkSize) { chunkP[i].origSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+                if (remaining > chunkSize) {
+                    chunkP[i].origSize = chunkSize;
+                    remaining -= chunkSize;
+                } else {
+                    chunkP[i].origSize = (int)remaining;
+                    remaining = 0;
+                }
                 chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
                 chunkP[i].compressedSize = 0;
                 chunkP[i].destBuffer = dst; dst += chunkSize;
@@ -528,7 +552,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
         fclose(inFile);
 
         if (readSize != benchedSize) {
-            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n", inFileName, (int)readSize, (int)benchedSize);
+            DISPLAY("\nError: problem reading file '%s' (%i read, should be %i) !!    \n",
+                    inFileName, (int)readSize, (int)benchedSize);
             free(orig_buff);
             free(compressedBuffer);
             free(destBuffer);
@@ -552,7 +577,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles)
     if (nbFiles > 1)
         DISPLAY("%-17.17s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL",
                 (long long unsigned int)totalSourceSize, (long long unsigned int)totalCompressedSize,
-                (double)totalCompressedSize/(double)totalSourceSize*100., (double)totalSourceSize/totalc/CLOCKS_PER_SEC,
+                (double)totalCompressedSize/(double)totalSourceSize*100.,
+                (double)totalSourceSize/totalc/CLOCKS_PER_SEC,
                 (double)totalSourceSize/totald/CLOCKS_PER_SEC);
 
     return 0;
