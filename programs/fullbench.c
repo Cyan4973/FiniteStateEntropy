@@ -57,6 +57,7 @@
 #define NBLOOPS    6
 #define TIMELOOP_S 2
 #define TIMELOOP   (TIMELOOP_S * CLOCKS_PER_SEC)
+#define BENCHCLOCK_MIN (CLOCKS_PER_SEC / 4)
 #define PROBATABLESIZE 2048
 
 #define KB *(1<<10)
@@ -1154,31 +1155,42 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     /* Bench */
     DISPLAY("\r%79s\r", "");
     {   int nbLoops = ((100 MB) / (benchedSize+1)) + 1;   /* initial speed evaluation */
-        double bestTime = 999.;
+        double bestTimeS = 999.;
         U32 benchNb=1;
         DISPLAY("%2u-%-34.34s : \r", benchNb, funcName);
         for (benchNb=1; benchNb <= nbBenchs; benchNb++) {
-            clock_t clockStart;
             size_t resultCode = 0;
-            double averageTime;
 
+            clock_t clockStart = clock();
+            while(clock() == clockStart);  /* wait beginning of next tick */
             clockStart = clock();
-            while(clock() == clockStart);
-            clockStart = clock();
+
             {   int loopNb;
                 for (loopNb=0; loopNb < nbLoops; loopNb++) {
                     resultCode = func(cBuffer, cBuffSize, oBuffer, benchedSize);
             }   }
-            averageTime = (double)BMK_clockSpan(clockStart) / nbLoops / CLOCKS_PER_SEC;
-            if (averageTime > 0.) {
-                nbLoops = (U32)(1. / averageTime) + 1;   /*aim for 1sec*/
-            } else {
-                assert(nbLoops < 20000000);  /* avoid overflow */
-                nbLoops *= 100;
+
+            {   clock_t const benchClock = BMK_clockSpan(clockStart);
+                double const averageTimeS = (double)benchClock / nbLoops / CLOCKS_PER_SEC;
+
+                if (benchClock > 0) {
+                    assert(averageTimeS != 0.0);
+                    nbLoops = (U32)(1. / averageTimeS) + 1;   /*aim for 1sec*/
+                } else {
+                    assert(nbLoops < 20000000);  /* avoid overflow */
+                    nbLoops *= 100;
+                }
+
+                if (benchClock < BENCHCLOCK_MIN) {
+                    assert(benchNb > 0);
+                    benchNb--;
+                    continue;
+                }
+
+                if (averageTimeS < bestTimeS) bestTimeS = averageTimeS;
+                DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6u) \r",
+                        benchNb+1, funcName, (double)benchedSize / (1 MB) / bestTimeS, (U32)resultCode);
             }
-            if (averageTime < bestTime) bestTime = averageTime;
-            DISPLAY("%2u-%-34.34s : %8.1f MB/s  (%6u) \r",
-                    benchNb+1, funcName, (double)benchedSize / (1 MB) / bestTime, (U32)resultCode);
         }
         DISPLAY("%2u#\n", algNb);
     }
