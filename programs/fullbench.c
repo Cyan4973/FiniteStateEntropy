@@ -547,6 +547,16 @@ static int local_HUF_compress4x_usingCTable(void* dst, size_t dstSize, const voi
     return (int)HUF_compress4X_usingCTable(dst, dstSize, src, srcSize, g_tree);
 }
 
+static unsigned huf4x_wksp[HUF_WORKSPACE_SIZE_U32];
+static int local_HUF_compress4x_usingCTable_bmi2(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    HUF_repeat repeat = HUF_repeat_valid;
+    return (int)HUF_compress4X_repeat(dst, dstSize, src, srcSize,
+                                g_max, g_tableLog,
+                                huf4x_wksp, sizeof(huf4x_wksp),
+                                g_tree, &repeat, 1, g_bmi2);
+}
+
 static int local_FSE_normalizeCount(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     (void)dst; (void)dstSize; (void)src;
@@ -882,6 +892,16 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             funcName = "HUF_compress4x_usingCTable";
             func = local_HUF_compress4x_usingCTable;
+            break;
+        }
+
+    case 24:
+        {
+            g_max=255;
+            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
+            funcName = "HUF_compress4x_usingCTable_bmi2";
+            func = local_HUF_compress4x_usingCTable_bmi2;
             break;
         }
 
