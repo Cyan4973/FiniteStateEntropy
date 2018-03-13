@@ -537,6 +537,7 @@ HUF_compress1X_usingCTable_internal(void* dst, size_t dstSize,
                               const void* src, size_t srcSize,
                               const HUF_CElt* CTable, const int bmi2)
 {
+    (void)bmi2;
     return HUF_compress1X_usingCTable_internal_body(dst, dstSize, src, srcSize, CTable);
 }
 
