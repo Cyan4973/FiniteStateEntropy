@@ -440,6 +440,12 @@ static int HUF_validateCTable(const HUF_CElt* CTable, const unsigned* count, uns
 
 size_t HUF_compressBound(size_t size) { return HUF_COMPRESSBOUND(size); }
 
+FORCE_INLINE_TEMPLATE void
+HUF_encodeSymbol(BIT_CStream_t* bitCPtr, U32 symbol, const HUF_CElt* CTable)
+{
+    BIT_addBitsFast(bitCPtr, CTable[symbol].val, CTable[symbol].nbBits);
+}
+
 
 #define FUNCTION(fn) fn##_default
 #define TARGET
