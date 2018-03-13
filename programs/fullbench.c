@@ -432,6 +432,47 @@ handle_remainder:
     return count[0][0];
 }
 
+static void histo_by8(U32* counts, const BYTE* rawArray, size_t rawLen)
+{
+    U32 countsArray[4][256];
+    memset(countsArray,0,sizeof(countsArray));
+
+    const BYTE* rawPtr = rawArray;
+    const BYTE* const rawEnd = rawArray+rawLen;
+    const BYTE* rawEndMul4 = rawArray+(rawLen&~3);
+
+    while(rawPtr < rawEndMul4) {
+        U64 x = MEM_read64(rawPtr);
+        countsArray[0][x & 0xff]++; x >>= 8;
+        countsArray[1][x & 0xff]++; x >>= 8;
+        countsArray[2][x & 0xff]++; x >>= 8;
+        countsArray[3][x & 0xff]++; x >>= 8;
+        countsArray[0][x & 0xff]++; x >>= 8;
+        countsArray[1][x & 0xff]++; x >>= 8;
+        countsArray[2][x & 0xff]++; x >>= 8;
+        countsArray[3][x] ++; // last one doesn't need to mask
+        rawPtr += 8;
+    }
+
+    // finish the last few bytes (just throw them into array 0, doesn't matter)
+    while(rawPtr < rawEnd)
+        countsArray[0][ *rawPtr++ ] ++;
+
+    // sum the countsarrays together
+    {   U32 s;
+        for (s=0; s<256; s++) {
+            counts[s] = countsArray[0][s] + countsArray[1][s] + countsArray[2][s] + countsArray[3][s];
+    }   }
+}
+
+static int local_histo_by8(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    U32 count[256];
+    (void)dst;(void)dstSize;
+    histo_by8(count, (const BYTE*)src, srcSize);
+    return count[0];
+}
+
 
 static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
@@ -1146,6 +1187,11 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 106:
         funcName = "local_count2x64v2";
         func = local_count2x64v2;
+        break;
+
+    case 107:
+        funcName = "local_histo_by8";
+        func = local_histo_by8;
         break;
 
     default:
