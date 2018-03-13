@@ -583,8 +583,7 @@ typedef struct {
     U16 fastMode;
 } FSE_DTableHeader;   /* sizeof U32 */
 
-typedef struct
-{
+typedef struct {
     unsigned short newState;
     unsigned char  symbol;
     unsigned char  nbBits;

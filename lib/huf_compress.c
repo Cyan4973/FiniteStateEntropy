@@ -567,6 +567,7 @@ HUF_compress4X_usingCTable_internal(void* dst, size_t dstSize,
 
     {   CHECK_V_F(cSize, HUF_compress1X_usingCTable_internal(op, oend-op, ip, segmentSize, CTable, bmi2) );
         if (cSize==0) return 0;
+        assert(cSize <= 65535);
         MEM_writeLE16(ostart, (U16)cSize);
         op += cSize;
     }
@@ -574,6 +575,7 @@ HUF_compress4X_usingCTable_internal(void* dst, size_t dstSize,
     ip += segmentSize;
     {   CHECK_V_F(cSize, HUF_compress1X_usingCTable_internal(op, oend-op, ip, segmentSize, CTable, bmi2) );
         if (cSize==0) return 0;
+        assert(cSize <= 65535);
         MEM_writeLE16(ostart+2, (U16)cSize);
         op += cSize;
     }
@@ -581,6 +583,7 @@ HUF_compress4X_usingCTable_internal(void* dst, size_t dstSize,
     ip += segmentSize;
     {   CHECK_V_F(cSize, HUF_compress1X_usingCTable_internal(op, oend-op, ip, segmentSize, CTable, bmi2) );
         if (cSize==0) return 0;
+        assert(cSize <= 65535);
         MEM_writeLE16(ostart+4, (U16)cSize);
         op += cSize;
     }
