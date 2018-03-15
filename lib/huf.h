@@ -254,8 +254,8 @@ size_t HUF_readCTable (HUF_CElt* CTable, unsigned* maxSymbolValuePtr, const void
  *  Tells which decoder is likely to decode faster,
  *  based on a set of pre-computed metrics.
  * @return : 0==HUF_decompress4X2, 1==HUF_decompress4X4 .
- *  Assumption : 0 < dstSize <= 128 KB */
-U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize);
+ *  Assumption : originalSize > 0 */
+U32 HUF_selectDecoder (size_t originalSize, size_t cSrcSize);
 
 /**
  *  The minimum workspace size for the `workSpace` used in
