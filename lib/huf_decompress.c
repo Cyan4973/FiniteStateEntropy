@@ -493,41 +493,41 @@ typedef size_t (*HUF_decompress_usingDTable_t)(void *dst, size_t dstSize,
                                                const HUF_DTable *DTable);
 #if DYNAMIC_BMI2
 
-#define X(fn)                                                                 \
-                                                                              \
-    static size_t fn##_default(                                               \
-                  void* dst,  size_t dstSize,                                 \
-            const void* cSrc, size_t cSrcSize,                                \
-            const HUF_DTable* DTable)                                         \
-    {                                                                         \
-        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);               \
-    }                                                                         \
-                                                                              \
-    static TARGET_ATTRIBUTE("bmi2") size_t fn##_bmi2(                         \
-                  void* dst,  size_t dstSize,                                 \
-            const void* cSrc, size_t cSrcSize,                                \
-            const HUF_DTable* DTable)                                         \
-    {                                                                         \
-        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);               \
-    }                                                                         \
-                                                                              \
-    static size_t fn(void* dst, size_t dstSize, void const* cSrc,             \
-                     size_t cSrcSize, HUF_DTable const* DTable, int bmi2)     \
-    {                                                                         \
-        if (bmi2) {                                                           \
-            return fn##_bmi2(dst, dstSize, cSrc, cSrcSize, DTable);           \
-        }                                                                     \
-        return fn##_default(dst, dstSize, cSrc, cSrcSize, DTable);            \
+#define X(fn)                                                               \
+                                                                            \
+    static size_t fn##_default(                                             \
+                  void* dst,  size_t dstSize,                               \
+            const void* cSrc, size_t cSrcSize,                              \
+            const HUF_DTable* DTable)                                       \
+    {                                                                       \
+        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);             \
+    }                                                                       \
+                                                                            \
+    static TARGET_ATTRIBUTE("bmi2") size_t fn##_bmi2(                       \
+                  void* dst,  size_t dstSize,                               \
+            const void* cSrc, size_t cSrcSize,                              \
+            const HUF_DTable* DTable)                                       \
+    {                                                                       \
+        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);             \
+    }                                                                       \
+                                                                            \
+    static size_t fn(void* dst, size_t dstSize, void const* cSrc,           \
+                     size_t cSrcSize, HUF_DTable const* DTable, int bmi2)   \
+    {                                                                       \
+        if (bmi2) {                                                         \
+            return fn##_bmi2(dst, dstSize, cSrc, cSrcSize, DTable);         \
+        }                                                                   \
+        return fn##_default(dst, dstSize, cSrc, cSrcSize, DTable);          \
     }
 
 #else
 
-#define X(fn)                                                                 \
-    static size_t fn(void* dst, size_t dstSize, void const* cSrc,             \
-                     size_t cSrcSize, HUF_DTable const* DTable, int bmi2)     \
-    {                                                                         \
-        (void)bmi2;                                                           \
-        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);               \
+#define X(fn)                                                               \
+    static size_t fn(void* dst, size_t dstSize, void const* cSrc,           \
+                     size_t cSrcSize, HUF_DTable const* DTable, int bmi2)   \
+    {                                                                       \
+        (void)bmi2;                                                         \
+        return fn##_body(dst, dstSize, cSrc, cSrcSize, DTable);             \
     }
 
 #endif
@@ -961,13 +961,14 @@ static const algo_time_t algoTime[16 /* Quantization */][3 /* single, double, qu
  *  Tells which decoder is likely to decode faster,
  *  based on a set of pre-computed metrics.
  * @return : 0==HUF_decompress4X2, 1==HUF_decompress4X4 .
- *  Assumption : originalSize > 0 */
-U32 HUF_selectDecoder (size_t originalSize, size_t cSrcSize)
+ *  Assumption : 0 < dstSize <= 128 KB */
+U32 HUF_selectDecoder (size_t dstSize, size_t cSrcSize)
 {
-    assert(originalSize > 0);
+    assert(dstSize > 0);
+    assert(dstSize <= 128*1024);
     /* decoder timing evaluation */
-    {   U32 const Q = (cSrcSize >= originalSize) ? 15 : (U32)(cSrcSize * 16 / originalSize);   /* Q < 16 */
-        U32 const D256 = (U32)(originalSize >> 8);
+    {   U32 const Q = (cSrcSize >= dstSize) ? 15 : (U32)(cSrcSize * 16 / dstSize);   /* Q < 16 */
+        U32 const D256 = (U32)(dstSize >> 8);
         U32 const DTime0 = algoTime[Q][0].tableTime + (algoTime[Q][0].decode256Time * D256);
         U32 DTime1 = algoTime[Q][1].tableTime + (algoTime[Q][1].decode256Time * D256);
         DTime1 += DTime1 >> 3;  /* advantage to algorithm using less memory, to reduce cache eviction */

@@ -63,6 +63,30 @@ extern "C" {
 #  endif
 #endif
 
+#if defined(BIT_DEBUG) && (BIT_DEBUG>=2)
+#  include <stdio.h>
+extern int g_debuglog_enable;
+/* recommended values for BIT_DEBUG display levels :
+ * 1 : no display, enables assert() only
+ * 2 : reserved for currently active debug path
+ * 3 : events once per object lifetime (CCtx, CDict, etc.)
+ * 4 : events once per frame
+ * 5 : events once per block
+ * 6 : events once per sequence (*very* verbose) */
+#  define RAWLOG(l, ...) {                                      \
+                if ((g_debuglog_enable) & (l<=BIT_DEBUG)) {    \
+                    fprintf(stderr, __VA_ARGS__);               \
+            }   }
+#  define DEBUGLOG(l, ...) {                                    \
+                if ((g_debuglog_enable) & (l<=BIT_DEBUG)) {    \
+                    fprintf(stderr, __FILE__ ": " __VA_ARGS__); \
+                    fprintf(stderr, " \n");                     \
+            }   }
+#else
+#  define RAWLOG(l, ...)      {}    /* disabled */
+#  define DEBUGLOG(l, ...)    {}    /* disabled */
+#endif
+
 
 /*=========================================
 *  Target specific
@@ -413,7 +437,7 @@ MEM_STATIC size_t BIT_readBits(BIT_DStream_t* bitD, U32 nbBits)
 }
 
 /*! BIT_readBitsFast() :
- *  unsafe version; only works if nbBits >= 1 */
+ *  unsafe version; only works only if nbBits >= 1 */
 MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
 {
     size_t const value = BIT_lookBitsFast(bitD, nbBits);
@@ -426,7 +450,7 @@ MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
  *  Refill `bitD` from buffer previously set in BIT_initDStream() .
  *  This function is safe, it guarantees it will not read beyond src buffer.
  * @return : status of `BIT_DStream_t` internal register.
- *           when status == BIT_DStream_unfinished, internal register is filled with at least 25 or 57 bits */
+ *           when status == BIT_DStream_unfinished, internal register is filled with at least 25 or 57 bits */
 MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
 {
     if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* overflow detected, like end of stream */
