@@ -404,15 +404,16 @@ static void unitTest(void)
         errorCode = FSE_writeNCount(header, headerSize+1, norm, max, tableLog);
         CHECK(FSE_isError(errorCode), "Error : FSE_writeNCount() should have worked");
 
-        max = 129;
-        errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
-        CHECK(FSE_isError(errorCode), "Error : FSE_readNCount() should have worked : (error %s)", FSE_getErrorName(errorCode));
+        {   unsigned maxN = 128;
+            size_t const err = FSE_readNCount(norm, &maxN, &tableLog, header, headerSize);
+            CHECK(FSE_isError(err), "Error : FSE_readNCount() should have worked : (error %s)", FSE_getErrorName(err));
+        }
 
         max = 64;
         errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize);
         CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (max too small)");
 
-        max = 129;
+        max = 128;
         errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize-1);
         CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
 
