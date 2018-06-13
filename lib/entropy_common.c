@@ -1,6 +1,6 @@
 /*
-   Common functions of New Generation Entropy library
-   Copyright (C) 2016, Yann Collet.
+   Common functions for Finite State Entropy project
+   Copyright (C) 2016-present, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -54,9 +54,8 @@ const char* FSE_getErrorName(size_t code) { return ERR_getErrorName(code); }
 unsigned HUF_isError(size_t code) { return ERR_isError(code); }
 const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 
-
 /*-**************************************************************
-*  FSE NCount encoding-decoding
+*  FSE NCount decoding
 ****************************************************************/
 size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* tableLogPtr,
                  const void* headerBuffer, size_t hbSize)
@@ -71,6 +70,8 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     int bitCount;
     unsigned charnum = 0;
     int previous0 = 0;
+
+    DEBUGLOG(5, "FSE_readNCount");
 
     if (hbSize < 4) {
         /* This function only works when hbSize >= 4 */

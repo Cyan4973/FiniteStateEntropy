@@ -66,6 +66,7 @@
 #include "mem.h"
 #include "bench.h"
 #include "fileio.h"
+#include "hist.h"
 #include "fse.h"
 #include "fseU16.h"
 #include "zlibh.h"
@@ -608,7 +609,7 @@ static void BMK_benchCore_Mem(char* dst,
 
     /* Init */
     crcOrig = XXH64(src, benchedSize,0);
-    FSE_count(count, &nbSymbols, (BYTE*)src, benchedSize);
+    HIST_count(count, &nbSymbols, (BYTE*)src, benchedSize);
     tableLog = (U32)FSE_normalizeCount(norm, tableLog, count, benchedSize, nbSymbols);
     ct = FSE_createCTable(tableLog, nbSymbols);
     FSE_buildCTable(ct, norm, nbSymbols, tableLog);

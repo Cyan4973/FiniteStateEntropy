@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\lib\entropy_common.c" />
+    <ClCompile Include="..\..\..\lib\hist.c" />
     <ClCompile Include="..\..\..\lib\fse_compress.c" />
     <ClCompile Include="..\..\..\lib\fse_decompress.c" />
     <ClCompile Include="..\..\..\lib\fseU16.c" />
