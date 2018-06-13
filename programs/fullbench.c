@@ -35,8 +35,9 @@
 #include <string.h>      /* strcmp */
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 
-#include "mem.h"
 #include "cpu.h"        /* ZSTD_cpuid_bmi2, ZSTD_cpuid */
+#include "mem.h"
+#include "hist.h"
 #define FSE_STATIC_LINKING_ONLY
 #include "fse.h"
 #define HUF_STATIC_LINKING_ONLY
@@ -479,7 +480,7 @@ static int local_FSE_count255(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 255;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, &max, (const BYTE*)src, (U32)srcSize);
+    return (int)HIST_count(count, &max, (const BYTE*)src, (U32)srcSize);
 }
 
 static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -487,7 +488,7 @@ static int local_FSE_count254(void* dst, size_t dstSize, const void* src, size_t
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return (int)FSE_count(count, &max, (const BYTE*)src, (U32)srcSize);
+    return (int)HIST_count(count, &max, (const BYTE*)src, (U32)srcSize);
 }
 
 static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -495,7 +496,7 @@ static int local_FSE_countFast254(void* dst, size_t dstSize, const void* src, si
     U32 count[256];
     U32 max = 254;
     (void)dst; (void)dstSize;
-    return (int)FSE_countFast(count, &max, (const unsigned char*)src, srcSize);
+    return (int)HIST_countFast(count, &max, (const unsigned char*)src, srcSize);
 }
 
 static int local_FSE_compress(void* dst, size_t dstSize, const void* src, size_t srcSize)
@@ -747,24 +748,24 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     switch (algNb)
     {
     case 1:
-        funcName = "FSE_count(255)";
+        funcName = "HIST_count(255)";
         func = local_FSE_count255;
         break;
 
     case 2:
-        funcName = "FSE_count(254)";
+        funcName = "HIST_count(254)";
         func = local_FSE_count254;
         break;
 
     case 3:
-        funcName = "FSE_countFast(254)";
+        funcName = "HIST_countFast(254)";
         func = local_FSE_countFast254;
         break;
 
     case 4:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
             funcName = "FSE_normalizeCount";
             func = local_FSE_normalizeCount;
@@ -774,7 +775,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 5:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_writeNCount";
@@ -785,7 +786,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 6:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = FSE_optimalTableLog(g_tableLog, benchedSize, g_max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_buildCTable";
@@ -796,7 +797,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 7:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable";
@@ -807,7 +808,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 8:
         {
             U32 max=255;
-            FSE_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, max);
             FSE_buildCTable(g_CTable, g_normTable, max, g_tableLog);
             funcName = "FSE_compress_usingCTable_smallDst";
@@ -869,7 +870,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 21:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             funcName = "HUF_buildCTable";
             func = local_HUF_buildCTable;
             break;
@@ -878,7 +879,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 22:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             funcName = "HUF_writeCTable";
             func = local_HUF_writeCTable;
@@ -888,7 +889,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 23:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             funcName = "HUF_compress4x_usingCTable";
             func = local_HUF_compress4x_usingCTable;
@@ -898,7 +899,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 24:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             funcName = "HUF_compress4x_usingCTable_bmi2";
             func = local_HUF_compress4x_usingCTable_bmi2;
@@ -996,7 +997,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         {
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             g_cSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize += HUF_compress1X_usingCTable(((BYTE*)cBuffer) + g_cSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1011,7 +1012,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             size_t hSize;
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             hSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize = HUF_compress1X_usingCTable(((BYTE*)cBuffer) + hSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1029,7 +1030,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             size_t hSize;
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             hSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize = HUF_compress1X_usingCTable(((BYTE*)cBuffer) + hSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1091,7 +1092,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
         {
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             g_cSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize += HUF_compress1X_usingCTable(((BYTE*)cBuffer) + g_cSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1106,7 +1107,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             size_t hSize;
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             hSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize = HUF_compress1X_usingCTable(((BYTE*)cBuffer) + hSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1124,7 +1125,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             size_t hSize;
             g_oSize = benchedSize;
             g_max = 255;
-            FSE_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, (const unsigned char*)oBuffer, benchedSize);
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             hSize = HUF_writeCTable(cBuffer, cBuffSize, g_tree, g_max, g_tableLog);
             g_cSize = HUF_compress1X_usingCTable(((BYTE*)cBuffer) + hSize, cBuffSize, oBuffer, benchedSize, g_tree);
@@ -1147,7 +1148,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 80:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, oBuffer, benchedSize);
             g_tableLog = FSE_optimalTableLog(10, benchedSize, g_max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_buildDTable(10)";
@@ -1158,7 +1159,7 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
     case 81:
         {
             g_max=255;
-            FSE_count(g_countTable, &g_max, oBuffer, benchedSize);
+            HIST_count(g_countTable, &g_max, oBuffer, benchedSize);
             g_tableLog = FSE_optimalTableLog(9, benchedSize, g_max);
             FSE_normalizeCount(g_normTable, g_tableLog, g_countTable, benchedSize, g_max);
             funcName = "FSE_buildDTable(9)";
