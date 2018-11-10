@@ -1,6 +1,6 @@
 /*
-   Common functions for Finite State Entropy project
-   Copyright (C) 2016-present, Yann Collet.
+   Common functions of New Generation Entropy library
+   Copyright (C) 2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -54,8 +54,9 @@ const char* FSE_getErrorName(size_t code) { return ERR_getErrorName(code); }
 unsigned HUF_isError(size_t code) { return ERR_isError(code); }
 const char* HUF_getErrorName(size_t code) { return ERR_getErrorName(code); }
 
+
 /*-**************************************************************
-*  FSE NCount decoding
+*  FSE NCount encoding-decoding
 ****************************************************************/
 size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* tableLogPtr,
                  const void* headerBuffer, size_t hbSize)
@@ -71,8 +72,6 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     unsigned charnum = 0;
     int previous0 = 0;
 
-    DEBUGLOG(5, "FSE_readNCount");
-
     if (hbSize < 4) {
         /* This function only works when hbSize >= 4 */
         char buffer[4];
@@ -86,6 +85,8 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     }   }
     assert(hbSize >= 4);
 
+    /* init */
+    memset(normalizedCounter, 0, (*maxSVPtr+1) * sizeof(normalizedCounter[0]));   /* all symbols not present in NCount have a frequency of 0 */
     bitStream = MEM_readLE32(ip);
     nbBits = (bitStream & 0xF) + FSE_MIN_TABLELOG;   /* extract tableLog */
     if (nbBits > FSE_TABLELOG_ABSOLUTE_MAX) return ERROR(tableLog_tooLarge);
@@ -157,11 +158,6 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     }   }   /* while ((remaining>1) & (charnum<=*maxSVPtr)) */
     if (remaining != 1) return ERROR(corruption_detected);
     if (bitCount > 32) return ERROR(corruption_detected);
-    /* zeroise the rest */
-    {   unsigned symbNb = charnum;
-        for (symbNb=charnum; symbNb <= *maxSVPtr; symbNb++)
-            normalizedCounter[symbNb] = 0;
-    }
     *maxSVPtr = charnum-1;
 
     ip += (bitCount+7)>>3;
