@@ -27,7 +27,14 @@ PROGDIR?= programs
 
 .PHONY: clean test
 
-default: test
+default: fse check
+
+check: fse
+	$(MAKE) -C $(PROGDIR) $@
+	cp $(PROGDIR)/fse .
+
+fse:
+	$(MAKE) -C $(PROGDIR) $@
 
 all:
 	$(MAKE) -C $(PROGDIR) $@

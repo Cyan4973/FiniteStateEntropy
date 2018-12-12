@@ -25,7 +25,7 @@
 # fuzzerHuff0 : stress tester for Huff0 library
 # #####################################################################
 
-RELEASE    = v0.3.2
+RELEASE    = v0.3.3
 FSEDIR     = ../lib
 
 ifeq ($(shell $(CC) -v 2>&1 | grep -c "gcc version "), 1)
@@ -125,6 +125,8 @@ test-fse: probagen fse
 	rm result
 	rm proba.bin
 	rm tmp
+
+check: test-fse
 
 test: test-fse fullbench fuzzer fuzzerU16 fuzzerHuff0
 	./fuzzer $(FSETEST)
