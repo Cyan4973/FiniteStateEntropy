@@ -227,6 +227,8 @@ static void get_fileHandle(const char* input_filename, const char* output_filena
         *pfinput = fopen(input_filename, "rb");
     }
 
+    if (*pfinput == 0) EXM_THROW(12, "Pb opening %s", input_filename);
+
     if (!strcmp (output_filename, stdoutmark)) {
         DISPLAYLEVEL(4,"Using stdout for output\n");
         *pfoutput = stdout;
@@ -249,7 +251,6 @@ static void get_fileHandle(const char* input_filename, const char* output_filena
         *pfoutput = fopen( output_filename, "wb" );
     }
 
-    if ( *pfinput==0 ) EXM_THROW(12, "Pb opening %s", input_filename);
     if ( *pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
 }
 
@@ -547,6 +548,7 @@ unsigned long long FIO_decompressFilename(const char* output_filename, const cha
             break;
           default :
           case bt_crc :
+            cSize = 0;
             assert(0);   /* supposed already eliminated at this stage */
         }
 

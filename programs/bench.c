@@ -114,7 +114,7 @@ static int BMK_tableLog = 12;
 
 void BMK_SetByteCompressor(int id) { BMK_byteCompressor = id; }
 
-void BMK_SetBlocksize(U32 bsize) { chunkSize = bsize; DISPLAY("- Blocks %i KB -\n", chunkSize>>10); }
+void BMK_SetBlocksize(U32 bsize) { chunkSize = bsize; DISPLAY("- Blocks %u KB -\n", chunkSize>>10); }
 
 void BMK_SetTableLog(int tableLog) { BMK_tableLog = 5 + tableLog; }
 
