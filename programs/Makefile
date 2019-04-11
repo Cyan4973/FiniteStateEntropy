@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - tester Makefile
-# Copyright (C) Yann Collet 2013-2017
+# Copyright (C) Yann Collet 2013-present
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,7 @@
 # fuzzerHuff0 : stress tester for Huff0 library
 # #####################################################################
 
-RELEASE    = v0.3.3
+RELEASE    = v0.3.4
 FSEDIR     = ../lib
 
 ifeq ($(shell $(CC) -v 2>&1 | grep -c "gcc version "), 1)
@@ -51,13 +51,14 @@ EXT =
 endif
 
 
+.PHONY: default
 default: fse
 
-all: bin bin32
+.PHONY: all
+all: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
 
-bin32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
-
-bin: fse fullbench fuzzer fuzzerU16 fuzzerHuff0 probagen
+.PHONY: all32
+all32: fse32 fullbench32 fuzzer32 fuzzerU16_32 fuzzerHuff0_32
 
 fse32: CFLAGS += -m32
 fsex32: CFLAGS += -mx32
@@ -69,9 +70,6 @@ fse fse32 fsex32: bench.c commandline.c fileio.c xxhash.c zlibh.c \
 
 fse_opt:
 	$(MAKE) fse MOREFLAGS=-flto
-
-fse_safe:
-	CFLAGS=-O2 $(MAKE) fse
 
 fuzzer fuzzer32: CPPFLAGS += -DDEBUGLEVEL=1
 fuzzer32: CFLAGS += -m32
@@ -102,11 +100,17 @@ fullbench fullbench32 fullbenchx32: fullbench.c xxhash.c $(FSEDIR)/entropy_commo
 probagen: probaGenerator.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+.PHONY: clean
 clean:
-	@$(RM) core *.o fse$(EXT) fse32$(EXT) fsex32$(EXT) fullbench$(EXT) fullbench32$(EXT) fullbenchx32$(EXT) probagen$(EXT)
-	@$(RM) core *.o fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
-	@$(RM) tmp result proba.bin
+	@$(RM) fse$(EXT) fse32$(EXT) fsex32$(EXT) fullbench$(EXT) fullbench32$(EXT) fullbenchx32$(EXT) probagen$(EXT)
+	@$(RM) fuzzer$(EXT) fuzzer32$(EXT) fuzzerU16$(EXT) fuzzerU16_32$(EXT) fuzzerHuff0$(EXT) fuzzerHuff0_32$(EXT)
+	@$(RM) core *.o tmp result proba.bin
 	@echo Cleaning completed
+
+
+.PHONY: list
+list:
+	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 test-fse: probagen fse
 	./probagen 20%

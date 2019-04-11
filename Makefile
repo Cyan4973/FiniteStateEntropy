@@ -1,6 +1,6 @@
 # #####################################################################
 # FSE - Makefile
-# Copyright (C) Yann Collet 2015 - 2017
+# Copyright (C) Yann Collet 2015 - present
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -25,25 +25,22 @@
 
 PROGDIR?= programs
 
-.PHONY: clean test
-
+.PHONY: default
 default: fse check
 
-check: fse
+.PHONY: fse   # only progdir knows if fse must be rebuilt or not
+fse:
 	$(MAKE) -C $(PROGDIR) $@
 	cp $(PROGDIR)/fse .
 
-fse:
+.PHONY: check
+check: fse
 	$(MAKE) -C $(PROGDIR) $@
 
-all:
+.PHONY: all test clean
+all test clean:
 	$(MAKE) -C $(PROGDIR) $@
 
-test:
-	$(MAKE) -C $(PROGDIR) $@
-
-clean:
-	$(MAKE) -C $(PROGDIR) $@
 
 gpptest: clean
 	@echo ---- test g++ compilation ----
