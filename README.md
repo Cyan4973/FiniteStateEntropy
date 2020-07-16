@@ -13,8 +13,8 @@ achieving precise compression accuracy (like [Arithmetic coding](http://en.wikip
 
 |Branch      |Status   |
 |------------|---------|
-|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/FiniteStateEntropy) |
-|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/FiniteStateEntropy) |
+|master      | [![Build Status](https://travis-ci.org/Cyan4973/FiniteStateEntropy.svg?branch=master)](https://travis-ci.org/Cyan4973/FiniteStateEntropy) |
+|dev         | [![Build Status](https://travis-ci.org/Cyan4973/FiniteStateEntropy.svg?branch=dev)](https://travis-ci.org/Cyan4973/FiniteStateEntropy) |
 
 
 Benchmarks
