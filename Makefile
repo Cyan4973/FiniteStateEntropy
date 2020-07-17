@@ -42,26 +42,37 @@ all test clean:
 	$(MAKE) -C $(PROGDIR) $@
 
 
+.PHONY: max13test
+max13test: clean
+	@echo ---- test FSE_MAX_MEMORY_USAGE = 13 ----
+	CPPFLAGS="-DFSE_MAX_MEMORY_USAGE=13" $(MAKE) check
+
+.PHONY: gpptest
 gpptest: clean
 	@echo ---- test g++ compilation ----
 	$(MAKE) -C $(PROGDIR) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Werror"
 
+.PHONY: armtest
 armtest: clean
 	@echo ---- test ARM compilation ----
 	CFLAGS="-O2 -Werror" $(MAKE) -C $(PROGDIR) all CC=arm-linux-gnueabi-gcc
 
+.PHONY: clangtest
 clangtest: clean
 	@echo ---- test clang compilation ----
 	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" CC=clang $(MAKE) -C $(PROGDIR) all
 
+.PHONY: clangpptest
 clangpptest: clean
 	@echo ---- test clang++ compilation ----
 	$(MAKE) -C $(PROGDIR) all CC=clang++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -x c++ -Werror"
 
+.PHONY: staticAnalyze
 staticAnalyze: clean
 	@echo ---- static analyzer - scan-build ----
 	scan-build --status-bugs -v $(MAKE) -C $(PROGDIR) all CFLAGS=-g   # does not work well; too many false positives
 
+.PHONY: sanitize
 sanitize: clean
 	@echo ---- check undefined behavior and address overflows ----
 	CC=clang CFLAGS="-g -O2 -fsanitize=undefined -fsanitize=address -fno-omit-frame-pointer" $(MAKE) -C $(PROGDIR) test   FSETEST="-i5000" FSEU16TEST=-i2000

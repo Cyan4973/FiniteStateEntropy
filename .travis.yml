@@ -17,3 +17,4 @@ env:
   - TravisCi_FseTest=sanitize
   - TravisCi_FseTest="-C programs test32"
   - TravisCi_FseTest="-C programs memtest"
+  - TravisCi_FseTest=max13test
