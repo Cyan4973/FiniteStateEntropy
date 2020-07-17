@@ -416,11 +416,10 @@ static void unitTest(void)
         errorCode = FSE_readNCount(norm, &max, &tableLog, header, headerSize-1);
         CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
 
-        {
-            void* smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
+        {   void* const smallBuffer = malloc(headerSize-1);   /* outbound read can be caught by valgrind */
             CHECK(smallBuffer==NULL, "Error : Not enough memory (FSE_readNCount unit test)");
             memcpy(smallBuffer, header, headerSize-1);
-            max = 129;
+            max = 128;
             errorCode = FSE_readNCount(norm, &max, &tableLog, smallBuffer, headerSize-1);
             CHECK(!FSE_isError(errorCode), "Error : FSE_readNCount() should have failed (size too small)");
             free(smallBuffer);
