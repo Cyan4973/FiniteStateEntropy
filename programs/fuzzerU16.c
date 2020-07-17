@@ -37,7 +37,7 @@
 #include <stdlib.h>    /* malloc, abs */
 #include <stdio.h>     /* printf */
 #include <string.h>    /* memset */
-#include <sys/timeb.h> /* timeb */
+#include <time.h>      /* clock */
 #include "fse.h"       /* FSE_isError */
 #include "fseU16.h"
 #include "xxhash.h"
@@ -88,22 +88,12 @@ static unsigned displayLevel = 2;   /* 0: no display;  1: errors;  2: + result +
 /*-*************************************************
 *  Local functions
 ***************************************************/
-static int FUZ_GetMilliStart(void)
-{
-    struct timeb tb;
-    int nCount;
-    ftime ( &tb );
-    nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-    return nCount;
-}
+static clock_t FUZ_GetMilliStart(void) { return clock(); }
 
-
-static int FUZ_GetMilliSpan ( int nTimeStart )
+static int FUZ_GetMilliSpan ( clock_t nTimeStart )
 {
-    int nSpan = FUZ_GetMilliStart() - nTimeStart;
-    if ( nSpan < 0 )
-        nSpan += 0x100000 * 1000;
-    return nSpan;
+    clock_t clockSpan = FUZ_GetMilliStart() - nTimeStart;
+    return (int)((U64)(clockSpan) * 1000 / CLOCKS_PER_SEC);
 }
 
 
@@ -160,7 +150,7 @@ static void FUZ_tests (const U32 startSeed, U32 totalTest, U32 startTestNb)
     void* const bufferDst   =        malloc (bufferDstSize);
     U16* const  bufferVerif = (U16*) malloc (bufferDstSize);
     const size_t maxTestSizeMask = 0x1FFFF;
-    U32 time = FUZ_GetMilliStart();
+    clock_t time = FUZ_GetMilliStart();
     U32 seed = startSeed;
     unsigned testNb;
 
@@ -301,7 +291,7 @@ int main (int argc, const char** argv)
     U32 startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
     int argNb;
 
-    U32 seed = FUZ_GetMilliStart() % 10000;
+    U32 seed = (U32)(FUZ_GetMilliStart() % 10000);
     DISPLAYLEVEL(1, "FSE U16 (%2i bits) automated test\n",(int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++) {
         const char* argument = argv[argNb];

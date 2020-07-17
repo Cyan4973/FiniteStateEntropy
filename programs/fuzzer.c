@@ -37,7 +37,7 @@ You can contact the author at :
 #include <stdlib.h>     /* malloc, abs */
 #include <stdio.h>      /* printf */
 #include <string.h>     /* memset */
-#include <sys/timeb.h>  /* timeb */
+#include <time.h>       /* clock_t */
 #include "mem.h"
 #include "hist.h"
 #define FSE_STATIC_LINKING_ONLY
@@ -69,22 +69,12 @@ static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + re
 /***************************************************
 *  local functions
 ***************************************************/
-static int FUZ_GetMilliStart(void)
-{
-    struct timeb tb;
-    int nCount;
-    ftime ( &tb );
-    nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-    return nCount;
-}
+static clock_t FUZ_GetMilliStart(void) { return clock(); }
 
-
-static int FUZ_GetMilliSpan ( int nTimeStart )
+static int FUZ_GetMilliSpan ( clock_t nTimeStart )
 {
-    int nSpan = FUZ_GetMilliStart() - nTimeStart;
-    if ( nSpan < 0 )
-        nSpan += 0x100000 * 1000;
-    return nSpan;
+    clock_t clockSpan = FUZ_GetMilliStart() - nTimeStart;
+    return (int)((U64)(clockSpan) * 1000 / CLOCKS_PER_SEC);
 }
 
 
@@ -162,7 +152,7 @@ static void FUZ_tests (U32 seed, U32 totalTest, U32 startTestNb)
     unsigned testNb, maxSV, tableLog;
     const size_t maxTestSizeMask = 0x1FFFF;
     U32 rootSeed = seed;
-    U32 time = FUZ_GetMilliStart();
+    clock_t time = FUZ_GetMilliStart();
 
     generateNoise (bufferP0, BUFFERSIZE, &rootSeed);
     generate (bufferP1  , BUFFERSIZE, 0.01, &rootSeed);
@@ -491,7 +481,7 @@ int main (int argc, char** argv)
     U32 seed, startTestNb=0, pause=0, totalTest = FUZ_NB_TESTS;
     int argNb;
 
-    seed = FUZ_GetMilliStart() % 10000;
+    seed = (U32)(FUZ_GetMilliStart() % 10000);
     DISPLAYLEVEL (1, "FSE (%2i bits) automated test\n", (int)sizeof(void*)*8);
     for (argNb=1; argNb<argc; argNb++)
     {
