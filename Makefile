@@ -48,7 +48,7 @@ gpptest: clean
 
 armtest: clean
 	@echo ---- test ARM compilation ----
-	CFLAGS="-O3 -Werror" $(MAKE) -C $(PROGDIR) bin CC=arm-linux-gnueabi-gcc
+	CFLAGS="-O2 -Werror" $(MAKE) -C $(PROGDIR) all CC=arm-linux-gnueabi-gcc
 
 clangtest: clean
 	@echo ---- test clang compilation ----
