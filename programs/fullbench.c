@@ -543,6 +543,14 @@ static int local_HUF_writeCTable(void* dst, size_t dstSize, const void* src, siz
     return (int)HUF_writeCTable(dst, dstSize, g_tree, g_max, g_tableLog);
 }
 
+static int local_HUF_readCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
+{
+    (void)dst; (void)dstSize;
+    unsigned max = 255;
+    unsigned hasZeros = 0;
+    return (int)HUF_readCTable(g_tree, &max, src, srcSize, &hasZeros);
+}
+
 static int local_HUF_compress4x_usingCTable(void* dst, size_t dstSize, const void* src, size_t srcSize)
 {
     return (int)HUF_compress4X_usingCTable(dst, dstSize, src, srcSize, g_tree);
@@ -903,6 +911,15 @@ int runBench(const void* buffer, size_t blockSize, U32 algNb, U32 nbBenchs)
             g_tableLog = (U32)HUF_buildCTable(g_tree, g_countTable, g_max, 0);
             funcName = "HUF_compress4x_usingCTable_bmi2";
             func = local_HUF_compress4x_usingCTable_bmi2;
+            break;
+        }
+
+    case 25:
+        {
+            g_cSize = HUF_compress(cBuffer, cBuffSize, oBuffer, benchedSize);
+            memcpy(oBuffer, cBuffer, g_cSize);
+            funcName = "HUF_readCTable";
+            func = local_HUF_readCTable;
             break;
         }
 
