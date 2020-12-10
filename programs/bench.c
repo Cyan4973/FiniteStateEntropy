@@ -208,7 +208,7 @@ void BMK_benchMem285(chunkParameters_t* chunkP, int nbChunks, const char* inFile
 
         /* Compression benchmark */
         DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, benchedSize);
-        { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }     /* warmimg up memory */
+        { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }     /* warming up memory */
 
         nbLoops = 0;
         clockStart = clock();
@@ -344,7 +344,7 @@ void BMK_benchMem(chunkParameters_t* chunkP, int nbChunks,
 
         /* Compression */
         DISPLAY("%1i-%-15.15s : %9i ->\r", trial, inFileName, benchedSize);
-        { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }    /* warmimg up memory */
+        { int i; for (i=0; i<benchedSize; i++) chunkP[0].compressedBuffer[i]=(char)i; }    /* warming up memory */
 
         clockStart = clock();
         while(clock() == clockStart);
@@ -623,7 +623,7 @@ static void BMK_benchCore_Mem(char* dst,
 
         /* Compression */
         DISPLAY("%1i-%-14.14s : %9u ->\r", loopNb, inFileName, benchedSize);
-        { unsigned i; for (i=0; i<benchedSize; i++) dst[i]=(char)i; }     /* warmimg up memory */
+        { unsigned i; for (i=0; i<benchedSize; i++) dst[i]=(char)i; }     /* warming up memory */
 
         nbLoops = 0;
         clockStart = clock();
