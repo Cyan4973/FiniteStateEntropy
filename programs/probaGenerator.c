@@ -77,7 +77,7 @@ static int usage(void)
 {
     DISPLAY("Usage :\n");
     DISPLAY("%s P%%\n", g_programName);
-    DISPLAY("Exemple :\n");
+    DISPLAY("Example :\n");
     DISPLAY("%s 70%%\n", g_programName);
     return 0;
 }
