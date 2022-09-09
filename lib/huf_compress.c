@@ -618,7 +618,7 @@ static size_t HUF_compressCTable_internal(
                          HUF_compress1X_usingCTable_internal(op, (size_t)(oend - op), src, srcSize, CTable, bmi2) :
                          HUF_compress4X_usingCTable_internal(op, (size_t)(oend - op), src, srcSize, CTable, bmi2);
     if (HUF_isError(cSize)) { return cSize; }
-    if (cSize==0) { return 0; }   /* uncompressible */
+    if (cSize==0) { return 0; }   /* incompressible */
     op += cSize;
     /* check compressibility */
     assert(op >= ostart);
