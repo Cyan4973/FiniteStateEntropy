@@ -63,7 +63,9 @@ You can contact the author at :
 #endif
 
 #ifdef __GNUC__    // GCC
+#ifndef __cplusplus
 #  pragma GCC diagnostic ignored "-Wstrict-prototypes"
+#endif
 #endif
 
 /*
@@ -532,7 +534,7 @@ static void feed_bltree(tree_desc * ltree_desc, tree_desc * bltree_desc)
 */
 static unsigned bi_reverse(unsigned code, int len)
 {
-    register unsigned res = 0;
+    unsigned res = 0;
     do {
         res |= code & 1;
         code >>= 1, res <<= 1;

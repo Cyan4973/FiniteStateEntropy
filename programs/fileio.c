@@ -401,7 +401,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
             break;
         }
 
-        DISPLAYUPDATE(2, "\rRead : %u MB  ==> %.2f%%   ", (U32)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %u MB  ==> %.2f%%   ", (U32)(filesize>>20), (double)(compressedfilesize/filesize)*100);
     }
 
     /* Checksum */
@@ -418,7 +418,7 @@ unsigned long long FIO_compressFilename(const char* output_filename, const char*
     /* Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
+        (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)(compressedfilesize/filesize)*100);
 
     /* clean */
     free(in_buff);
