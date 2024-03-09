@@ -188,7 +188,7 @@ static int local_count8v2(void* dst, size_t dstSize, const void* src, size_t src
     memset(count, 0, sizeof(count));
 
     while (ptr != end) {
-        register U64 bs = next;
+        U64 bs = next;
         next = *ptr++;
 
         count[ 0][(BYTE)bs] ++;
