@@ -68,7 +68,9 @@
 #  include <fcntl.h>    // _O_BINARY
 #  include <io.h>       // _setmode, _isatty
 #  ifdef __MINGW32__
+#  if ((!defined(__clang__)) && __GNUC__ < 9) || (defined(__clang__) && __clang_major__ < 10)
    int _fileno(FILE *stream);   // MINGW somehow forgets to include this windows declaration into <stdio.h>
+#  endif
 #  endif
 #  define SET_BINARY_MODE(file) { int unused = _setmode(_fileno(file), _O_BINARY); (void)unused; }
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
