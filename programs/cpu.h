@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-present, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -15,8 +15,6 @@
  * Implementation taken from folly/CpuId.h
  * https://github.com/facebook/folly/blob/master/folly/CpuId.h
  */
-
-#include <string.h>
 
 #include "mem.h"
 
@@ -36,7 +34,7 @@ MEM_STATIC ZSTD_cpuid_t ZSTD_cpuid(void) {
     U32 f1d = 0;
     U32 f7b = 0;
     U32 f7c = 0;
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
     int reg[4];
     __cpuid((int*)reg, 0);
     {
@@ -72,14 +70,13 @@ MEM_STATIC ZSTD_cpuid_t ZSTD_cpuid(void) {
           "cpuid\n\t"
           "popl %%ebx\n\t"
           : "=a"(f1a), "=c"(f1c), "=d"(f1d)
-          : "a"(1)
-          :);
+          : "a"(1));
     }
     if (n >= 7) {
       __asm__(
           "pushl %%ebx\n\t"
           "cpuid\n\t"
-          "movl %%ebx, %%eax\n\r"
+          "movl %%ebx, %%eax\n\t"
           "popl %%ebx"
           : "=a"(f7b), "=c"(f7c)
           : "a"(7), "c"(0)
