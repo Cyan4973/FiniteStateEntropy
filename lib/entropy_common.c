@@ -58,7 +58,6 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
         memcpy(buffer, headerBuffer, hbSize);
         {   size_t const countSize = FSE_readNCount(normalizedCounter, maxSVPtr, tableLogPtr,
                                                     buffer, sizeof(buffer));
-            if (FSE_isError(countSize)) return countSize;
             if (countSize > hbSize) return ERROR(corruption_detected);
             return countSize;
     }   }
@@ -76,7 +75,7 @@ size_t FSE_readNCount (short* normalizedCounter, unsigned* maxSVPtr, unsigned* t
     threshold = 1<<nbBits;
     nbBits++;
 
-    while ((remaining>1) & (charnum<=*maxSVPtr)) {
+    while ((remaining>1) && (charnum<=*maxSVPtr)) {
         if (previous0) {
             unsigned n0 = charnum;
             while ((bitStream & 0xFFFF) == 0xFFFF) {
